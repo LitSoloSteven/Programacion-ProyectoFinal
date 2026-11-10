@@ -13,7 +13,26 @@ Aplicación académica de administración de alquileres. Esta entrega implementa
 
 Desde pgAdmin o psql, crear un usuario local con contraseña propia y una base llamada `latch_db` de su propiedad. No utilizar el superusuario de PostgreSQL para la aplicación.
 
-Variables de entorno para PowerShell:
+La aplicación carga automáticamente `.env` desde la raíz del proyecto. Copiar `.env.example` a `.env` si no existe y completar:
+
+```dotenv
+LATCH_DB_URL=jdbc:postgresql://localhost:5432/latch_db
+LATCH_DB_USER=tu_usuario_postgresql
+LATCH_DB_PASSWORD=tu_contraseña_postgresql
+LATCH_DB_SCHEMA_MODE=update
+```
+
+Ejecutar los comandos Maven desde la raíz del proyecto. En IntelliJ, establecer esa carpeta como directorio de trabajo. Usar `update` en la primera ejecución y cambiarlo a `validate` después de crear las tablas.
+
+Para comprobar la conexión y crear las tablas con `update`, ejecutar:
+
+```powershell
+./mvnw.cmd compile exec:java
+```
+
+Debe aparecer `Conexión con PostgreSQL verificada correctamente.`. Esta comprobación no crea una cuenta de la aplicación; para eso se utiliza el paso «Primer propietario» de abajo. La pantalla JavaFX sigue siendo la plantilla inicial hasta integrar los formularios.
+
+También se pueden usar variables de entorno para PowerShell; tienen prioridad sobre los valores del archivo:
 
 ```powershell
 $env:JAVA_HOME = 'C:/ruta/al/jdk-21'
@@ -26,7 +45,7 @@ $env:LATCH_DB_SCHEMA_MODE = 'update'
 
 `update` crea las tablas de esta entrega en una base de desarrollo. Después del primer inicio, usar `validate`, el valor predeterminado: verifica el esquema sin modificarlo. `none` desactiva esa verificación. No se aceptan `create` ni `create-drop` en la configuración de ejecución.
 
-La aplicación lee variables de entorno con `System.getenv`; no carga archivos `.env` automáticamente. El archivo `.env.example` sólo enumera las variables necesarias. No introducir credenciales ni parámetros en la URL JDBC; usuario y contraseña tienen sus propias variables.
+El archivo `.env` está ignorado por Git. Admite líneas `NOMBRE=valor`, líneas vacías, comentarios que empiezan con `#` y valores entre comillas simples o dobles. Los valores son literales: no se expanden variables ni secuencias de escape. No añadir comentarios al final de una credencial. No introducir credenciales ni parámetros en la URL JDBC; usuario y contraseña tienen sus propias variables.
 
 ## Primer propietario
 

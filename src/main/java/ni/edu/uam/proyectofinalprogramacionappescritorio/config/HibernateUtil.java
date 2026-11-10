@@ -4,14 +4,25 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.*;
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;
 import java.util.Properties;
+import java.nio.file.Path;
 
 public final class HibernateUtil {
     private static SessionFactory factory;
     private HibernateUtil() {}
 
+    public static void main(String[] args) {
+        try {
+            HibernateTransactions tx = new HibernateTransactions(getSessionFactory());
+            tx.ejecutar(session -> session.createQuery("select 1", Integer.class).getSingleResult());
+            System.out.println("Conexión con PostgreSQL verificada correctamente.");
+        } finally {
+            shutdown();
+        }
+    }
+
     public static synchronized SessionFactory getSessionFactory() {
         if (factory == null || factory.isClosed()) {
-            factory = construir(DatabaseConfig.desdeEntorno(System.getenv()));
+            factory = construir(DatabaseConfig.desdeArchivo(Path.of(".env"), System.getenv()));
         }
         return factory;
     }
