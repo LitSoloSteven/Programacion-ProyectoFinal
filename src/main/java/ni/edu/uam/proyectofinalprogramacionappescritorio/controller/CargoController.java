@@ -298,9 +298,11 @@ public class CargoController {
         cargoSeleccionado = null;
         if (!cmbContrato.getItems().isEmpty()) {
             cmbContrato.getSelectionModel().selectFirst();
+        } else {
+            cmbContrato.getSelectionModel().clearSelection();
         }
-        cmbTipo.getSelectionModel().selectFirst();
-        cmbEstado.getSelectionModel().selectFirst();
+        if (!cmbTipo.getItems().isEmpty()) cmbTipo.getSelectionModel().selectFirst();
+        if (!cmbEstado.getItems().isEmpty()) cmbEstado.getSelectionModel().selectFirst();
         txtImporte.clear();
         txtConcepto.clear();
         dpPeriodo.setValue(LocalDate.now().withDayOfMonth(1));

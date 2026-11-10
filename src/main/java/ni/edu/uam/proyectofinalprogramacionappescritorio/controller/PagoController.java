@@ -282,11 +282,13 @@ public class PagoController {
         pagoSeleccionado = null;
         if (!cmbContrato.getItems().isEmpty()) {
             cmbContrato.getSelectionModel().selectFirst();
+        } else {
+            cmbContrato.getSelectionModel().clearSelection();
         }
         txtMonto.clear();
-        cmbMoneda.getSelectionModel().selectFirst();
+        if (!cmbMoneda.getItems().isEmpty()) cmbMoneda.getSelectionModel().selectFirst();
         dpFechaPago.setValue(LocalDate.now());
-        cmbMetodo.getSelectionModel().selectFirst();
+        if (!cmbMetodo.getItems().isEmpty()) cmbMetodo.getSelectionModel().selectFirst();
         txtReferencia.clear();
         txtNotas.clear();
         tblPagos.getSelectionModel().clearSelection();

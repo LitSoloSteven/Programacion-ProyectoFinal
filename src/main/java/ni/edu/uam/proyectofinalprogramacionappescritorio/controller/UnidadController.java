@@ -272,10 +272,12 @@ public class UnidadController {
         txtCanon.clear();
         if (!cmbPropiedad.getItems().isEmpty()) {
             cmbPropiedad.getSelectionModel().selectFirst();
+        } else {
+            cmbPropiedad.getSelectionModel().clearSelection();
         }
-        cmbTipo.getSelectionModel().selectFirst();
-        cmbEstado.getSelectionModel().selectFirst();
-        cmbMoneda.getSelectionModel().selectFirst();
+        if (!cmbTipo.getItems().isEmpty()) cmbTipo.getSelectionModel().selectFirst();
+        if (!cmbEstado.getItems().isEmpty()) cmbEstado.getSelectionModel().selectFirst();
+        if (!cmbMoneda.getItems().isEmpty()) cmbMoneda.getSelectionModel().selectFirst();
         tblUnidades.getSelectionModel().clearSelection();
     }
 

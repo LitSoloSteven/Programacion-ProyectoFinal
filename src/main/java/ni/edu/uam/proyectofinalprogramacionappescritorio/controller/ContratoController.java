@@ -407,8 +407,8 @@ public class ContratoController {
         txtCanon.clear();
         txtDeposito.clear();
         txtDiaPago.setText("5");
-        cmbMoneda.getSelectionModel().selectFirst();
-        cmbEstado.setValue("Vigente");
+        if (!cmbMoneda.getItems().isEmpty()) cmbMoneda.getSelectionModel().selectFirst();
+        if (!cmbEstado.getItems().isEmpty()) cmbEstado.setValue("Vigente");
         tblContratos.getSelectionModel().clearSelection();
     }
 
