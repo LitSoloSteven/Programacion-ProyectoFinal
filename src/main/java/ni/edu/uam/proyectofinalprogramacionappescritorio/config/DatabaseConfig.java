@@ -3,9 +3,50 @@ package ni.edu.uam.proyectofinalprogramacionappescritorio.config;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.HashMap;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.NoSuchFileException;
+import java.nio.charset.StandardCharsets;
+import java.io.IOException;
 
 public final class DatabaseConfig {
     private DatabaseConfig() {}
+
+    public static Properties desdeArchivo(Path archivo, Map<String, String> entorno) {
+        Map<String, String> valores = new HashMap<>();
+        try {
+            int numero = 0;
+            for (String linea : Files.readAllLines(archivo, StandardCharsets.UTF_8)) {
+                numero++;
+                if (numero == 1 && linea.startsWith("\uFEFF")) linea = linea.substring(1);
+                linea = linea.strip();
+                if (linea.isEmpty() || linea.startsWith("#")) continue;
+                int separador = linea.indexOf('=');
+                if (separador < 1) throw lineaInvalida(numero);
+                String clave = linea.substring(0, separador).strip();
+                String valor = linea.substring(separador + 1).strip();
+                if (!clave.matches("[A-Za-z_][A-Za-z0-9_]*")) throw lineaInvalida(numero);
+                if (valor.startsWith("\"") || valor.startsWith("'")) {
+                    if (valor.length() < 2 || valor.charAt(valor.length() - 1) != valor.charAt(0)) {
+                        throw lineaInvalida(numero);
+                    }
+                    valor = valor.substring(1, valor.length() - 1);
+                }
+                valores.put(clave, valor);
+            }
+        } catch (NoSuchFileException e) {
+            // Sin archivo local, se conserva la configuración mediante variables del sistema.
+        } catch (IOException e) {
+            throw new IllegalStateException("No se pudo leer el archivo .env. Revisa sus permisos.");
+        }
+        valores.putAll(entorno);
+        return desdeEntorno(valores);
+    }
+
+    private static IllegalArgumentException lineaInvalida(int numero) {
+        return new IllegalArgumentException("Formato inválido en .env, línea " + numero + ". Usa NOMBRE=valor.");
+    }
 
     public static Properties desdeEntorno(Map<String, String> entorno) {
         String url = requerida(entorno, "LATCH_DB_URL");

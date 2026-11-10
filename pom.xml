@@ -71,6 +71,9 @@
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.5.0</version>
+                <configuration>
+                    <mainClass>ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil</mainClass>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
