@@ -1,5 +1,7 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.modelo;
 
+import jakarta.persistence.*;
+import org.hibernate.annotations.Immutable;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -11,16 +13,28 @@ import java.util.UUID;
  * Instantanea inmutable de una tasa NIO por USD, con su procedencia.
  * Una referencia informativa no puede usarse para convertir pagos.
  * El Service debe comprobar el permiso de Propietario antes de autorizar.
- * Este modelo aun no incluye el mapeo ORM ni acceso a servicios externos.
+ * Hibernate conserva cada registro; no se sobrescriben tasas anteriores.
  */
-public final class TipoCambio {
-    private final UUID id;
-    private final LocalDate fecha;
-    private final BigDecimal nioPorUsd;
-    private final String fuente;
-    private final Instant registradoEn;
-    private final UUID autorizadoPor;
-    private final String motivo;
+@Entity
+@Table(name = "tipo_cambio", schema = "latch")
+@Immutable
+public class TipoCambio {
+    @Id
+    private UUID id;
+    @Column(nullable = false)
+    private LocalDate fecha;
+    @Column(name = "nio_por_usd", nullable = false, precision = 19, scale = 8)
+    private BigDecimal nioPorUsd;
+    @Column(nullable = false, length = 500)
+    private String fuente;
+    @Column(name = "registrado_en", nullable = false)
+    private Instant registradoEn;
+    @Column(name = "autorizado_por")
+    private UUID autorizadoPor;
+    @Column(length = 500)
+    private String motivo;
+
+    protected TipoCambio() { }
 
     private TipoCambio(LocalDate fecha, BigDecimal tasa, String fuente,
                        Instant registradoEn, UUID autorizadoPor, String motivo) {
@@ -77,6 +91,9 @@ public final class TipoCambio {
     private static String texto(String valor, String campo) {
         if (valor == null || valor.trim().isEmpty()) {
             throw new IllegalArgumentException("Falta " + campo + ".");
+        }
+        if (valor.trim().length() > 500) {
+            throw new IllegalArgumentException("El campo supera 500 caracteres.");
         }
         return valor.trim();
     }
