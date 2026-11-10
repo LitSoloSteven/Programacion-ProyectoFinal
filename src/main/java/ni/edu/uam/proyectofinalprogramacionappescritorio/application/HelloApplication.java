@@ -1,4 +1,4 @@
-package ni.edu.uam.proyectofinalprogramacionappescritorio;
+package ni.edu.uam.proyectofinalprogramacionappescritorio.application;
 
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
