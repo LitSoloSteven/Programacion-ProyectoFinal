@@ -1,0 +1,11 @@
+target/
+.idea/
+*.iml
+.env
+.env.*
+!.env.example
+config/*.local.properties
+*.log
+*.hprof
+*.dump
+*.backup

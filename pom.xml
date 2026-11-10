@@ -12,6 +12,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.12.1</junit.version>
+        <maven.compiler.release>21</maven.compiler.release>
         <!-- Actualizado a Java 21 según el PRD -->
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
@@ -89,6 +90,7 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
                 <configuration>
+                    <release>21</release>
                     <source>21</source>
                     <target>21</target>
                     <!-- Configuración necesaria para que Lombok funcione al compilar -->
