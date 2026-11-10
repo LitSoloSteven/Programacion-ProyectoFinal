@@ -13,4 +13,6 @@ module ni.edu.uam.proyectofinalprogramacionappescritorio {
     opens ni.edu.uam.proyectofinalprogramacionappescritorio.entity to org.hibernate.orm.core;
     exports ni.edu.uam.proyectofinalprogramacionappescritorio.config;
     exports ni.edu.uam.proyectofinalprogramacionappescritorio.entity;
+    exports ni.edu.uam.proyectofinalprogramacionappescritorio.service;
+    exports ni.edu.uam.proyectofinalprogramacionappescritorio.util;
 }
