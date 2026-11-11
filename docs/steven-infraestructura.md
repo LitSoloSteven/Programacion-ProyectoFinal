@@ -28,7 +28,13 @@ sesion.close();
 
 La contraseña se recibe como `char[]`. El Controller debe limpiar el arreglo con `Arrays.fill(password, '\0')` después del login y vaciar el campo visual. La contraseña nunca se almacena en texto plano.
 
-## Contrato para Alfredo
+## Integración del modelo de propietario
+
+Los datos de contacto de `Propietario` viven en su propia entidad y se identifican con el mismo ID del usuario autenticado. Cada propiedad puede enlazar ese perfil. El formulario de propiedades crea o actualiza el perfil del usuario activo; un correo por perfil debe ser único. Para bases existentes, aplicar una vez `docs/migrations/V1__propietario_perfil.sql` antes de iniciar con `LATCH_DB_SCHEMA_MODE=validate`. Las propiedades anteriores conservan `propietario_id` nulo hasta que se editen.
+
+El depósito pactado continúa en el contrato. `Garantia` ahora mantiene por separado el monto inicial y el saldo retenido, que puede reducirse sin alterar el contrato. Los contratos previos se inicializan con el depósito pactado al aplicar `docs/migrations/V2__seguimiento_garantias.sql`; aplícala después de V1. Los nuevos contratos crean automáticamente su seguimiento con el saldo inicial igual al depósito pactado. `docs/migrations/V3__descripcion_unidad.sql` añade el campo de descripción de Alfredo. Aplicar V1, V2 y V3 en ese orden antes de iniciar una base existente con modo `validate`.
+
+## Contrato de integración para Alfredo
 
 - Registrar cada nueva entidad en el método `HibernateUtil.construir`, junto con las tres existentes. Al construir una factory aislada también se pueden pasar entidades adicionales como argumentos.
 - El DAO recibe una `Session`; no la abre ni la cierra y no hace commit.
