@@ -24,7 +24,9 @@ public final class AutenticacionService {
             boolean valido = passwords.verificar(password, usuario == null ? hashInexistente : usuario.getPasswordHash());
             if (!valido || usuario == null || !usuario.isActivo()) throw credencialesInvalidas();
             auditoria.registrar(session, usuario, UUID.randomUUID(), "INICIO_SESION", "usuario:" + usuario.getId());
-            return new SesionUsuario(usuario.getId(), usuario.getNombre(), usuario.getRol());
+            SesionUsuario identidad = new SesionUsuario(usuario.getId(), usuario.getNombre(), usuario.getRol());
+            SesionUsuario.establecer(identidad);
+            return identidad;
         });
     }
 

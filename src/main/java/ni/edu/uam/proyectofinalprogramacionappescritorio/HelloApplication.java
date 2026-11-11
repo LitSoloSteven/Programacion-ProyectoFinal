@@ -34,9 +34,11 @@ public class HelloApplication extends Application {
 
     @Override
     public void start(Stage stage) throws IOException {
-        FXMLLoader fxmlLoader = new FXMLLoader(HelloApplication.class.getResource("hello-view.fxml"));
-        Scene scene = new Scene(fxmlLoader.load(), 320, 240);
-        stage.setTitle("Hello!");
+        FXMLLoader fxmlLoader = new FXMLLoader(HelloApplication.class.getResource("login-view.fxml"));
+        Scene scene = new Scene(fxmlLoader.load(), 850, 620);
+        var css = HelloApplication.class.getResource("estilos.css");
+        if (css != null) scene.getStylesheets().add(css.toExternalForm());
+        stage.setTitle("Latch — Iniciar sesión");
         stage.setScene(scene);
         stage.show();
     }
