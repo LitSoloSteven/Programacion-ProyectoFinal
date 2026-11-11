@@ -1,6 +1,5 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.dao;
 
-import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelos.Unidad;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
