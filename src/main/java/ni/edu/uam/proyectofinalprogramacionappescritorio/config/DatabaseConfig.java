@@ -9,47 +9,62 @@ import java.util.Properties;
 
 public final class DatabaseConfig {
 
-    private DatabaseConfig() {
-        // Constructor privado
-    }
+    private DatabaseConfig() {}
 
-    // 1. Método requerido por HibernateUtil (Lee el archivo .env)
     public static Properties desdeArchivo(Path envPath, Map<String, String> systemEnv) {
-        Map<String, String> envMap = new HashMap<>(systemEnv);
+        Map<String, String> mergedEnv = new HashMap<>();
 
         if (Files.exists(envPath)) {
             try {
                 Files.readAllLines(envPath).forEach(line -> {
-                    // Ignora comentarios y líneas vacías
-                    if (line.contains("=") && !line.trim().startsWith("#")) {
-                        String[] parts = line.split("=", 2);
-                        envMap.put(parts[0].trim(), parts[1].trim());
+                    // Limpiar BOM (Byte Order Mark) y espacios
+                    String cleanLine = line.replace("\uFEFF", "").trim();
+                    if (cleanLine.contains("=") && !cleanLine.startsWith("#")) {
+                        String[] parts = cleanLine.split("=", 2);
+                        // Limpiar comillas iniciales y finales
+                        String value = parts[1].trim().replaceAll("^\"|\"$", "");
+                        mergedEnv.put(parts[0].trim(), value);
                     }
                 });
             } catch (IOException e) {
-                System.err.println("Advertencia: No se pudo leer el archivo .env - " + e.getMessage());
+                System.err.println("Advertencia: No se pudo leer el archivo .env");
             }
         }
-        return desdeEntorno(envMap);
+        // Las variables del sistema pisan a las del .env (Prioridad correcta)
+        mergedEnv.putAll(systemEnv);
+        return desdeEntorno(mergedEnv);
     }
 
-    // 2. Configura las propiedades de Hibernate usando las variables extraídas
     public static Properties desdeEntorno(Map<String, String> env) {
-        Properties properties = new Properties();
+        String url = env.get("DB_URL");
+        String user = env.get("DB_USER");
+        String password = env.get("DB_PASSWORD");
+        String schemaMode = env.getOrDefault("DB_SCHEMA_MODE", "validate");
 
+        // Validaciones estrictas requeridas por las pruebas
+        if (url == null || url.trim().isEmpty()) {
+            throw new IllegalArgumentException("La variable DB_URL es obligatoria");
+        }
+        if (user == null || password == null) {
+            throw new IllegalArgumentException("Las credenciales (DB_USER, DB_PASSWORD) son obligatorias");
+        }
+        if (schemaMode.contains("create")) {
+            throw new IllegalArgumentException("Modo de esquema peligroso. No se permite 'create' o 'create-drop'");
+        }
+
+        Properties properties = new Properties();
         properties.put("hibernate.connection.driver_class", "org.postgresql.Driver");
         properties.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
+        properties.put("hibernate.connection.url", url);
+        properties.put("hibernate.connection.username", user);
+        properties.put("hibernate.connection.password", password);
+        properties.put("hibernate.hbm2ddl.auto", schemaMode);
 
-        // Ahora busca exactamente los nombres que pusiste en tu .env
-        properties.put("hibernate.connection.url", env.getOrDefault("LATCH_DB_URL", "jdbc:postgresql://localhost:5432/latch_db"));
-        properties.put("hibernate.connection.username", env.getOrDefault("LATCH_DB_USER", "postgres"));
-        properties.put("hibernate.connection.password", env.getOrDefault("LATCH_DB_PASSWORD", "postgres"));
-
-        // Generación automática de tablas usando tu variable
-        properties.put("hibernate.hbm2ddl.auto", env.getOrDefault("LATCH_DB_SCHEMA_MODE", "update"));
-
-        properties.put("hibernate.show_sql", "true");
-        properties.put("hibernate.format_sql", "true");
+        // Restaurar ajustes de rendimiento y seguridad de Steven
+        properties.put("hibernate.connection.autocommit", "false");
+        properties.put("hibernate.jdbc.time_zone", "UTC");
+        properties.put("hibernate.c3p0.timeout", "300");
+        properties.put("hibernate.show_sql", "false");
         properties.put("hibernate.current_session_context_class", "thread");
 
         return properties;

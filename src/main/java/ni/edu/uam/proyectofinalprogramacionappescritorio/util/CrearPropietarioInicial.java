@@ -1,6 +1,7 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.util;
 
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelos.Rol;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelos.Usuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.AuditoriaService;

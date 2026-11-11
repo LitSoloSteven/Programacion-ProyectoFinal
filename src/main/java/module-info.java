@@ -1,5 +1,4 @@
 module ni.edu.uam.proyectofinalprogramacionappescritorio {
-    // JavaFX
     requires javafx.controls;
     requires javafx.fxml;
     requires jakarta.persistence;
@@ -7,33 +6,17 @@ module ni.edu.uam.proyectofinalprogramacionappescritorio {
     requires java.sql;
     requires java.naming;
     requires org.postgresql.jdbc;
-
-    // Persistencia y Base de Datos (Hibernate y PostgreSQL)
-    requires jakarta.persistence;
-    requires org.hibernate.orm.core;
-    requires java.sql;
-    requires java.naming;
-
-    // Integración y Utilidades
     requires com.google.gson;
     requires static lombok;
 
-    opens ni.edu.uam.proyectofinalprogramacionappescritorio to javafx.fxml;
-    exports ni.edu.uam.proyectofinalprogramacionappescritorio;
-    opens ni.edu.uam.proyectofinalprogramacionappescritorio.entity to org.hibernate.orm.core;
-    exports ni.edu.uam.proyectofinalprogramacionappescritorio.config;
-    exports ni.edu.uam.proyectofinalprogramacionappescritorio.entity;
-    exports ni.edu.uam.proyectofinalprogramacionappescritorio.service;
-    exports ni.edu.uam.proyectofinalprogramacionappescritorio.util;
-    // 1. Permisos para la aplicación principal
     exports ni.edu.uam.proyectofinalprogramacionappescritorio.application;
     opens ni.edu.uam.proyectofinalprogramacionappescritorio.application to javafx.fxml;
 
-    // 2. Permisos para los controladores (necesario para JavaFX)
-    exports ni.edu.uam.proyectofinalprogramacionappescritorio.controllers;
-    opens ni.edu.uam.proyectofinalprogramacionappescritorio.controllers to javafx.fxml;
+    exports ni.edu.uam.proyectofinalprogramacionappescritorio.config;
+    exports ni.edu.uam.proyectofinalprogramacionappescritorio.service;
+    exports ni.edu.uam.proyectofinalprogramacionappescritorio.util;
+    exports ni.edu.uam.proyectofinalprogramacionappescritorio.dao;
 
-    // 3. Permisos críticos para Hibernate sobre tus modelos
     exports ni.edu.uam.proyectofinalprogramacionappescritorio.modelos;
     opens ni.edu.uam.proyectofinalprogramacionappescritorio.modelos to org.hibernate.orm.core, javafx.base;
 }
