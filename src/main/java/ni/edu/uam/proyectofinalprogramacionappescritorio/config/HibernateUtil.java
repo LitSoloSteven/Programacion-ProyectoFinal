@@ -1,6 +1,8 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.config;
 
-import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.*;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelos.Auditoria;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelos.Configuracion;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelos.Usuario;
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;
 import java.util.Properties;

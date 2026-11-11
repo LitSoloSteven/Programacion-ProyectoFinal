@@ -1,6 +1,5 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.service;
 
-import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.Rol;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class SesionUsuario implements AutoCloseable {

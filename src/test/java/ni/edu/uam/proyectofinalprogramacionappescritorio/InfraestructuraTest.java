@@ -1,7 +1,10 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio;
 
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.*;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.*;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelos.Auditoria;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelos.Configuracion;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelos.Rol;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelos.Usuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.*;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PasswordHasher;
 import org.hibernate.Session;
