@@ -49,6 +49,12 @@ public final class TipoCambioService {
                 new IllegalStateException("No hay tasa autorizada para la fecha del pago."));
     }
 
+    public TipoCambio consultarInformativa(ClienteTipoCambio cliente)
+            throws java.io.IOException, InterruptedException {
+        exigirUsuario();
+        return Objects.requireNonNull(cliente).consultar();
+    }
+
     private Usuario exigirUsuario() {
         Usuario actor = usuarioActual.get();
         if (actor == null || !actor.isActivo() || actor.getId() == null
