@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="ni.edu.uam.proyectofinalprogramacionappescritorio.controller.DashboardController"
+            prefHeight="720.0" prefWidth="1100.0" styleClass="dashboard-root">
+
+    <!-- BARRA LATERAL (SIDEBAR) -->
+    <left>
+        <VBox prefWidth="250.0" spacing="12.0" styleClass="sidebar">
+            <padding>
+                <Insets bottom="20.0" left="16.0" right="16.0" top="24.0" />
+            </padding>
+
+            <!-- LOGO / MARCA -->
+            <VBox spacing="4.0">
+                <Label styleClass="sidebar-brand" text="Latch" />
+                <Label styleClass="sidebar-subtitle" text="Gestión Inmobiliaria UAM" />
+            </VBox>
+
+            <Separator styleClass="sidebar-sep" />
+
+            <!-- PERFIL DE USUARIO / ROL -->
+            <VBox spacing="4.0" styleClass="user-profile-box">
+                <Label fx:id="lblUsuarioNombre" styleClass="user-name" text="Administrador" />
+                <HBox alignment="CENTER_LEFT" spacing="6.0">
+                    <Label fx:id="lblUsuarioRol" styleClass="role-badge" text="Propietario" />
+                </HBox>
+            </VBox>
+
+            <Separator styleClass="sidebar-sep" />
+
+            <!-- MENÚ DE NAVEGACIÓN -->
+            <VBox spacing="6.0" VBox.vgrow="ALWAYS">
+                <Button fx:id="btnNavDashboard" maxWidth="Infinity" onAction="#navegarDashboard"
+                        styleClass="nav-btn, nav-btn-active" text="📊  Panel Principal" />
+                <Button fx:id="btnNavPropiedades" maxWidth="Infinity" onAction="#navegarPropiedades"
+                        styleClass="nav-btn" text="🏢  Propiedades" />
+                <Button fx:id="btnNavUnidades" maxWidth="Infinity" onAction="#navegarUnidades"
+                        styleClass="nav-btn" text="🚪  Unidades" />
+                <Button fx:id="btnNavInquilinos" maxWidth="Infinity" onAction="#navegarInquilinos"
+                        styleClass="nav-btn" text="👥  Inquilinos" />
+                <Button fx:id="btnNavContratos" maxWidth="Infinity" onAction="#navegarContratos"
+                        styleClass="nav-btn" text="📄  Contratos" />
+                <Button fx:id="btnNavCargos" maxWidth="Infinity" onAction="#navegarCargos"
+                        styleClass="nav-btn" text="📑  Cargos" />
+                <Button fx:id="btnNavPagos" maxWidth="Infinity" onAction="#navegarPagos"
+                        styleClass="nav-btn" text="💵  Pagos" />
+            </VBox>
+
+            <!-- CERRAR SESIÓN -->
+            <Button fx:id="btnCerrarSesion" maxWidth="Infinity" onAction="#handleCerrarSesion"
+                    styleClass="btn-logout" text="🚪  Cerrar Sesión" />
+        </VBox>
+    </left>
+
+    <!-- ÁREA DE CONTENIDO CENTRAL -->
+    <center>
+        <StackPane fx:id="contentArea" styleClass="content-area">
+            <!-- VISTA POR DEFECTO: MÉTRICAS DEL DASHBOARD -->
+            <VBox fx:id="homeView" spacing="24.0">
+                <padding>
+                    <Insets bottom="28.0" left="32.0" right="32.0" top="28.0" />
+                </padding>
+
+                <!-- ENCABEZADO SUPERIOR -->
+                <HBox alignment="CENTER_LEFT">
+                    <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                        <Label styleClass="page-title" text="Panel de Control General" />
+                        <Label styleClass="page-subtitle" text="Resumen de actividad e indicadores en tiempo real de PostgreSQL" />
+                    </VBox>
+                    <Button onAction="#actualizarMetricas" styleClass="btn-secondary" text="🔄 Actualizar Datos" />
+                </HBox>
+
+                <!-- TARJETAS DE MÉTRICAS (KPIs) -->
+                <GridPane hgap="18.0" vgap="18.0">
+                    <columnConstraints>
+                        <ColumnConstraints percentWidth="33.33" />
+                        <ColumnConstraints percentWidth="33.33" />
+                        <ColumnConstraints percentWidth="33.33" />
+                    </columnConstraints>
+
+                    <!-- Tarjeta 1: Propiedades -->
+                    <VBox styleClass="kpi-card, kpi-blue" GridPane.columnIndex="0" GridPane.rowIndex="0">
+                        <Label styleClass="kpi-title" text="PROPIEDADES ACTIVAS" />
+                        <Label fx:id="lblTotalPropiedades" styleClass="kpi-value" text="0" />
+                        <Label styleClass="kpi-desc" text="Edificios y residencias registradas" />
+                    </VBox>
+
+                    <!-- Tarjeta 2: Unidades -->
+                    <VBox styleClass="kpi-card, kpi-teal" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                        <Label styleClass="kpi-title" text="UNIDADES EN INVENTARIO" />
+                        <Label fx:id="lblTotalUnidades" styleClass="kpi-value" text="0" />
+                        <Label styleClass="kpi-desc" text="Apartamentos, casas y locales" />
+                    </VBox>
+
+                    <!-- Tarjeta 3: Inquilinos -->
+                    <VBox styleClass="kpi-card, kpi-green" GridPane.columnIndex="2" GridPane.rowIndex="0">
+                        <Label styleClass="kpi-title" text="INQUILINOS ACTIVOS" />
+                        <Label fx:id="lblTotalInquilinos" styleClass="kpi-value" text="0" />
+                        <Label styleClass="kpi-desc" text="Arrendatarios con registro vigente" />
+                    </VBox>
+
+                    <!-- Tarjeta 4: Contratos -->
+                    <VBox styleClass="kpi-card, kpi-purple" GridPane.columnIndex="0" GridPane.rowIndex="1">
+                        <Label styleClass="kpi-title" text="CONTRATOS VIGENTES" />
+                        <Label fx:id="lblTotalContratos" styleClass="kpi-value" text="0" />
+                        <Label styleClass="kpi-desc" text="Arrendamientos en curso" />
+                    </VBox>
+
+                    <!-- Tarjeta 5: Cargos Pendientes -->
+                    <VBox styleClass="kpi-card, kpi-amber" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                        <Label styleClass="kpi-title" text="CARGOS PENDIENTES" />
+                        <Label fx:id="lblCargosPendientes" styleClass="kpi-value" text="0" />
+                        <Label fx:id="lblCargosMonto" styleClass="kpi-desc" text="Total: $0.00" />
+                    </VBox>
+
+                    <!-- Tarjeta 6: Pagos Registrados -->
+                    <VBox styleClass="kpi-card, kpi-emerald" GridPane.columnIndex="2" GridPane.rowIndex="1">
+                        <Label styleClass="kpi-title" text="PAGOS REGISTRADOS" />
+                        <Label fx:id="lblPagosRegistrados" styleClass="kpi-value" text="0" />
+                        <Label fx:id="lblPagosMonto" styleClass="kpi-desc" text="Total: $0.00" />
+                    </VBox>
+                </GridPane>
+
+                <!-- BANNER DE BIENVENIDA / GUÍA -->
+                <VBox spacing="8.0" styleClass="welcome-banner">
+                    <Label styleClass="welcome-title" text="Bienvenido al entorno de gestión inmobiliaria Latch" />
+                    <Label styleClass="welcome-text"
+                           text="Utilice el menú lateral para acceder a la gestión de Propiedades, Unidades, Inquilinos, Contratos, Cargos y Pagos. Las operaciones respetan los permisos de rol Propietario y Asistente y sincronizan automáticamente contra PostgreSQL."
+                           wrapText="true" />
+                </VBox>
+            </VBox>
+        </StackPane>
+    </center>
+
+</BorderPane>
