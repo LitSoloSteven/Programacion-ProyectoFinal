@@ -13,6 +13,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.12.1</junit.version>
         <maven.compiler.release>21</maven.compiler.release>
+        <exec.mainClass>ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil</exec.mainClass>
     </properties>
 
     <dependencies>
@@ -72,7 +73,7 @@
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.5.0</version>
                 <configuration>
-                    <mainClass>ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil</mainClass>
+                    <mainClass>${exec.mainClass}</mainClass>
                 </configuration>
             </plugin>
             <plugin>
