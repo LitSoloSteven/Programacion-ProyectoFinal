@@ -1,4 +1,4 @@
-package ni.edu.uam.proyectofinalprogramacionappescritorio.application;
+package ni.edu.uam.proyectofinalprogramacionappescritorio;
 
 import javafx.application.Application;
 

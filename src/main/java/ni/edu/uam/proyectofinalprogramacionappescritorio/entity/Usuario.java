@@ -1,4 +1,4 @@
-package ni.edu.uam.proyectofinalprogramacionappescritorio.modelos;
+package ni.edu.uam.proyectofinalprogramacionappescritorio.entity;
 
 import jakarta.persistence.*;
 import java.util.Locale;

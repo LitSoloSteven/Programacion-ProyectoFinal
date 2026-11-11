@@ -1,4 +1,4 @@
-package ni.edu.uam.proyectofinalprogramacionappescritorio.application;
+package ni.edu.uam.proyectofinalprogramacionappescritorio;
 
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
@@ -7,8 +7,6 @@ import javafx.stage.Stage;
 
 import java.io.IOException;
 import java.time.Duration;
-
-// 1. Importación corregida de HibernateUtil
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasSegundoPlano;
 
@@ -28,7 +26,6 @@ public class HelloApplication extends Application {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } finally {
-                // Ahora esta línea compilará correctamente
                 HibernateUtil.shutdown();
             }
         }, "latch-cierre");
@@ -37,16 +34,10 @@ public class HelloApplication extends Application {
 
     @Override
     public void start(Stage stage) throws IOException {
-        // 2. Preparar el cargador para la vista real (Caleb deberá crear Login.fxml en la carpeta resources adecuada)
-        // Por ahora, dejamos hello-view.fxml si Caleb aún no crea el Login, pero ajustamos la ventana.
-        FXMLLoader fxmlLoader = new FXMLLoader(HelloApplication.class.getResource("/ni/edu/uam/proyectofinalprogramacionappescritorio/hello-view.fxml"));
-
-        // Ajustamos la resolución a un tamaño de escritorio realista
-        Scene scene = new Scene(fxmlLoader.load(), 1024, 768);
-
-        stage.setTitle("Latch - Administración de Alquileres");
+        FXMLLoader fxmlLoader = new FXMLLoader(HelloApplication.class.getResource("hello-view.fxml"));
+        Scene scene = new Scene(fxmlLoader.load(), 320, 240);
+        stage.setTitle("Hello!");
         stage.setScene(scene);
-        stage.centerOnScreen();
         stage.show();
     }
 }

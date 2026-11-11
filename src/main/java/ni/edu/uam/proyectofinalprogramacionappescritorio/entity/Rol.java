@@ -1,4 +1,4 @@
-package ni.edu.uam.proyectofinalprogramacionappescritorio.modelos;
+package ni.edu.uam.proyectofinalprogramacionappescritorio.entity;
 
 public final class Rol {
     public static final String PROPIETARIO = "PROPIETARIO";

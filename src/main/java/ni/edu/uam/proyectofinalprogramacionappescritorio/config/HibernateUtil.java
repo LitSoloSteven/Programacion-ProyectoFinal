@@ -1,7 +1,6 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.config;
 
-// Importa todas las entidades
-import ni.edu.uam.proyectofinalprogramacionappescritorio.modelos.*;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.*;
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;
 import java.util.Properties;
@@ -30,22 +29,9 @@ public final class HibernateUtil {
 
     public static SessionFactory construir(Properties properties, Class<?>... entidadesAdicionales) {
         Configuration cfg = new Configuration().addProperties(properties)
-                // Entidades de Seguridad y Configuración (Steven)
-                .addAnnotatedClass(Usuario.class)
-                .addAnnotatedClass(Auditoria.class)
-                .addAnnotatedClass(Configuracion.class)
-                // TUS ENTIDADES (Inventario, Alquiler y Finanzas)
-                .addAnnotatedClass(Propietario.class)
-                .addAnnotatedClass(Propiedad.class)
-                .addAnnotatedClass(Unidad.class)
-                .addAnnotatedClass(Inquilino.class)
-                .addAnnotatedClass(Contrato.class)
-                .addAnnotatedClass(Cargo.class)
-                .addAnnotatedClass(Pago.class)
-                .addAnnotatedClass(Garantia.class);
-
+                .addAnnotatedClass(Usuario.class).addAnnotatedClass(Auditoria.class)
+                .addAnnotatedClass(Configuracion.class);
         for (Class<?> entidad : entidadesAdicionales) cfg.addAnnotatedClass(entidad);
-
         try {
             return cfg.buildSessionFactory();
         } catch (RuntimeException e) {
