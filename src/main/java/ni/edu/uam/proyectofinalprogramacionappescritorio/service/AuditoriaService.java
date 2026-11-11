@@ -1,7 +1,7 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.service;
 
-import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.Auditoria;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.Usuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelos.Auditoria;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelos.Usuario;
 import org.hibernate.Session;
 import java.util.UUID;
 

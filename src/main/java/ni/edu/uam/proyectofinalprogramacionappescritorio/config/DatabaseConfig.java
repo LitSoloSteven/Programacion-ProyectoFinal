@@ -2,80 +2,41 @@ package ni.edu.uam.proyectofinalprogramacionappescritorio.config;
 
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
-import java.util.HashMap;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.NoSuchFileException;
-import java.nio.charset.StandardCharsets;
-import java.io.IOException;
 
 public final class DatabaseConfig {
-    private DatabaseConfig() {}
 
-    public static Properties desdeArchivo(Path archivo, Map<String, String> entorno) {
-        Map<String, String> valores = new HashMap<>();
-        try {
-            int numero = 0;
-            for (String linea : Files.readAllLines(archivo, StandardCharsets.UTF_8)) {
-                numero++;
-                if (numero == 1 && linea.startsWith("\uFEFF")) linea = linea.substring(1);
-                linea = linea.strip();
-                if (linea.isEmpty() || linea.startsWith("#")) continue;
-                int separador = linea.indexOf('=');
-                if (separador < 1) throw lineaInvalida(numero);
-                String clave = linea.substring(0, separador).strip();
-                String valor = linea.substring(separador + 1).strip();
-                if (!clave.matches("[A-Za-z_][A-Za-z0-9_]*")) throw lineaInvalida(numero);
-                if (valor.startsWith("\"") || valor.startsWith("'")) {
-                    if (valor.length() < 2 || valor.charAt(valor.length() - 1) != valor.charAt(0)) {
-                        throw lineaInvalida(numero);
-                    }
-                    valor = valor.substring(1, valor.length() - 1);
-                }
-                valores.put(clave, valor);
-            }
-        } catch (NoSuchFileException e) {
-            // Sin archivo local, se conserva la configuración mediante variables del sistema.
-        } catch (IOException e) {
-            throw new IllegalStateException("No se pudo leer el archivo .env. Revisa sus permisos.");
-        }
-        valores.putAll(entorno);
-        return desdeEntorno(valores);
+    private DatabaseConfig() {
+        // Constructor privado para ocultar el implícito público
     }
 
-    private static IllegalArgumentException lineaInvalida(int numero) {
-        return new IllegalArgumentException("Formato inválido en .env, línea " + numero + ". Usa NOMBRE=valor.");
-    }
+    public static Properties desdeEntorno(Map<String, String> env) {
+        Properties properties = new Properties();
 
-    public static Properties desdeEntorno(Map<String, String> entorno) {
-        String url = requerida(entorno, "LATCH_DB_URL");
-        // Impide introducir credenciales en la URL, que Hibernate puede escribir en logs.
-        if (!url.matches("jdbc:postgresql://[^?@]+/[a-zA-Z0-9_-]+")) {
-            throw new IllegalArgumentException("LATCH_DB_URL debe ser jdbc:postgresql://host:puerto/base, sin credenciales ni parámetros.");
-        }
-        String schema = entorno.getOrDefault("LATCH_DB_SCHEMA_MODE", "validate");
-        if (!Set.of("validate", "update", "none").contains(schema)) {
-            throw new IllegalArgumentException("LATCH_DB_SCHEMA_MODE debe ser validate, update o none.");
-        }
-        Properties p = new Properties();
-        p.setProperty("hibernate.connection.driver_class", "org.postgresql.Driver");
-        p.setProperty("hibernate.connection.url", url);
-        p.setProperty("hibernate.connection.username", requerida(entorno, "LATCH_DB_USER"));
-        p.setProperty("hibernate.connection.password", requerida(entorno, "LATCH_DB_PASSWORD"));
-        p.setProperty("hibernate.hbm2ddl.auto", schema);
-        p.setProperty("hibernate.jdbc.time_zone", "UTC");
-        p.setProperty("hibernate.show_sql", "false");
-        p.setProperty("hibernate.connection.pool_size", "5");
-        p.setProperty("hibernate.connection.autocommit", "false");
-        p.setProperty("hibernate.connection.connectTimeout", "5");
-        p.setProperty("hibernate.connection.socketTimeout", "10");
-        return p;
-    }
+        // 1. Configuración del driver y base de datos (PostgreSQL 18 / pgJDBC 42.7.14)
+        properties.put("hibernate.connection.driver_class", "org.postgresql.Driver");
+        properties.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
 
-    private static String requerida(Map<String, String> entorno, String clave) {
-        String valor = entorno.get(clave);
-        if (valor == null || valor.isBlank()) throw new IllegalArgumentException("Falta configurar " + clave + ".");
-        return valor;
+        // 2. URL de conexión (Busca variable de entorno, si no existe usa la local)
+        // Asegúrate de haber creado la base de datos "latch_db" en pgAdmin primero.
+        String dbUrl = env.getOrDefault("DB_URL", "jdbc:postgresql://localhost:5432/latch_db");
+        properties.put("hibernate.connection.url", dbUrl);
+
+        // 3. Credenciales (Busca variables de entorno, si no usa las tuyas locales)
+        // Cambia "postgres" por tu usuario y contraseña real de tu PostgreSQL local.
+        properties.put("hibernate.connection.username", env.getOrDefault("DB_USER", "postgres"));
+        properties.put("hibernate.connection.password", env.getOrDefault("DB_PASSWORD", "1234"));
+
+        // 4. ¡INSTRUCCIÓN DEL PROFESOR!: Autogeneración de tablas
+        // "update" crea las tablas si no existen y las actualiza si añades nuevos campos a los modelos.
+        properties.put("hibernate.hbm2ddl.auto", "update");
+
+        // 5. Opciones de depuración (Muy útiles para ver qué hace Hibernate por debajo)
+        properties.put("hibernate.show_sql", "true"); // Imprime el SQL generado en la consola
+        properties.put("hibernate.format_sql", "true"); // Lo formatea para que sea fácil de leer
+
+        // 6. Contexto de hilo para transacciones
+        properties.put("hibernate.current_session_context_class", "thread");
+
+        return properties;
     }
 }
