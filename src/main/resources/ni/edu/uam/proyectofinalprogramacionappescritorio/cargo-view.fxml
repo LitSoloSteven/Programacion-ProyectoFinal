@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="ni.edu.uam.proyectofinalprogramacionappescritorio.controller.CargoController"
+      spacing="18.0" styleClass="view-container">
+
+    <padding>
+        <Insets bottom="24.0" left="28.0" right="28.0" top="24.0" />
+    </padding>
+
+    <!-- ENCABEZADO -->
+    <HBox alignment="CENTER_LEFT" spacing="12.0">
+        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+            <Label styleClass="page-title" text="📑 Gestión de Cargos y Cobros" />
+            <Label styleClass="page-subtitle" text="Emisión y control de obligaciones financieras por contrato en PostgreSQL" />
+        </VBox>
+        <Button onAction="#refrescarTabla" styleClass="btn-secondary" text="🔄 Refrescar" />
+    </HBox>
+
+    <!-- FORMULARIO DE REGISTRO / EDICIÓN -->
+    <VBox spacing="14.0" styleClass="form-card">
+        <Label styleClass="form-card-title" text="Datos de la Obligación / Cargo" />
+
+        <GridPane hgap="16.0" vgap="12.0">
+            <columnConstraints>
+                <ColumnConstraints percentWidth="40.0" />
+                <ColumnConstraints percentWidth="20.0" />
+                <ColumnConstraints percentWidth="20.0" />
+                <ColumnConstraints percentWidth="20.0" />
+            </columnConstraints>
+
+            <!-- Fila 0 -->
+            <VBox spacing="4.0" GridPane.columnIndex="0" GridPane.rowIndex="0">
+                <Label styleClass="form-label" text="Contrato / Inquilino *" />
+                <ComboBox fx:id="cmbContrato" maxWidth="Infinity" promptText="Seleccione contrato..." />
+            </VBox>
+
+            <VBox spacing="4.0" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                <Label styleClass="form-label" text="Tipo de Cargo *" />
+                <ComboBox fx:id="cmbTipo" maxWidth="Infinity" />
+            </VBox>
+
+            <VBox spacing="4.0" GridPane.columnIndex="2" GridPane.rowIndex="0">
+                <Label styleClass="form-label" text="Importe ($) *" />
+                <TextField fx:id="txtImporte" promptText="ej. 450.00" />
+            </VBox>
+
+            <VBox spacing="4.0" GridPane.columnIndex="3" GridPane.rowIndex="0">
+                <Label styleClass="form-label" text="Estado *" />
+                <ComboBox fx:id="cmbEstado" maxWidth="Infinity" />
+            </VBox>
+
+            <!-- Fila 1 -->
+            <VBox spacing="4.0" GridPane.columnIndex="0" GridPane.rowIndex="1">
+                <Label styleClass="form-label" text="Concepto o Descripción *" />
+                <TextField fx:id="txtConcepto" promptText="ej. Renta correspondiente al mes de mayo" />
+            </VBox>
+
+            <VBox spacing="4.0" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                <Label styleClass="form-label" text="Periodo Facturación *" />
+                <DatePicker fx:id="dpPeriodo" maxWidth="Infinity" />
+            </VBox>
+
+            <VBox spacing="4.0" GridPane.columnIndex="2" GridPane.rowIndex="1">
+                <Label styleClass="form-label" text="Fecha de Emisión *" />
+                <DatePicker fx:id="dpFechaEmision" maxWidth="Infinity" />
+            </VBox>
+
+            <VBox spacing="4.0" GridPane.columnIndex="3" GridPane.rowIndex="1">
+                <Label styleClass="form-label" text="Fecha de Vencimiento *" />
+                <DatePicker fx:id="dpVenceEl" maxWidth="Infinity" />
+            </VBox>
+        </GridPane>
+
+        <!-- BOTONES DE ACCIÓN -->
+        <HBox alignment="CENTER_RIGHT" spacing="10.0">
+            <Button onAction="#limpiarFormulario" styleClass="btn-secondary" text="Limpiar Formulario" />
+            <Button fx:id="btnEliminar" onAction="#handleEliminar" styleClass="btn-danger" text="Eliminar Cargo" />
+            <Button onAction="#handleGuardar" styleClass="btn-primary" text="Guardar Cargo" />
+        </HBox>
+    </VBox>
+
+    <!-- TABLA DE CARGOS -->
+    <VBox spacing="8.0" VBox.vgrow="ALWAYS">
+        <HBox alignment="CENTER_LEFT" spacing="12.0">
+            <Label styleClass="table-title" text="Cargos Registrados" HBox.hgrow="ALWAYS" />
+            <TextField fx:id="txtBuscar" promptText="🔍 Buscar por contrato o concepto..." prefWidth="320.0" />
+        </HBox>
+
+        <TableView fx:id="tblCargos" VBox.vgrow="ALWAYS">
+            <columns>
+                <TableColumn fx:id="colContrato" prefWidth="260.0" text="Contrato / Inquilino" />
+                <TableColumn fx:id="colTipo" prefWidth="120.0" text="Tipo" />
+                <TableColumn fx:id="colConcepto" prefWidth="240.0" text="Concepto" />
+                <TableColumn fx:id="colImporte" prefWidth="110.0" text="Importe" />
+                <TableColumn fx:id="colVence" prefWidth="110.0" text="Vence el" />
+                <TableColumn fx:id="colEstado" prefWidth="110.0" text="Estado" />
+            </columns>
+            <placeholder>
+                <Label text="No hay cargos registrados en PostgreSQL." />
+            </placeholder>
+        </TableView>
+    </VBox>
+
+</VBox>

@@ -1,6 +1,7 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.config;
 
 import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.*;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.*;
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;
 import java.util.Properties;
@@ -30,7 +31,12 @@ public final class HibernateUtil {
     public static SessionFactory construir(Properties properties, Class<?>... entidadesAdicionales) {
         Configuration cfg = new Configuration().addProperties(properties)
                 .addAnnotatedClass(Usuario.class).addAnnotatedClass(Auditoria.class)
-                .addAnnotatedClass(Configuracion.class);
+                .addAnnotatedClass(Configuracion.class)
+                .addAnnotatedClass(Propiedad.class).addAnnotatedClass(Unidad.class)
+                .addAnnotatedClass(Propietario.class).addAnnotatedClass(Garantia.class)
+                .addAnnotatedClass(Inquilino.class).addAnnotatedClass(Contrato.class)
+                .addAnnotatedClass(Cargo.class).addAnnotatedClass(Pago.class)
+                .addAnnotatedClass(TipoCambio.class).addAnnotatedClass(Recibo.class);
         for (Class<?> entidad : entidadesAdicionales) cfg.addAnnotatedClass(entidad);
         try {
             return cfg.buildSessionFactory();

@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="ni.edu.uam.proyectofinalprogramacionappescritorio.controller.ContratoController"
+      spacing="18.0" styleClass="view-container">
+
+    <padding>
+        <Insets bottom="24.0" left="28.0" right="28.0" top="24.0" />
+    </padding>
+
+    <!-- ENCABEZADO -->
+    <HBox alignment="CENTER_LEFT" spacing="12.0">
+        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+            <Label styleClass="page-title" text="📄 Gestión de Contratos de Arrendamiento" />
+            <Label styleClass="page-subtitle" text="Formalice y supervise obligaciones contractuales respaldadas en PostgreSQL" />
+        </VBox>
+        <Button onAction="#refrescarTabla" styleClass="btn-secondary" text="🔄 Refrescar" />
+    </HBox>
+
+    <!-- FORMULARIO DE REGISTRO / EDICIÓN -->
+    <VBox spacing="14.0" styleClass="form-card">
+        <Label styleClass="form-card-title" text="Datos del Contrato" />
+
+        <GridPane hgap="16.0" vgap="12.0">
+            <columnConstraints>
+                <ColumnConstraints percentWidth="35.0" />
+                <ColumnConstraints percentWidth="35.0" />
+                <ColumnConstraints percentWidth="15.0" />
+                <ColumnConstraints percentWidth="15.0" />
+            </columnConstraints>
+
+            <!-- Fila 0: Relaciones obligatorias -->
+            <VBox spacing="4.0" GridPane.columnIndex="0" GridPane.rowIndex="0">
+                <Label styleClass="form-label" text="Unidad / Inmueble *" />
+                <ComboBox fx:id="cmbUnidad" maxWidth="Infinity" promptText="Seleccione unidad..." />
+            </VBox>
+
+            <VBox spacing="4.0" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                <Label styleClass="form-label" text="Inquilino Arrendatario *" />
+                <ComboBox fx:id="cmbInquilino" maxWidth="Infinity" promptText="Seleccione inquilino..." />
+            </VBox>
+
+            <VBox spacing="4.0" GridPane.columnIndex="2" GridPane.rowIndex="0">
+                <Label styleClass="form-label" text="Canon Mensual *" />
+                <TextField fx:id="txtCanon" promptText="ej. 450.00" />
+            </VBox>
+
+            <VBox spacing="4.0" GridPane.columnIndex="3" GridPane.rowIndex="0">
+                <Label styleClass="form-label" text="Moneda *" />
+                <ComboBox fx:id="cmbMoneda" maxWidth="Infinity" />
+            </VBox>
+
+            <!-- Fila 1: Fechas y condiciones -->
+            <VBox spacing="4.0" GridPane.columnIndex="0" GridPane.rowIndex="1">
+                <Label styleClass="form-label" text="Fecha de Inicio *" />
+                <DatePicker fx:id="dpInicio" maxWidth="Infinity" promptText="dd/mm/aaaa" />
+            </VBox>
+
+            <VBox spacing="4.0" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                <Label styleClass="form-label" text="Fecha de Finalización *" />
+                <DatePicker fx:id="dpFin" maxWidth="Infinity" promptText="dd/mm/aaaa" />
+            </VBox>
+
+            <VBox spacing="4.0" GridPane.columnIndex="2" GridPane.rowIndex="1">
+                <Label styleClass="form-label" text="Día Límite de Pago *" />
+                <TextField fx:id="txtDiaPago" promptText="1 - 31" />
+            </VBox>
+
+            <VBox spacing="4.0" GridPane.columnIndex="3" GridPane.rowIndex="1">
+                <Label styleClass="form-label" text="Depósito Garantía" />
+                <TextField fx:id="txtDeposito" promptText="ej. 450.00" />
+            </VBox>
+
+            <!-- Fila 2: Estado -->
+            <VBox spacing="4.0" GridPane.columnIndex="0" GridPane.rowIndex="2">
+                <Label styleClass="form-label" text="Estado del Contrato *" />
+                <ComboBox fx:id="cmbEstado" maxWidth="Infinity" />
+            </VBox>
+        </GridPane>
+
+        <!-- BOTONES DE ACCIÓN -->
+        <HBox alignment="CENTER_RIGHT" spacing="10.0">
+            <Button onAction="#limpiarFormulario" styleClass="btn-secondary" text="Limpiar Formulario" />
+            <Button fx:id="btnTerminar" onAction="#handleTerminarContrato" styleClass="btn-secondary" text="Finalizar Contrato" />
+            <Button fx:id="btnAjustarGarantia" disable="true" onAction="#handleAjustarGarantia" styleClass="btn-secondary" text="Ajustar Garantía" />
+            <Button fx:id="btnEliminar" onAction="#handleEliminar" styleClass="btn-danger" text="Eliminar Contrato" />
+            <Button onAction="#handleGuardar" styleClass="btn-primary" text="Guardar Contrato" />
+        </HBox>
+    </VBox>
+
+    <!-- TABLA DE CONTRATOS -->
+    <VBox spacing="8.0" VBox.vgrow="ALWAYS">
+        <HBox alignment="CENTER_LEFT" spacing="12.0">
+            <Label styleClass="table-title" text="Contratos Registrados" HBox.hgrow="ALWAYS" />
+            <TextField fx:id="txtBuscar" promptText="🔍 Buscar por inquilino o unidad..." prefWidth="320.0" />
+        </HBox>
+
+        <TableView fx:id="tblContratos" VBox.vgrow="ALWAYS">
+            <columns>
+                <TableColumn fx:id="colInquilino" prefWidth="240.0" text="Inquilino Arrendatario" />
+                <TableColumn fx:id="colUnidad" prefWidth="220.0" text="Unidad / Inmueble" />
+                <TableColumn fx:id="colInicio" prefWidth="110.0" text="Fecha Inicio" />
+                <TableColumn fx:id="colFin" prefWidth="110.0" text="Fecha Fin" />
+                <TableColumn fx:id="colCanon" prefWidth="130.0" text="Canon Mensual" />
+                <TableColumn fx:id="colDiaPago" prefWidth="80.0" text="Día Pago" />
+                <TableColumn fx:id="colDeposito" prefWidth="130.0" text="Depósito" />
+                <TableColumn fx:id="colSaldoGarantia" prefWidth="140.0" text="Saldo Garantía" />
+                <TableColumn fx:id="colEstado" prefWidth="110.0" text="Estado" />
+            </columns>
+            <placeholder>
+                <Label text="No hay contratos registrados en PostgreSQL." />
+            </placeholder>
+        </TableView>
+    </VBox>
+
+</VBox>

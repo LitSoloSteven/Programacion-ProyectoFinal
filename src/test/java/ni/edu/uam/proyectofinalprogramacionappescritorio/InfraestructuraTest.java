@@ -3,6 +3,7 @@ package ni.edu.uam.proyectofinalprogramacionappescritorio;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.*;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.*;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.*;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PasswordHasher;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
@@ -147,6 +148,12 @@ class InfraestructuraTest {
         long cantidad = tx.ejecutar(session -> session.createQuery("select count(a) from Auditoria a where a.actor.id = :id", Long.class)
                 .setParameter("id", usuario.getId()).getSingleResult());
         assertEquals(0L, cantidad);
+    }
+
+    @Test void consultaContratosTraeRelacionesYSeguimientoDeGarantia() {
+        assertDoesNotThrow(() -> tx.ejecutar(session -> session.createQuery(
+                "from Contrato c join fetch c.unidad join fetch c.inquilino left join fetch c.garantiaSeguimiento order by c.inicio desc",
+                Contrato.class).getResultList()));
     }
 
     @Test void versionImpideSobrescribirConfiguracionObsoleta() {
