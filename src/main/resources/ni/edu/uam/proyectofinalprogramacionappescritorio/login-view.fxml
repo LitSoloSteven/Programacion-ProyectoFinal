@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<StackPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="ni.edu.uam.proyectofinalprogramacionappescritorio.controller.LoginController"
+           prefHeight="600.0" prefWidth="800.0" styleClass="login-root">
+
+    <VBox alignment="CENTER" maxWidth="420.0" spacing="18.0" styleClass="login-card">
+        <padding>
+            <Insets bottom="32.0" left="36.0" right="36.0" top="32.0" />
+        </padding>
+
+        <VBox alignment="CENTER" spacing="6.0">
+            <Label styleClass="login-badge" text="SISTEMA INMOBILIARIO" />
+            <Label styleClass="login-title" text="Latch" />
+            <Label styleClass="login-subtitle" text="Administración de Alquileres y Contratos" />
+        </VBox>
+
+        <Separator prefWidth="200.0" />
+
+        <VBox alignment="CENTER_LEFT" spacing="6.0">
+            <Label styleClass="form-label" text="Nombre de usuario" />
+            <TextField fx:id="txtUsuario" promptText="ej. admin o asistente" styleClass="text-field" />
+        </VBox>
+
+        <VBox alignment="CENTER_LEFT" spacing="6.0">
+            <Label styleClass="form-label" text="Contraseña" />
+            <PasswordField fx:id="txtPassword" promptText="Ingrese su contraseña" styleClass="password-field" />
+        </VBox>
+
+        <Label fx:id="lblMensajeError" managed="false" styleClass="lbl-error" text="" visible="false" wrapText="true" />
+
+        <Button fx:id="btnIngresar" defaultButton="true" maxWidth="Infinity" onAction="#handleLogin" prefHeight="42.0"
+                styleClass="btn-primary" text="Iniciar Sesión" />
+
+    </VBox>
+
+</StackPane>
