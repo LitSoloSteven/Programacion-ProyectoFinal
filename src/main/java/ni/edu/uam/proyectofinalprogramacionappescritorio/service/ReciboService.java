@@ -1,75 +1,48 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.service;
 
-import ni.edu.uam.proyectofinalprogramacionappescritorio.dao.HibernateTransaccion;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.dao.ReciboDao;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.ReciboDTO;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.ReciboMapper;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.SesionUsuario;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.*;
+import org.hibernate.Session;
 import org.hibernate.SessionFactory;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.function.Supplier;
+import java.util.*;
+import java.util.function.*;
 
-/**
- * Consultas de recibos para cuentas autenticadas de Propietario o Asistente.
- * Devuelve DTO y los construye antes de cerrar la sesion Hibernate.
- * La emision y la anulacion conjunta con pagos se integran por separado.
- */
+/** Consultas de recibos mediante la sesion y los permisos compartidos de main. */
 public final class ReciboService {
-    private final SessionFactory factory;
-    private final Supplier<Usuario> usuarioActual;
+    private final HibernateTransactions tx;
+    private final Supplier<SesionUsuario> identidad;
     private final ReciboDao dao = new ReciboDao();
-
-    public ReciboService(SessionFactory factory) {
-        this(factory, SesionUsuario::getUsuarioActual);
+    private final PermisoService permisos = new PermisoService();
+    public ReciboService(SessionFactory factory) { this(factory, SesionUsuario::getActual); }
+    public ReciboService(SessionFactory factory, Supplier<SesionUsuario> identidad) {
+        tx = new HibernateTransactions(factory);
+        this.identidad = Objects.requireNonNull(identidad);
     }
-
-    public ReciboService(SessionFactory factory, Supplier<Usuario> usuarioActual) {
-        this.factory = Objects.requireNonNull(factory, "Falta SessionFactory.");
-        this.usuarioActual = Objects.requireNonNull(usuarioActual, "Falta el proveedor de usuario.");
+    public Optional<ReciboDTO> buscarPorId(Long numero) {
+        Objects.requireNonNull(numero, "Falta el numero.");
+        return buscarPorNumero(numero);
     }
-
-    public Optional<ReciboDTO> buscarPorId(UUID id) {
-        exigirUsuario();
-        Objects.requireNonNull(id, "Falta el identificador del recibo.");
-        return HibernateTransaccion.ejecutar(factory, session ->
-                dao.buscarPorId(session, id).map(ReciboMapper::aDTO));
-    }
-
-    public Optional<ReciboDTO> buscarPorPago(UUID pagoId) {
-        exigirUsuario();
-        Objects.requireNonNull(pagoId, "Falta el identificador del pago.");
-        return HibernateTransaccion.ejecutar(factory, session ->
-                dao.buscarPorPago(session, pagoId).map(ReciboMapper::aDTO));
-    }
-
     public Optional<ReciboDTO> buscarPorNumero(long numero) {
-        exigirUsuario();
         if (numero <= 0) throw new IllegalArgumentException("El numero debe ser positivo.");
-        return HibernateTransaccion.ejecutar(factory, session ->
-                dao.buscarPorNumero(session, numero).map(ReciboMapper::aDTO));
+        return consultar(s -> dao.buscarPorNumero(s, numero).map(ReciboMapper::aDTO));
     }
-
-    /** Incluye anulados y devuelve una lista inmutable con paginacion acotada. */
+    public Optional<ReciboDTO> buscarPorPago(UUID pagoId) {
+        Objects.requireNonNull(pagoId, "Falta el pago.");
+        return consultar(s -> dao.buscarPorPago(s, pagoId).map(ReciboMapper::aDTO));
+    }
     public List<ReciboDTO> listarPorContrato(UUID contratoId, int desplazamiento, int cantidad) {
-        exigirUsuario();
-        Objects.requireNonNull(contratoId, "Falta el identificador del contrato.");
+        Objects.requireNonNull(contratoId, "Falta el contrato.");
         if (desplazamiento < 0 || cantidad < 1 || cantidad > 200) {
             throw new IllegalArgumentException("La pagina debe contener entre 1 y 200 registros y un desplazamiento no negativo.");
         }
-        return HibernateTransaccion.ejecutar(factory, session ->
-                dao.listarPorContrato(session, contratoId, desplazamiento, cantidad)
-                        .stream().map(ReciboMapper::aDTO).toList());
+        return consultar(s -> dao.listarPorContrato(s, contratoId, desplazamiento, cantidad)
+                .stream().map(ReciboMapper::aDTO).toList());
     }
-
-    private void exigirUsuario() {
-        Usuario actor = usuarioActual.get();
-        if (actor == null || !actor.isActivo() || actor.getId() == null
-                || !(actor.esPropietario() || "Asistente".equalsIgnoreCase(actor.getRolNombre()))) {
-            throw new SecurityException("Se requiere una sesion activa y autorizada para consultar recibos.");
-        }
+    private <T> T consultar(Function<Session, T> operacion) {
+        return tx.ejecutar(s -> {
+            permisos.exigir(s, identidad.get(), Permiso.CONSULTAR_REPORTES);
+            return operacion.apply(s);
+        });
     }
 }
