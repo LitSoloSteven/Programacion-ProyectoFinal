@@ -1,8 +1,8 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.service;
 
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.Configuracion;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.Usuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Configuracion;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
 import java.util.UUID;
 
 public final class ConfiguracionService {

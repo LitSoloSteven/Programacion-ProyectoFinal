@@ -23,7 +23,7 @@ public final class SesionUsuario implements AutoCloseable {
     public static void cerrarSesion() { SesionUsuario anterior = actual; actual = null; if (anterior != null) anterior.close(); }
     public static boolean esPropietario() {
         SesionUsuario sesion = getActual();
-        return sesion != null && ni.edu.uam.proyectofinalprogramacionappescritorio.entity.Rol.PROPIETARIO.equals(sesion.getRol());
+        return sesion != null && ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Rol.PROPIETARIO.equals(sesion.getRol());
     }
     @Override public void close() { vigente.set(false); }
 }

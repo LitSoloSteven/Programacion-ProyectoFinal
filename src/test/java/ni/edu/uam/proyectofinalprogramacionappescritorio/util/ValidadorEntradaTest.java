@@ -1,4 +1,4 @@
-package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
+package ni.edu.uam.proyectofinalprogramacionappescritorio.util;
 
 import org.junit.jupiter.api.Test;
 

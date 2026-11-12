@@ -2,7 +2,7 @@ package ni.edu.uam.proyectofinalprogramacionappescritorio.service;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propiedad;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.Usuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propietario;
 import java.sql.SQLException;
 import java.util.*;

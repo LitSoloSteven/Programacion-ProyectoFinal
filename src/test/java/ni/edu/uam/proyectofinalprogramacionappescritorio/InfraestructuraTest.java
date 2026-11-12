@@ -1,7 +1,7 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio;
 
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.*;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.*;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.*;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.*;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PasswordHasher;

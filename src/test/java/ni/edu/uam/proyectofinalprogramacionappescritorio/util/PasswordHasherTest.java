@@ -1,4 +1,4 @@
-package ni.edu.uam.proyectofinalprogramacionappescritorio;
+package ni.edu.uam.proyectofinalprogramacionappescritorio.util;
 
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PasswordHasher;
 import org.junit.jupiter.api.Test;

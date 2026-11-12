@@ -1,4 +1,4 @@
-package ni.edu.uam.proyectofinalprogramacionappescritorio;
+package ni.edu.uam.proyectofinalprogramacionappescritorio.config;
 
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.DatabaseConfig;
 import org.junit.jupiter.api.Test;
