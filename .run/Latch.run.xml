@@ -1,0 +1,41 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Latch" type="MavenRunConfiguration" factoryName="Maven">
+    <MavenSettings>
+      <option name="myGeneralSettings">
+        <MavenGeneralSettings>
+          <option name="mavenHome" value="Bundled (Maven 3)" />
+          <option name="userSettingsFile" />
+          <option name="localRepository" />
+        </MavenGeneralSettings>
+      </option>
+      <option name="myRunnerSettings">
+        <MavenRunnerSettings>
+          <option name="jreName" value="Project SDK" />
+          <option name="vmOptions" value="" />
+          <option name="passParentEnv" value="true" />
+          <option name="envs">
+            <map>
+              <entry key="LATCH_DB_SCHEMA_MODE" value="validate" />
+            </map>
+          </option>
+        </MavenRunnerSettings>
+      </option>
+      <option name="myRunnerParameters">
+        <MavenRunnerParameters>
+          <option name="cmdOptions" value="" />
+          <option name="profiles"><set /></option>
+          <option name="goals">
+            <list><option value="javafx:run" /></list>
+          </option>
+          <option name="pomFileName" value="$PROJECT_DIR$/pom.xml" />
+          <option name="profilesMap"><map /></option>
+          <option name="resolveToWorkspace" value="false" />
+          <option name="workingDirPath" value="$PROJECT_DIR$" />
+          <option name="mavenProjectId" value="ni.edu.uam:ProyectoFInal-ProgramacionAppEscritorio" />
+          <option name="mavenProperties"><map /></option>
+        </MavenRunnerParameters>
+      </option>
+    </MavenSettings>
+    <method v="2" />
+  </configuration>
+</component>

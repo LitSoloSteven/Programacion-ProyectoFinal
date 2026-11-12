@@ -1,6 +1,7 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.modelo;
 
 import jakarta.persistence.*;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.Usuario;
 import org.hibernate.annotations.Immutable;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -16,7 +17,7 @@ import java.util.UUID;
  * Hibernate conserva cada registro; no se sobrescriben tasas anteriores.
  */
 @Entity
-@Table(name = "tipo_cambio", schema = "latch")
+@Table(name = "tipo_cambio", indexes = @Index(columnList = "fecha, registrado_en"))
 @Immutable
 public class TipoCambio {
     @Id
@@ -29,22 +30,23 @@ public class TipoCambio {
     private String fuente;
     @Column(name = "registrado_en", nullable = false)
     private Instant registradoEn;
-    @Column(name = "autorizado_por")
-    private UUID autorizadoPor;
+    @ManyToOne
+    @JoinColumn(name = "autorizado_por")
+    private Usuario autorizadoPor;
     @Column(length = 500)
     private String motivo;
 
     protected TipoCambio() { }
 
     private TipoCambio(LocalDate fecha, BigDecimal tasa, String fuente,
-                       Instant registradoEn, UUID autorizadoPor, String motivo) {
+                       Instant registradoEn, Usuario autorizadoPor, String motivo) {
         this.id = UUID.randomUUID();
         this.fecha = Objects.requireNonNull(fecha, "Falta la fecha de la tasa.");
         this.registradoEn = Objects.requireNonNull(registradoEn, "Falta el instante de registro.");
         Objects.requireNonNull(tasa, "Falta la tasa.");
         this.nioPorUsd = tasa.setScale(8, RoundingMode.HALF_EVEN);
-        if (this.nioPorUsd.signum() <= 0) {
-            throw new IllegalArgumentException("La tasa debe ser positiva a ocho decimales.");
+        if (this.nioPorUsd.signum() <= 0 || this.nioPorUsd.precision() > 19) {
+            throw new IllegalArgumentException("La tasa debe ser positiva y caber en 19 dígitos con ocho decimales.");
         }
         this.fuente = texto(fuente, "fuente");
         this.autorizadoPor = autorizadoPor;
@@ -59,7 +61,7 @@ public class TipoCambio {
     /** Invocar solo desde un Service que haya comprobado el rol del actor. */
     public static TipoCambio autorizada(LocalDate fecha, BigDecimal tasa,
                                          String fuente, Instant registradoEn,
-                                         UUID autorizadoPor, String motivo) {
+                                         Usuario autorizadoPor, String motivo) {
         Objects.requireNonNull(autorizadoPor, "Falta el usuario autorizador.");
         return new TipoCambio(fecha, tasa, fuente, registradoEn, autorizadoPor, motivo);
     }
@@ -103,7 +105,7 @@ public class TipoCambio {
     public BigDecimal getNioPorUsd() { return nioPorUsd; }
     public String getFuente() { return fuente; }
     public Instant getRegistradoEn() { return registradoEn; }
-    public UUID getAutorizadoPor() { return autorizadoPor; }
+    public Long getAutorizadoPor() { return autorizadoPor == null ? null : autorizadoPor.getId(); }
     public String getMotivo() { return motivo; }
     public boolean isAutorizada() { return autorizadoPor != null; }
 }

@@ -20,6 +20,7 @@ public final class ReciboDTO {
     private final BigDecimal montoOriginal;
     private final String monedaOriginal;
     private final BigDecimal montoContrato;
+    private final String monedaContrato;
     private final String metodo;
     private final String referencia;
     private final boolean anulado;
@@ -27,7 +28,7 @@ public final class ReciboDTO {
     public ReciboDTO(long numero, UUID pagoId, UUID contratoId,
                      LocalDate fechaPago, String contratoInfo,
                      BigDecimal montoOriginal, String monedaOriginal,
-                     BigDecimal montoContrato, String metodo,
+                     BigDecimal montoContrato, String monedaContrato, String metodo,
                      String referencia, boolean anulado) {
         if (numero <= 0) {
             throw new IllegalArgumentException("El numero debe ser positivo.");
@@ -44,6 +45,7 @@ public final class ReciboDTO {
             throw new IllegalArgumentException("La moneda debe ser USD o NIO.");
         }
         this.montoContrato = monto(montoContrato);
+        this.monedaContrato = monedaContrato;
         this.metodo = texto(metodo, "metodo de pago");
         this.referencia = referencia == null ? "" : referencia.trim();
         this.anulado = anulado;
@@ -73,6 +75,7 @@ public final class ReciboDTO {
     public BigDecimal getMontoOriginal() { return montoOriginal; }
     public String getMonedaOriginal() { return monedaOriginal; }
     public BigDecimal getMontoContrato() { return montoContrato; }
+    public String getMonedaContrato() { return monedaContrato; }
     public String getMetodo() { return metodo; }
     public String getReferencia() { return referencia; }
     public boolean isAnulado() { return anulado; }
