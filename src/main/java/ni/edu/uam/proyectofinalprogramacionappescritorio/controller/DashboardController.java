@@ -13,16 +13,13 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.MetricasDashboardDTO;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.DashboardService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoMoneda;
 
 import java.io.IOException;
-import java.math.BigDecimal;
-import java.sql.SQLException;
-import java.text.NumberFormat;
-import java.util.Locale;
-import java.util.Map;
 
 /**
  * Controlador del Dashboard principal de Latch.
@@ -91,7 +88,6 @@ public class DashboardController {
     private Label lblPagosMonto;
 
     private final DashboardService dashboardService;
-    private final NumberFormat formatoMoneda = NumberFormat.getCurrencyInstance(Locale.US);
 
     public DashboardController() {
         this.dashboardService = new DashboardService();
@@ -118,21 +114,21 @@ public class DashboardController {
     @FXML
     public void actualizarMetricas() {
         try {
-            Map<String, Object> metricas = dashboardService.obtenerMetricas();
-            lblTotalPropiedades.setText(String.valueOf(metricas.get("totalPropiedades")));
-            lblTotalUnidades.setText(String.valueOf(metricas.get("totalUnidades")));
-            lblTotalInquilinos.setText(String.valueOf(metricas.get("totalInquilinos")));
-            lblTotalContratos.setText(String.valueOf(metricas.get("totalContratosVigentes")));
+            MetricasDashboardDTO metricas = dashboardService.obtenerMetricas();
+            lblTotalPropiedades.setText(String.valueOf(metricas.propiedades()));
+            lblTotalUnidades.setText(String.valueOf(metricas.unidades()));
+            lblTotalInquilinos.setText(String.valueOf(metricas.inquilinos()));
+            lblTotalContratos.setText(String.valueOf(metricas.contratosVigentes()));
 
-            int cantCargos = (int) metricas.get("cargosPendientesCant");
-            BigDecimal montoCargos = (BigDecimal) metricas.get("cargosPendientesMonto");
-            lblCargosPendientes.setText(String.valueOf(cantCargos));
-            lblCargosMonto.setText("Total: " + formatoMoneda.format(montoCargos));
+            lblCargosPendientes.setText(String.valueOf(metricas.cantidadCargosPendientes()));
+            lblCargosMonto.setText(String.join("\n", metricas.cargosPendientes().stream()
+                    .map(total -> FormatoMoneda.formatear(total.moneda(), total.total())).toList()));
 
-            int cantPagos = (int) metricas.get("pagosRegistradosCant");
-            BigDecimal montoPagos = (BigDecimal) metricas.get("pagosRegistradosMonto");
-            lblPagosRegistrados.setText(String.valueOf(cantPagos));
-            lblPagosMonto.setText("Total: " + formatoMoneda.format(montoPagos));
+            lblPagosRegistrados.setText(String.valueOf(metricas.cantidadPagosRegistrados()));
+            lblPagosMonto.setText(String.join("\n", metricas.pagosRegistrados().stream()
+                    .map(total -> FormatoMoneda.formatear(total.moneda(), total.total())).toList()));
+        } catch (SecurityException e) {
+            AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
         } catch (RuntimeException e) {
             AlertaUtil.mostrarError("Error de Base de Datos", "No fue posible actualizar las métricas desde PostgreSQL.");
         }

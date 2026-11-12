@@ -115,14 +115,14 @@
                     <VBox styleClass="kpi-card, kpi-amber" GridPane.columnIndex="1" GridPane.rowIndex="1">
                         <Label styleClass="kpi-title" text="CARGOS PENDIENTES" />
                         <Label fx:id="lblCargosPendientes" styleClass="kpi-value" text="0" />
-                        <Label fx:id="lblCargosMonto" styleClass="kpi-desc" text="Total: $0.00" />
+                        <Label fx:id="lblCargosMonto" styleClass="kpi-desc" text="0.00 USD / 0.00 NIO" wrapText="true" />
                     </VBox>
 
                     <!-- Tarjeta 6: Pagos Registrados -->
                     <VBox styleClass="kpi-card, kpi-emerald" GridPane.columnIndex="2" GridPane.rowIndex="1">
                         <Label styleClass="kpi-title" text="PAGOS REGISTRADOS" />
                         <Label fx:id="lblPagosRegistrados" styleClass="kpi-value" text="0" />
-                        <Label fx:id="lblPagosMonto" styleClass="kpi-desc" text="Total: $0.00" />
+                        <Label fx:id="lblPagosMonto" styleClass="kpi-desc" text="0.00 USD / 0.00 NIO" wrapText="true" />
                     </VBox>
                 </GridPane>
 

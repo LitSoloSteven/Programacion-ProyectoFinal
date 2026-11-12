@@ -1,8 +1,12 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.modelo;
 
 import jakarta.persistence.*;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoMoneda;
+
 import java.math.BigDecimal;
+import java.text.NumberFormat;
 import java.time.LocalDate;
+import java.util.Locale;
 import java.util.UUID;
 
 /**
@@ -156,8 +160,13 @@ public class Cargo {
     }
 
     public String getImporteFormateado() {
-        if (importe == null) return "$0.00";
-        return String.format("$%.2f", importe);
+        if (contrato != null) {
+            return FormatoMoneda.formatear(contrato.getMoneda(), importe);
+        }
+        NumberFormat formato = NumberFormat.getNumberInstance(Locale.US);
+        formato.setMinimumFractionDigits(2);
+        formato.setMaximumFractionDigits(2);
+        return formato.format(importe == null ? BigDecimal.ZERO : importe);
     }
 
     @Override
