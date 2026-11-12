@@ -1,4 +1,4 @@
-package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
+package ni.edu.uam.proyectofinalprogramacionappescritorio.util;
 
 import javafx.application.Platform;
 import javafx.scene.control.Alert;

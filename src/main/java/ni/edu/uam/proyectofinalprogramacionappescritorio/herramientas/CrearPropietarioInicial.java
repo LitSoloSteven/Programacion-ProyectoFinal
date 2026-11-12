@@ -1,10 +1,11 @@
-package ni.edu.uam.proyectofinalprogramacionappescritorio.util;
+package ni.edu.uam.proyectofinalprogramacionappescritorio.herramientas;
 
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.Rol;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.Usuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Rol;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.AuditoriaService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PasswordHasher;
 import java.util.Arrays;
 import java.util.UUID;
 

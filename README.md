@@ -55,7 +55,7 @@ Ejecutar una sola vez, con la aplicación detenida y la conexión configurada:
 $env:LATCH_INITIAL_USER = 'steven'
 $claveInicial = Read-Host 'Contraseña inicial (12 a 128 caracteres)' -AsSecureString
 $env:LATCH_INITIAL_PASSWORD = [System.Net.NetworkCredential]::new('', $claveInicial).Password
-./mvnw.cmd compile exec:java '-Dexec.mainClass=ni.edu.uam.proyectofinalprogramacionappescritorio.util.CrearPropietarioInicial'
+./mvnw.cmd compile exec:java '-Dexec.mainClass=ni.edu.uam.proyectofinalprogramacionappescritorio.herramientas.CrearPropietarioInicial'
 Remove-Item Env:LATCH_INITIAL_PASSWORD
 Remove-Item Env:LATCH_INITIAL_USER
 $env:LATCH_DB_SCHEMA_MODE = 'validate'
@@ -91,9 +91,9 @@ Se conserva el paquete existente `ni.edu.uam.proyectofinalprogramacionappescrito
 | `config/DatabaseConfig` | Configuración sin credenciales en código |
 | `config/HibernateUtil` | Una SessionFactory compartida y registro de entidades |
 | `config/HibernateTransactions` | Sesión por operación, commit, rollback y cierre |
-| `entity/Usuario` | Cuenta, contraseña derivada, rol, estado y versión |
-| `entity/Auditoria` | Actor relacionado, instante UTC, correlación, acción y referencia |
-| `entity/Configuracion` | Parámetro de aplicación con control de versión; no guardar secretos aquí |
+| `modelo/Usuario` | Cuenta, contraseña derivada, rol, estado y versión |
+| `modelo/Auditoria` | Actor relacionado, instante UTC, correlación, acción y referencia |
+| `modelo/Configuracion` | Parámetro de aplicación con control de versión; no guardar secretos aquí |
 | `service/*` | Autenticación, permisos y operaciones auditadas |
 | `util/PasswordHasher` | PBKDF2-HMAC-SHA256, sal aleatoria y comparación segura |
 | `util/TareasSegundoPlano` | Cola acotada, ejecución de Task y cancelación al cerrar |

@@ -1,4 +1,5 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
