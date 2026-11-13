@@ -33,7 +33,11 @@ public final class HibernateTransactions {
         } catch (OptimisticLockException | StaleStateException e) {
             throw new IllegalStateException("Otro usuario modificó el registro. Actualiza los datos antes de reintentar.", e);
         } catch (ConstraintViolationException e) {
-            throw new IllegalStateException("La operación contiene datos duplicados o relaciones inválidas.", e);
+            String mensaje = switch (e.getKind()) {
+                case UNIQUE -> "Ya existe un registro con esos datos.";
+                default -> "La operación viola una restricción de la base de datos.";
+            };
+            throw new IllegalStateException(mensaje, e);
         } catch (RuntimeException e) {
             throw new IllegalStateException("No se pudo completar la operación. Revisa la conexión e inténtalo nuevamente.", e);
         }

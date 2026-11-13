@@ -1,4 +1,5 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -246,6 +247,10 @@ public class PagoController {
             limpiarFormulario();
         } catch (IllegalArgumentException e) {
             AlertaUtil.mostrarAdvertencia("Datos inválidos", e.getMessage());
+        } catch (SecurityException e) {
+            AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
+        } catch (IllegalStateException e) {
+            AlertaUtil.mostrarError("Error de persistencia", e.getMessage());
         } catch (SQLException e) {
             AlertaUtil.mostrarError("Error de persistencia", "No se pudo registrar el pago en la base de datos.");
         }

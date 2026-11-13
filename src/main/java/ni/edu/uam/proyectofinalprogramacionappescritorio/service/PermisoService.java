@@ -1,7 +1,7 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.service;
 
-import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.Rol;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.Usuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Rol;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
 import org.hibernate.Session;
 import java.util.Objects;
 import java.util.Set;

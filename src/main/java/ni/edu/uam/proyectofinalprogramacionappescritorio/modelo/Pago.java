@@ -27,8 +27,6 @@ public class Pago {
     private BigDecimal montoOriginal;
     @Column(name = "monto_contrato", precision = 19, scale = 2, updatable = false, nullable = false)
     private BigDecimal montoContrato;
-    @Column(name = "monto_contrato", insertable = false, updatable = false, precision = 19, scale = 2)
-    private BigDecimal montoContratoLegacy;
     @Column(length = 24, updatable = false, nullable = false)
     private String metodo;
     @Column(length = 100, updatable = false)
@@ -45,8 +43,6 @@ public class Pago {
 
     @Column(name = "moneda_contrato", length = 3, nullable = false, updatable = false)
     private String monedaContrato;
-    @Column(name = "moneda_contrato", insertable = false, updatable = false, length = 3)
-    private String monedaContratoLegacy;
 
     @ManyToOne
     @JoinColumn(name = "tipo_cambio_id", updatable = false)

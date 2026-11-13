@@ -1,4 +1,5 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -187,6 +188,10 @@ public class InquilinoController {
             limpiarFormulario();
         } catch (IllegalArgumentException e) {
             AlertaUtil.mostrarAdvertencia("Datos inválidos", e.getMessage());
+        } catch (SecurityException e) {
+            AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
+        } catch (IllegalStateException e) {
+            AlertaUtil.mostrarError("Error de persistencia", e.getMessage());
         } catch (SQLException e) {
             AlertaUtil.mostrarError("Error de persistencia", "No fue posible guardar el registro del inquilino en PostgreSQL.");
         }
@@ -236,6 +241,8 @@ public class InquilinoController {
                 limpiarFormulario();
             } catch (SecurityException e) {
                 AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
+            } catch (IllegalStateException e) {
+                AlertaUtil.mostrarError("Error de persistencia", e.getMessage());
             } catch (SQLException e) {
                 AlertaUtil.mostrarError("Restricción de integridad", "No es posible eliminar el inquilino porque tiene contratos o cobros históricos asociados. Utilice 'Deshabilitar' en su lugar.");
             }

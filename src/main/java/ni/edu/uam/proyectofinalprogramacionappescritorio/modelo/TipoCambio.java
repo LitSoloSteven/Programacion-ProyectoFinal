@@ -1,7 +1,7 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.modelo;
 
 import jakarta.persistence.*;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.Usuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
 import org.hibernate.annotations.Immutable;
 import java.math.BigDecimal;
 import java.math.RoundingMode;

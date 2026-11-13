@@ -1,6 +1,5 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.config;
 
-import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.*;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.*;
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;

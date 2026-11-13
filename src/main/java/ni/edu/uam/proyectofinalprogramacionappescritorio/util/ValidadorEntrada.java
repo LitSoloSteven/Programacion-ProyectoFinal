@@ -1,4 +1,4 @@
-package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
+package ni.edu.uam.proyectofinalprogramacionappescritorio.util;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

@@ -45,7 +45,7 @@
             </VBox>
 
             <VBox spacing="4.0" GridPane.columnIndex="2" GridPane.rowIndex="0">
-                <Label styleClass="form-label" text="Importe ($) *" />
+                <Label styleClass="form-label" text="Importe *" />
                 <TextField fx:id="txtImporte" promptText="ej. 450.00" />
             </VBox>
 
