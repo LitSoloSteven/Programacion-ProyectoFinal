@@ -14,6 +14,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ContratoService
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.InquilinoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.GarantiaService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.UnidadService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 
 import java.math.BigDecimal;
 import java.sql.SQLException;
