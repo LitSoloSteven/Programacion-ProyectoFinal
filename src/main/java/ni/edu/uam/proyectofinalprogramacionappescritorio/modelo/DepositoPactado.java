@@ -6,7 +6,7 @@ import java.math.BigDecimal;
 
 @Embeddable
 public class DepositoPactado {
-    @Column(name = "deposito_pactado", nullable = false, precision = 19, scale = 2, insertable = false, updatable = false)
+    @Column(name = "deposito_pactado", nullable = false, precision = 19, scale = 2)
     private BigDecimal montoPactado;
 
     protected DepositoPactado() {}
