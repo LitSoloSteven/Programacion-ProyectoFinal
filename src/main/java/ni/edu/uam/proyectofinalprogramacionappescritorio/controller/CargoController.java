@@ -263,6 +263,10 @@ public class CargoController {
             limpiarFormulario();
         } catch (IllegalArgumentException e) {
             AlertaUtil.mostrarAdvertencia("Datos inválidos", e.getMessage());
+        } catch (SecurityException e) {
+            AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
+        } catch (IllegalStateException e) {
+            AlertaUtil.mostrarError("Error de persistencia", e.getMessage());
         } catch (SQLException e) {
             AlertaUtil.mostrarError("Error de persistencia", "No fue posible guardar el cargo en PostgreSQL.");
         }
@@ -288,6 +292,8 @@ public class CargoController {
                 limpiarFormulario();
             } catch (SecurityException e) {
                 AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
+            } catch (IllegalStateException e) {
+                AlertaUtil.mostrarError("Error de persistencia", e.getMessage());
             } catch (SQLException e) {
                 AlertaUtil.mostrarError("Error", "No fue posible eliminar el cargo.");
             }

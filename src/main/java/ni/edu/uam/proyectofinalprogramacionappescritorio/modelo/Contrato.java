@@ -37,15 +37,6 @@ public class Contrato {
     private DepositoPactado deposito = new DepositoPactado(BigDecimal.ZERO);
     @OneToOne(mappedBy = "contrato", cascade = CascadeType.ALL, orphanRemoval = true)
     private Garantia garantiaSeguimiento;
-    @Column(name = "deposito_pactado", insertable = false, updatable = false, precision = 19, scale = 2)
-    private BigDecimal depositoPactadoLegacy;
-    @PostLoad
-    private void sincronizarGarantia() {
-        if (depositoPactadoLegacy != null) deposito = new DepositoPactado(depositoPactadoLegacy);
-    }
-    @PrePersist
-    @PreUpdate
-    private void prepararGarantia() { depositoPactadoLegacy = deposito.getMontoPactado(); }
     @Column(length = 24, nullable = false)
     private String estado;
     @Version
@@ -170,7 +161,7 @@ public class Contrato {
     }
 
     public BigDecimal getDepositoPactado() {
-        return deposito.getMontoPactado();
+        return deposito == null ? BigDecimal.ZERO : deposito.getMontoPactado();
     }
 
     public void setDepositoPactado(BigDecimal depositoPactado) {

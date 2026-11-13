@@ -181,7 +181,7 @@ class DashboardServiceTest {
 
     private UUID insertarContrato(Session session, UUID unidadId, UUID inquilinoId, String moneda) {
         UUID contratoId = UUID.randomUUID();
-        // deposito_pactado es de solo lectura en el mapeo y debe incluirse en el seed.
+        // El mapeo escribe deposito_pactado; el INSERT nativo también lo define en el seed.
         session.createNativeMutationQuery("""
                 insert into contrato (id, unidad_id, inquilino_id, inicio, fin, canon, moneda,
                                       dia_pago, deposito_pactado, estado, version)

@@ -245,6 +245,10 @@ public class UnidadController {
             limpiarFormulario();
         } catch (IllegalArgumentException e) {
             AlertaUtil.mostrarAdvertencia("Datos inválidos", e.getMessage());
+        } catch (SecurityException e) {
+            AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
+        } catch (IllegalStateException e) {
+            AlertaUtil.mostrarError("Error de persistencia", e.getMessage());
         } catch (SQLException e) {
             AlertaUtil.mostrarError("Error de persistencia", "No fue posible guardar la unidad. Verifique que el código no esté duplicado en el mismo inmueble.");
         }
@@ -270,6 +274,8 @@ public class UnidadController {
                 limpiarFormulario();
             } catch (SecurityException e) {
                 AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
+            } catch (IllegalStateException e) {
+                AlertaUtil.mostrarError("Error de persistencia", e.getMessage());
             } catch (SQLException e) {
                 AlertaUtil.mostrarError("Restricción de integridad", "No es posible eliminar la unidad porque tiene contratos o cobros asociados.");
             }
