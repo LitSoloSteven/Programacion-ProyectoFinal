@@ -357,6 +357,10 @@ public class ContratoController {
             limpiarFormulario();
         } catch (IllegalArgumentException e) {
             AlertaUtil.mostrarAdvertencia("Validación de contrato", e.getMessage());
+        } catch (SecurityException e) {
+            AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
+        } catch (IllegalStateException e) {
+            AlertaUtil.mostrarError("Error de persistencia", e.getMessage());
         } catch (SQLException e) {
             AlertaUtil.mostrarError("Error de persistencia", "No se pudo guardar el contrato en PostgreSQL. Verifique los datos ingresados.");
         }
