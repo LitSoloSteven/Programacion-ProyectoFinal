@@ -21,8 +21,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * Controlador de la vista de Contratos de arrendamiento.
- * Vincula unidades e inquilinos reales de PostgreSQL y valida coherencia contractual.
+ - Controlador de la vista de Contratos de arrendamiento.
+ - Vincula unidades e inquilinos reales de PostgreSQL y valida coherencia contractual.
  */
 public class ContratoController {
 
@@ -354,10 +354,12 @@ public class ContratoController {
 
             cargarDatos();
             limpiarFormulario();
+
         } catch (IllegalArgumentException e) {
             AlertaUtil.mostrarAdvertencia("Validación de contrato", e.getMessage());
-        } catch (SQLException e) {
-            AlertaUtil.mostrarError("Error de persistencia", "No se pudo guardar el contrato en PostgreSQL. Verifique los datos ingresados.");
+        } catch (Exception e) {
+            AlertaUtil.mostrarError("Error de persistencia",
+                    "No se pudo guardar el contrato. Detalle: " + e.getMessage());
         }
     }
 
