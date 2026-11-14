@@ -78,9 +78,18 @@ public final class ServicioPagos {
     }
 
     public ServicioPagos(HibernateTransactions tx, Clock reloj) {
+        this(tx, new PagoService(tx), new CargoService(tx), reloj);
+    }
+
+    public ServicioPagos(HibernateTransactions tx, PagoService pagos, CargoService cargos) {
+        this(tx, pagos, cargos, Clock.systemUTC());
+    }
+
+    public ServicioPagos(HibernateTransactions tx, PagoService pagos, CargoService cargos,
+                         Clock reloj) {
         this.tx = Objects.requireNonNull(tx, "Faltan las transacciones de la API.");
-        this.pagos = new PagoService(tx);
-        this.cargos = new CargoService(tx);
+        this.pagos = Objects.requireNonNull(pagos, "Falta el servicio de pagos.");
+        this.cargos = Objects.requireNonNull(cargos, "Falta el servicio de cargos.");
         this.reloj = Objects.requireNonNull(reloj, "Falta el reloj de la API.");
     }
 
@@ -88,6 +97,9 @@ public final class ServicioPagos {
         Objects.requireNonNull(operacion, "Falta la operación de la API.");
         return tx.ejecutar(session -> operacion.get());
     }
+
+    public PagoService pagoService() { return pagos; }
+    public CargoService cargoService() { return cargos; }
 
     public PaginaResponse<PagoListaResponse> listarPagos(int pagina, int tamano, String texto) {
         validarPaginacion(pagina, tamano);

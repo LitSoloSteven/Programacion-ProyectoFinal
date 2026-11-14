@@ -23,7 +23,7 @@ public class GarantiaService {
         this(new HibernateTransactions(HibernateUtil.getSessionFactory()));
     }
 
-    GarantiaService(HibernateTransactions tx) {
+    public GarantiaService(HibernateTransactions tx) {
         this.tx = Objects.requireNonNull(tx);
         this.db = new HibernateCrudService(tx);
     }

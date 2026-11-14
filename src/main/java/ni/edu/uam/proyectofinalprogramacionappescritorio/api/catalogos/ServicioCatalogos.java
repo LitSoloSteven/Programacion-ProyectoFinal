@@ -74,17 +74,29 @@ public final class ServicioCatalogos {
     private final ContratoService contratos;
 
     public ServicioCatalogos(HibernateTransactions tx) {
+        this(tx, new PropiedadService(tx), new UnidadService(tx),
+                new InquilinoService(tx), new ContratoService(tx));
+    }
+
+    public ServicioCatalogos(HibernateTransactions tx, PropiedadService propiedades,
+                             UnidadService unidades, InquilinoService inquilinos,
+                             ContratoService contratos) {
         this.tx = Objects.requireNonNull(tx, "Faltan las transacciones de la API.");
-        this.propiedades = new PropiedadService(tx);
-        this.unidades = new UnidadService(tx);
-        this.inquilinos = new InquilinoService(tx);
-        this.contratos = new ContratoService(tx);
+        this.propiedades = Objects.requireNonNull(propiedades, "Falta el servicio de propiedades.");
+        this.unidades = Objects.requireNonNull(unidades, "Falta el servicio de unidades.");
+        this.inquilinos = Objects.requireNonNull(inquilinos, "Falta el servicio de inquilinos.");
+        this.contratos = Objects.requireNonNull(contratos, "Falta el servicio de contratos.");
     }
 
     public <T> T enTransaccion(Supplier<T> operacion) {
         Objects.requireNonNull(operacion, "Falta la operación de la API.");
         return tx.ejecutar(session -> operacion.get());
     }
+
+    public PropiedadService propiedadService() { return propiedades; }
+    public UnidadService unidadService() { return unidades; }
+    public InquilinoService inquilinoService() { return inquilinos; }
+    public ContratoService contratoService() { return contratos; }
 
     // ------------------------------------------------------------------
     // Propiedades
