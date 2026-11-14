@@ -24,6 +24,18 @@ public class Recibo {
         this.contratoInfo = contratoInfo;
     }
 
+    public Long getNumero() {
+        return numero;
+    }
+
+    public Pago getPago() {
+        return pago;
+    }
+
+    public String getContratoInfo() {
+        return contratoInfo;
+    }
+
     public ReciboDTO presentar() {
         return new ReciboDTO(numero, pago.getId(), pago.getContratoId(), pago.getFechaPago(),
                 contratoInfo, pago.getMontoOriginal(), pago.getMonedaOriginal(),
