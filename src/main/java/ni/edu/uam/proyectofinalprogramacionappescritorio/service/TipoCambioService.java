@@ -7,7 +7,6 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ParserMonto;
 import org.hibernate.Session;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
@@ -28,6 +27,7 @@ public final class TipoCambioService {
     private final HibernateTransactions transactions;
     private final PermisoService permisos = new PermisoService();
     private final AuditoriaService auditoria = new AuditoriaService();
+    private final RelojService reloj = new RelojService();
 
     public TipoCambioService(HibernateTransactions transactions) {
         this.transactions = Objects.requireNonNull(transactions);
@@ -80,11 +80,12 @@ public final class TipoCambioService {
         });
     }
 
+    public LocalDate fechaOperativa() {
+        return transactions.ejecutar(session -> reloj.leer(session).fecha());
+    }
+
     public TipoCambio registrar(LocalDate fecha, BigDecimal tasa, String fuente) {
         if (fecha == null) throw new IllegalArgumentException("La fecha de la tasa es obligatoria.");
-        if (fecha.isAfter(LocalDate.now())) {
-            throw new IllegalArgumentException("La fecha de la tasa no puede ser futura.");
-        }
         if (tasa == null) {
             throw new IllegalArgumentException("La tasa es obligatoria.");
         }
@@ -98,7 +99,11 @@ public final class TipoCambioService {
         return transactions.ejecutar(session -> {
             Usuario actor = permisos.exigir(session, SesionUsuario.getActual(),
                     Permiso.OPERAR_ALQUILERES);
-            TipoCambio registro = TipoCambio.informativa(fecha, tasa, fuente, Instant.now());
+            RelojService.TiempoOperativo tiempo = reloj.comprobar(session);
+            if (fecha.isAfter(tiempo.fecha())) {
+                throw new IllegalArgumentException("La fecha de la tasa no puede ser futura.");
+            }
+            TipoCambio registro = TipoCambio.informativa(fecha, tasa, fuente, tiempo.instante());
             session.persist(registro);
             auditoria.registrar(session, actor, UUID.randomUUID(), "TASA_REGISTRADA",
                     "tasa:" + registro.getId());
@@ -126,6 +131,7 @@ public final class TipoCambioService {
             return transactions.ejecutar((Session session) -> {
                 Usuario actor = permisos.exigir(session, SesionUsuario.getActual(),
                         Permiso.AUTORIZAR_TASA);
+                RelojService.TiempoOperativo tiempo = reloj.comprobar(session);
                 TipoCambio origen = session.find(TipoCambio.class, id);
                 if (origen == null) return Optional.<TipoCambio>empty();
                 if (origen.isAutorizada()) {
@@ -144,7 +150,7 @@ public final class TipoCambioService {
                     throw new ConflictoDatosException(MENSAJE_TASA_DUPLICADA);
                 }
                 TipoCambio autorizada = TipoCambio.autorizada(origen.getFecha(),
-                        origen.getNioPorUsd(), origen.getFuente(), Instant.now(), actor, motivo);
+                        origen.getNioPorUsd(), origen.getFuente(), tiempo.instante(), actor, motivo);
                 session.persist(autorizada);
                 auditoria.registrar(session, actor, UUID.randomUUID(), "TASA_AUTORIZADA",
                         "tasa:" + autorizada.getId());

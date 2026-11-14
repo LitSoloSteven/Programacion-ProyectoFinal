@@ -17,6 +17,7 @@ public class GarantiaService {
     private final HibernateCrudService db;
     private final PermisoService permisos = new PermisoService();
     private final AuditoriaService auditoria = new AuditoriaService();
+    private final RelojService reloj = new RelojService();
 
     public GarantiaService() {
         this(new HibernateTransactions(HibernateUtil.getSessionFactory()));
@@ -40,6 +41,7 @@ public class GarantiaService {
         tx.ejecutar(session -> {
             Usuario actor = permisos.exigir(session, SesionUsuario.getActual(),
                     Permiso.LIQUIDAR_GARANTIA);
+            reloj.comprobar(session);
             Garantia garantia = session.find(Garantia.class, id);
             if (garantia == null) throw new IllegalArgumentException("La garantía ya no existe.");
             garantia.ajustarSaldo(saldoActual.setScale(2));

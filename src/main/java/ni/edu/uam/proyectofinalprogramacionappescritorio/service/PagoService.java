@@ -15,7 +15,6 @@ import org.hibernate.Session;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.SQLException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -38,6 +37,7 @@ public class PagoService {
     private final HibernateTransactions tx;
     private final PermisoService permisos = new PermisoService();
     private final AuditoriaService auditoria = new AuditoriaService();
+    private final RelojService reloj = new RelojService();
 
     public PagoService() {
         this(new HibernateTransactions(HibernateUtil.getSessionFactory()));
@@ -73,6 +73,14 @@ public class PagoService {
     public RegistroPago registrarPagoEnSesion(Session session, Pago pago,
                                               List<AplicacionPago> aplicaciones) {
         Objects.requireNonNull(session, "Falta la sesión.");
+        return registrarPagoEnSesion(session, pago, aplicaciones, reloj.comprobar(session));
+    }
+
+    public RegistroPago registrarPagoEnSesion(Session session, Pago pago,
+                                              List<AplicacionPago> aplicaciones,
+                                              RelojService.TiempoOperativo tiempo) {
+        Objects.requireNonNull(session, "Falta la sesión.");
+        Objects.requireNonNull(tiempo, "Falta la hora operativa.");
         validarPago(pago);
         Usuario actor = permisos.exigir(session, SesionUsuario.getActual(),
                 Permiso.OPERAR_ALQUILERES);
@@ -114,6 +122,11 @@ public class PagoService {
         auditoria.registrar(session, actor, UUID.randomUUID(), "PAGO_REGISTRADO",
                 "pago:" + pago.getId());
         return new RegistroPago(pago, recibo, credito);
+    }
+
+    /** Comprueba el reloj antes de crear una idempotencia para un pago nuevo. */
+    public RelojService.TiempoOperativo comprobarReloj(Session session) {
+        return reloj.comprobar(session);
     }
 
     public Optional<Pago> obtener(UUID id) {
@@ -193,12 +206,13 @@ public class PagoService {
         return tx.ejecutar(session -> {
             Usuario actor = permisos.exigir(session, SesionUsuario.getActual(),
                     Permiso.ANULAR_PAGOS);
+            RelojService.TiempoOperativo tiempo = reloj.comprobar(session);
             Pago pago = session.find(Pago.class, id);
             if (pago == null) return Optional.<Pago>empty();
             if ("Anulado".equals(pago.getEstado())) {
                 throw new ConflictoDatosException("El pago ya está anulado.");
             }
-            pago.anular(limpio, actor.getId(), Instant.now());
+            pago.anular(limpio, actor.getId(), tiempo.instante());
             auditoria.registrar(session, actor, UUID.randomUUID(), "PAGO_ANULADO",
                     "pago:" + pago.getId());
             return Optional.of(pago);
