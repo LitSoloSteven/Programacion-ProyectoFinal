@@ -16,7 +16,7 @@ public final class AutenticacionService {
     public AutenticacionService(HibernateTransactions transactions) { this.transactions = transactions; }
 
     public SesionUsuario autenticar(String nombre, char[] password) {
-        return autenticar(nombre, password, true);
+        return autenticar(nombre, password, true, "desktop");
     }
 
     /**
@@ -24,18 +24,30 @@ public final class AutenticacionService {
      * La auditoría de inicio de sesión correcto se conserva en la transacción.
      */
     public SesionUsuario autenticar(String nombre, char[] password, boolean establecerSesionGlobal) {
+        return autenticar(nombre, password, establecerSesionGlobal, "desktop");
+    }
+
+    public SesionUsuario autenticar(String nombre, char[] password,
+                                    boolean establecerSesionGlobal, String origen) {
         String normalizado;
         try { normalizado = Usuario.normalizarNombre(nombre); }
-        catch (IllegalArgumentException e) { throw credencialesInvalidas(); }
-        return transactions.ejecutar(session -> {
-            Usuario usuario = usuarios.buscarPorNombre(session, normalizado).orElse(null);
+        catch (IllegalArgumentException e) { normalizado = null; }
+        String identificadorNormalizado = normalizado;
+        SesionUsuario identidad = transactions.ejecutar(session -> {
+            Usuario usuario = identificadorNormalizado == null ? null
+                    : usuarios.buscarPorNombre(session, identificadorNormalizado).orElse(null);
             boolean valido = passwords.verificar(password, usuario == null ? hashInexistente : usuario.getPasswordHash());
-            if (!valido || usuario == null || !usuario.isActivo()) throw credencialesInvalidas();
+            if (!valido || usuario == null || !usuario.isActivo()) {
+                auditoria.registrarIntentoLoginFallido(session, UUID.randomUUID(), nombre, origen);
+                return null;
+            }
             auditoria.registrar(session, usuario, UUID.randomUUID(), "INICIO_SESION", "usuario:" + usuario.getId());
-            SesionUsuario identidad = new SesionUsuario(usuario.getId(), usuario.getNombre(), usuario.getRol());
-            if (establecerSesionGlobal) SesionUsuario.establecer(identidad);
-            return identidad;
+            SesionUsuario sesionUsuario = new SesionUsuario(usuario.getId(), usuario.getNombre(), usuario.getRol());
+            if (establecerSesionGlobal) SesionUsuario.establecer(sesionUsuario);
+            return sesionUsuario;
         });
+        if (identidad == null) throw credencialesInvalidas();
+        return identidad;
     }
 
     private IllegalArgumentException credencialesInvalidas() {

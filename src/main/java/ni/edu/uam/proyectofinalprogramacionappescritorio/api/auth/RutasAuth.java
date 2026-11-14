@@ -16,6 +16,8 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 
 import java.util.Arrays;
 import java.util.Objects;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 
 /**
  * API 1: autenticación y sesión. El login emite un token opaco de 15 minutos.
@@ -51,29 +53,36 @@ public final class RutasAuth {
             throw ExcepcionApi.solicitudInvalida("Usuario y contraseña son obligatorios.");
         }
 
-        if (intentos.estaBloqueado(solicitud.usuario())) {
+        String origen = origen(contexto);
+        if (intentos.estaBloqueado(solicitud.usuario(), origen)) {
             throw ExcepcionApi.demasiadosIntentos();
         }
 
         char[] password = solicitud.password().toCharArray();
+        SesionUsuario sesion;
         try {
-            SesionUsuario sesion = autenticacion.autenticar(
-                    solicitud.usuario(), password, false);
-            intentos.registrarExito(solicitud.usuario());
-            TokenService.TokenEmitido emitido = tokens.emitir(
-                    new SesionApi(sesion.getUsuarioId(), sesion.getNombre(), sesion.getRol()));
-            return RespuestaJson.ok(new LoginResponse(
-                    emitido.token(),
-                    emitido.expiraEn().toString(),
-                    sesion.getRol(),
-                    sesion.getUsuarioId(),
-                    sesion.getNombre()));
+            sesion = autenticacion.autenticar(solicitud.usuario(), password, false, origen);
         } catch (IllegalArgumentException e) {
-            intentos.registrarFallo(solicitud.usuario());
+            intentos.registrarFallo(solicitud.usuario(), origen);
             throw ExcepcionApi.credencialesInvalidas();
         } finally {
             Arrays.fill(password, '\0');
         }
+        intentos.registrarExito(solicitud.usuario(), origen);
+        TokenService.TokenEmitido emitido = tokens.emitir(
+                new SesionApi(sesion.getUsuarioId(), sesion.getNombre(), sesion.getRol()));
+        return RespuestaJson.ok(new LoginResponse(
+                emitido.token(),
+                emitido.expiraEn().toString(),
+                sesion.getRol(),
+                sesion.getUsuarioId(),
+                sesion.getNombre()));
+    }
+
+    private static String origen(ContextoPeticion contexto) {
+        InetSocketAddress remoto = contexto.intercambio().getRemoteAddress();
+        InetAddress direccion = remoto == null ? null : remoto.getAddress();
+        return direccion == null ? "desconocido" : direccion.getHostAddress();
     }
 
     private RespuestaJson logout(ContextoPeticion contexto) {
