@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SesionUsuarioTest {
     @AfterEach
@@ -32,6 +33,12 @@ class SesionUsuarioTest {
 
         assertEquals(delHilo, visto.get());
         assertEquals(global, SesionUsuario.getActual());
+    }
+
+    @Test
+    void reconocePermisosFinancierosDePropietario() {
+        assertTrue(Permiso.esValido(Permiso.ANULAR_CARGOS));
+        assertTrue(Permiso.esValido(Permiso.LIQUIDAR_GARANTIA));
     }
 
     @Test
