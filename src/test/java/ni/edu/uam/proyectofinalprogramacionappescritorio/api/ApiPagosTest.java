@@ -487,6 +487,38 @@ class ApiPagosTest {
     }
 
     @Test
+    void dosPagosConcurrentesNoSobreaplicanElMismoCargo() throws Exception {
+        String token = login(nombrePropietario);
+        String cuerpo = GSON.toJson(pago("300.00", List.of(
+                new DistribucionRequest(cargoRentaId.toString(), "300.00"))));
+        CountDownLatch salida = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<Integer> primero = pool.submit(() -> {
+                salida.await();
+                return postJson("/api/v1/pagos", cuerpo, token,
+                        UUID.randomUUID().toString()).statusCode();
+            });
+            Future<Integer> segundo = pool.submit(() -> {
+                salida.await();
+                return postJson("/api/v1/pagos", cuerpo, token,
+                        UUID.randomUUID().toString()).statusCode();
+            });
+            salida.countDown();
+
+            List<Integer> estados = List.of(primero.get(15, TimeUnit.SECONDS),
+                    segundo.get(15, TimeUnit.SECONDS));
+
+            assertEquals(1, estados.stream().filter(e -> e == 201).count(), estados.toString());
+            assertEquals(1, estados.stream().filter(e -> e == 422).count(), estados.toString());
+            assertEquals(1, contar("select count(p) from Pago p"));
+            assertEquals(1, contar("select count(a) from AplicacionPago a"));
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
     void unaClaveDeOtroUsuarioNoRevelaNiDuplicaElPago() throws Exception {
         String tokenPropietario = login(nombrePropietario);
         String tokenAsistente = login(nombreAsistente);

@@ -16,8 +16,11 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -74,7 +77,7 @@ public class PagoService {
         Usuario actor = permisos.exigir(session, SesionUsuario.getActual(),
                 Permiso.OPERAR_ALQUILERES);
 
-        Contrato contrato = session.find(Contrato.class, pago.getContratoId());
+        Contrato contrato = bloquearContrato(session, pago.getContratoId());
         if (contrato == null) {
             throw new IllegalArgumentException("El contrato ya no existe.");
         }
@@ -215,6 +218,7 @@ public class PagoService {
 
         BigDecimal total = BigDecimal.ZERO;
         Set<UUID> cargosVistos = new HashSet<>();
+        List<UUID> cargosSolicitados = new ArrayList<>();
         for (AplicacionPago aplicacion : aplicaciones) {
             if (aplicacion == null) {
                 throw new IllegalArgumentException("La distribución contiene una fila vacía.");
@@ -224,10 +228,34 @@ public class PagoService {
                 throw new IllegalArgumentException(
                         "La distribución repite el mismo cargo.");
             }
-            Cargo cargo = session.find(Cargo.class, cargoId);
+            cargosSolicitados.add(cargoId);
+        }
+
+        List<UUID> cargosOrdenados = session.createQuery("""
+                        select c.id from Cargo c
+                        where c.id in :ids and c.contratoId = :contratoId
+                        order by c.venceEl, c.id
+                        """, UUID.class)
+                .setParameter("ids", cargosSolicitados)
+                .setParameter("contratoId", pago.getContratoId())
+                .getResultList();
+        if (cargosOrdenados.size() != cargosSolicitados.size()) {
+            throw new IllegalArgumentException(
+                    "Uno de los cargos no existe o no pertenece al contrato del pago.");
+        }
+
+        Map<UUID, Cargo> cargosBloqueados = new HashMap<>();
+        for (UUID cargoId : cargosOrdenados) {
+            Cargo cargo = bloquearCargo(session, cargoId);
             if (cargo == null) {
                 throw new IllegalArgumentException("Uno de los cargos ya no existe.");
             }
+            cargosBloqueados.put(cargoId, cargo);
+        }
+
+        for (AplicacionPago aplicacion : aplicaciones) {
+            UUID cargoId = aplicacion.getCargoId();
+            Cargo cargo = cargosBloqueados.get(cargoId);
             if (!pago.getContratoId().equals(cargo.getContratoId())) {
                 throw new IllegalArgumentException(
                         "Todos los cargos deben pertenecer al contrato del pago.");
@@ -262,6 +290,22 @@ public class PagoService {
                     "La distribución supera el monto del pago en la moneda del contrato.");
         }
         return montoContrato.subtract(total).setScale(2, RoundingMode.HALF_EVEN);
+    }
+
+    private Contrato bloquearContrato(Session session, UUID contratoId) {
+        Object filaBloqueada = session.createNativeQuery(
+                        "select id from contrato where id = :id for update")
+                .setParameter("id", contratoId)
+                .uniqueResult();
+        return filaBloqueada == null ? null : session.find(Contrato.class, contratoId);
+    }
+
+    private Cargo bloquearCargo(Session session, UUID cargoId) {
+        Object filaBloqueada = session.createNativeQuery(
+                        "select id from cargo where id = :id for update")
+                .setParameter("id", cargoId)
+                .uniqueResult();
+        return filaBloqueada == null ? null : session.find(Cargo.class, cargoId);
     }
 
     private static void validarPago(Pago pago) {
