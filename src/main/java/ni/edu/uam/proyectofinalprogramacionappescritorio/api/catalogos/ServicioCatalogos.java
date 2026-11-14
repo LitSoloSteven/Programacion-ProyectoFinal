@@ -25,6 +25,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PermisoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PropiedadService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.UnidadService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ParserMonto;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ValidadorEntrada;
 import org.hibernate.Session;
 import org.hibernate.query.Query;
@@ -658,13 +659,11 @@ public final class ServicioCatalogos {
         }
         BigDecimal numero;
         try {
-            numero = new BigDecimal(valor.strip());
+            numero = ParserMonto.parsear(valor, campo);
         } catch (NumberFormatException e) {
             throw ExcepcionApi.solicitudInvalida("El campo " + campo + " debe ser un número decimal.");
-        }
-        if (numero.stripTrailingZeros().scale() > 2) {
-            throw ExcepcionApi.entidadNoProcesable(
-                    "El campo " + campo + " admite como máximo 2 decimales.");
+        } catch (IllegalArgumentException e) {
+            throw ExcepcionApi.entidadNoProcesable(e.getMessage());
         }
         if (positivo && numero.compareTo(BigDecimal.ZERO) <= 0) {
             throw ExcepcionApi.entidadNoProcesable(
@@ -674,7 +673,7 @@ public final class ServicioCatalogos {
             throw ExcepcionApi.entidadNoProcesable(
                     "El campo " + campo + " no puede ser negativo.");
         }
-        return numero.setScale(2, RoundingMode.HALF_EVEN);
+        return numero;
     }
 
     private static UUID uuid(String valor, String campo) {

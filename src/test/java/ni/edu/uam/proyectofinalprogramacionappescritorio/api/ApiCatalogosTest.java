@@ -194,6 +194,27 @@ class ApiCatalogosTest {
     }
 
     @Test
+    void rechazaExponenteExtremoSinCrearUnidad() throws Exception {
+        String token = login(nombrePropietario);
+        PropiedadResponse propiedad = crearPropiedad(token,
+                new PropiedadRequest("Edificio", "Calle 1", true,
+                        "Ana Propietaria", CORREO_PROPIETARIO, null, null));
+        long unidadesAntes = new HibernateTransactions(factory).ejecutar(session ->
+                session.createQuery("select count(u) from Unidad u", Long.class)
+                        .getSingleResult());
+
+        HttpResponse<String> respuesta = postJson("/api/v1/unidades",
+                GSON.toJson(new UnidadRequest(propiedad.id(), "A-02", null,
+                        "Apartamento", "Disponible", "1E+999999999", "USD", null)), token);
+        long unidadesDespues = new HibernateTransactions(factory).ejecutar(session ->
+                session.createQuery("select count(u) from Unidad u", Long.class)
+                        .getSingleResult());
+
+        assertEquals(422, respuesta.statusCode(), respuesta.body());
+        assertEquals(unidadesAntes, unidadesDespues);
+    }
+
+    @Test
     void paginaYFiltraInquilinos() throws Exception {
         String token = login(nombrePropietario);
         int indice = 0;
