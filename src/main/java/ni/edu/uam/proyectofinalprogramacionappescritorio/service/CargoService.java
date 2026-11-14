@@ -25,6 +25,7 @@ public final class CargoService {
     private final HibernateTransactions tx;
     private final PermisoService permisos = new PermisoService();
     private final AuditoriaService auditoria = new AuditoriaService();
+    private final RelojService reloj = new RelojService();
 
     public CargoService() {
         this(new HibernateTransactions(HibernateUtil.getSessionFactory()));
@@ -56,7 +57,7 @@ public final class CargoService {
                 aplicadoPorCargo.put((UUID) fila[0], (BigDecimal) fila[1]);
             }
 
-            LocalDate hoy = LocalDate.now();
+            LocalDate hoy = reloj.leer(session).fecha();
             for (Cargo cargo : cargos) {
                 cargo.establecerEstadoDerivado(aplicadoPorCargo.get(cargo.getId()), hoy);
             }
@@ -69,6 +70,7 @@ public final class CargoService {
         return tx.ejecutar(session -> {
             Usuario actor = permisos.exigir(session, SesionUsuario.getActual(),
                     Permiso.OPERAR_ALQUILERES);
+            reloj.comprobar(session);
             Cargo cargo;
             String accion;
             if (solicitud.id() == null) {
@@ -112,6 +114,7 @@ public final class CargoService {
         tx.ejecutar(session -> {
             Usuario actor = permisos.exigir(session, SesionUsuario.getActual(),
                     Permiso.ANULAR_CARGOS);
+            reloj.comprobar(session);
             Cargo cargo = session.find(Cargo.class, id);
             if (cargo == null) throw new IllegalArgumentException("El cargo ya no existe.");
             if ("Cancelado".equals(cargo.getEstado())) return null;

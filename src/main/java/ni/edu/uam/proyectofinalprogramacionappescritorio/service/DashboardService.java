@@ -19,6 +19,7 @@ public final class DashboardService {
 
     private final HibernateTransactions transactions;
     private final PermisoService permisos = new PermisoService();
+    private final RelojService reloj = new RelojService();
 
     public DashboardService() {
         this(new HibernateTransactions(HibernateUtil.getSessionFactory()));
@@ -66,6 +67,7 @@ public final class DashboardService {
 
     private List<TotalMonedaDTO> cargosPendientes(Session session) {
         Map<String, TotalMonedaDTO> totales = new HashMap<>();
+        LocalDate hoy = reloj.leer(session).fecha();
         for (String moneda : MONEDAS) {
             totales.put(moneda, new TotalMonedaDTO(moneda, 0, BigDecimal.ZERO));
         }
@@ -82,7 +84,7 @@ public final class DashboardService {
             Cargo cargo = (Cargo) fila[0];
             String moneda = (String) fila[1];
             BigDecimal aplicado = (BigDecimal) fila[2];
-            cargo.establecerEstadoDerivado(aplicado, LocalDate.now());
+            cargo.establecerEstadoDerivado(aplicado, hoy);
             String estado = cargo.getEstado();
             if (!"Pendiente".equals(estado) && !"Parcial".equals(estado)
                     && !"Vencido".equals(estado)) {

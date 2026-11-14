@@ -24,6 +24,7 @@ public class ContratoService {
     private final HibernateTransactions tx;
     private final HibernateCrudService db;
     private final PermisoService permisos = new PermisoService();
+    private final RelojService reloj = new RelojService();
 
     public ContratoService() {
         this(new HibernateTransactions(HibernateUtil.getSessionFactory()));
@@ -59,11 +60,12 @@ public class ContratoService {
         if ("Terminado".equals(contrato.getEstado()) || "Cancelado".equals(contrato.getEstado())) {
             throw new IllegalArgumentException("Un contrato nuevo debe guardarse como Borrador o activarse.");
         }
-        validarFechaActivacion(contrato.getInicio(), contrato.getEstado());
         contrato.inicializarGarantiaSeguimiento();
 
         tx.ejecutar(session -> {
             permisos.exigir(session, SesionUsuario.getActual(), Permiso.OPERAR_ALQUILERES);
+            RelojService.TiempoOperativo tiempo = reloj.comprobar(session);
+            validarFechaActivacion(contrato.getInicio(), contrato.getEstado(), tiempo.fecha());
             if (Contrato.reservaUnidad(contrato.getEstado())) {
                 bloquearUnidades(session, List.of(contrato.getUnidadId()));
                 validarDisponibilidad(session, contrato.getUnidadId(), null);
@@ -77,10 +79,11 @@ public class ContratoService {
                           LocalDate inicio, LocalDate fin, BigDecimal canon, String moneda,
                           int diaPago, BigDecimal deposito, String estado) throws SQLException {
         validarDatos(unidadId, inquilinoId, inicio, fin, estado);
-        validarFechaActivacion(inicio, estado);
 
         tx.ejecutar(session -> {
             permisos.exigir(session, SesionUsuario.getActual(), Permiso.OPERAR_ALQUILERES);
+            RelojService.TiempoOperativo tiempo = reloj.comprobar(session);
+            validarFechaActivacion(inicio, estado, tiempo.fecha());
             Contrato contrato = buscarContratoBloqueado(session, id);
             if (contrato == null) throw new IllegalArgumentException("El registro ya no existe.");
             if (contrato.getVersion() != version) {
@@ -110,7 +113,7 @@ public class ContratoService {
             contrato.setMoneda(moneda);
             contrato.setDiaPago(diaPago);
             contrato.setDepositoPactado(deposito);
-            contrato.transicionarA(estado, LocalDate.now());
+            contrato.transicionarA(estado, tiempo.fecha());
             return null;
         });
     }
@@ -121,10 +124,11 @@ public class ContratoService {
         }
         tx.ejecutar(session -> {
             permisos.exigir(session, SesionUsuario.getActual(), Permiso.OPERAR_ALQUILERES);
+            RelojService.TiempoOperativo tiempo = reloj.comprobar(session);
             Contrato contrato = buscarContratoBloqueado(session, id);
             if (contrato == null) throw new IllegalArgumentException("El registro ya no existe.");
             contrato.validarTransicionA(estado);
-            validarFechaActivacion(contrato.getInicio(), estado);
+            validarFechaActivacion(contrato.getInicio(), estado, tiempo.fecha());
 
             boolean reservaAntes = Contrato.reservaUnidad(contrato.getEstado());
             boolean reservaDespues = Contrato.reservaUnidad(estado);
@@ -133,7 +137,7 @@ public class ContratoService {
             }
             if (reservaDespues) validarDisponibilidad(session, contrato.getUnidadId(), id);
 
-            contrato.transicionarA(estado, LocalDate.now());
+            contrato.transicionarA(estado, tiempo.fecha());
             return null;
         });
     }
@@ -157,8 +161,9 @@ public class ContratoService {
         }
     }
 
-    private static void validarFechaActivacion(LocalDate inicio, String estado) {
-        if (Contrato.reservaUnidad(estado) && inicio.isAfter(LocalDate.now())) {
+    private static void validarFechaActivacion(LocalDate inicio, String estado,
+                                               LocalDate fechaOperativa) {
+        if (Contrato.reservaUnidad(estado) && inicio.isAfter(fechaOperativa)) {
             throw new IllegalArgumentException(
                     "Un contrato con inicio futuro debe permanecer como Borrador.");
         }
