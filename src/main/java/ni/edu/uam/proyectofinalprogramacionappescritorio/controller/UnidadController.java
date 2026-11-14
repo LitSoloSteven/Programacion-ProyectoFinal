@@ -1,4 +1,5 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 
 import javafx.collections.FXCollections;
@@ -79,8 +80,8 @@ public class UnidadController {
     private Unidad unidadSeleccionada = null;
 
     public UnidadController() {
-        this.unidadService = new UnidadService();
-        this.propiedadService = new PropiedadService();
+        this(HelloApplication.instancia().getComposicion().unidades(),
+                HelloApplication.instancia().getComposicion().propiedades());
     }
 
     public UnidadController(UnidadService unidadService, PropiedadService propiedadService) {

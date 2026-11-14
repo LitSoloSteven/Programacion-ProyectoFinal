@@ -99,7 +99,7 @@ public class DashboardController {
     private final DashboardService dashboardService;
 
     public DashboardController() {
-        this.dashboardService = new DashboardService();
+        this(HelloApplication.instancia().getComposicion().dashboard());
     }
 
     public DashboardController(DashboardService dashboardService) {
