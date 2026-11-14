@@ -5,6 +5,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Properties;
 import static org.junit.jupiter.api.Assertions.*;
@@ -48,8 +51,66 @@ class DatabaseConfigTest {
         assertFalse(error.contains("secreto-sintetico"));
     }
 
+    @Test void aceptaConexionLocalSinCambiarLaConfiguracionActual() {
+        Properties p = DatabaseConfig.desdeEntorno(entorno());
+        assertEquals("jdbc:postgresql://localhost:5432/latch_db", p.getProperty("hibernate.connection.url"));
+    }
+
+    @Test void limitaLosParametrosDeLaUrlYRechazaDuplicados() {
+        assertThrows(IllegalArgumentException.class,
+                () -> DatabaseConfig.desdeEntorno(entornoConUrl("jdbc:postgresql://localhost:5432/latch_db?currentSchema=public")));
+        assertThrows(IllegalArgumentException.class,
+                () -> DatabaseConfig.desdeEntorno(entornoConUrl("jdbc:postgresql://localhost:5432/latch_db?sslmode=disable&sslmode=require")));
+        assertThrows(IllegalArgumentException.class,
+                () -> DatabaseConfig.desdeEntorno(entornoConUrl("jdbc:postgresql://usuario@localhost:5432/latch_db")));
+    }
+
+    @Test void conexionesRemotasExigenModoConVerificacion() {
+        assertThrows(IllegalArgumentException.class,
+                () -> DatabaseConfig.desdeEntorno(entornoConUrl("jdbc:postgresql://db.example.com:5432/latch_db")));
+        assertThrows(IllegalArgumentException.class,
+                () -> DatabaseConfig.desdeEntorno(entornoConUrl("jdbc:postgresql://db.example.com:5432/latch_db?sslmode=require")));
+        assertThrows(IllegalArgumentException.class,
+                () -> DatabaseConfig.desdeEntorno(entornoConUrl("jdbc:postgresql://db.example.com:5432/latch_db?sslmode=disable")));
+    }
+
+    @Test void modoVerificadoRemotoExigeCertificadoRaizExistente() throws Exception {
+        Path certificado = temporal.resolve("root.crt");
+        Files.writeString(certificado, "certificado sintético");
+        String ruta = URLEncoder.encode(certificado.toString(), StandardCharsets.UTF_8).replace("+", "%20");
+        String url = "jdbc:postgresql://db.example.com:5432/latch_db?sslmode=verify-full&sslrootcert=" + ruta;
+
+        Properties p = DatabaseConfig.desdeEntorno(entornoConUrl(url));
+        String urlConfigurada = p.getProperty("hibernate.connection.url");
+        assertTrue(urlConfigurada.startsWith("jdbc:postgresql://db.example.com:5432/latch_db?sslmode=verify-full&sslrootcert="));
+        assertEquals(certificado.normalize().toString(), URLDecoder.decode(
+                urlConfigurada.substring(urlConfigurada.indexOf("sslrootcert=") + "sslrootcert=".length()), StandardCharsets.UTF_8));
+        Properties verificacionCa = DatabaseConfig.desdeEntorno(entornoConUrl(
+                "jdbc:postgresql://db.example.com:5432/latch_db?sslmode=verify-ca&sslrootcert=" + ruta));
+        assertTrue(verificacionCa.getProperty("hibernate.connection.url").contains("sslmode=verify-ca"));
+        assertThrows(IllegalArgumentException.class,
+                () -> DatabaseConfig.desdeEntorno(entornoConUrl("jdbc:postgresql://db.example.com:5432/latch_db?sslmode=verify-full")));
+        assertThrows(IllegalArgumentException.class,
+                () -> DatabaseConfig.desdeEntorno(entornoConUrl("jdbc:postgresql://db.example.com:5432/latch_db?sslmode=verify-full&sslrootcert=" + ruta + ".missing")));
+    }
+
+    @Test void requireSoloSePermiteEnHostLocalYElCertificadoSoloConVerificacion() {
+        for (String modo : new String[] {"disable", "allow", "prefer", "require"}) {
+            Properties p = DatabaseConfig.desdeEntorno(entornoConUrl(
+                    "jdbc:postgresql://127.0.0.1:5432/latch_db?sslmode=" + modo));
+            assertEquals("jdbc:postgresql://127.0.0.1:5432/latch_db?sslmode=" + modo,
+                    p.getProperty("hibernate.connection.url"));
+        }
+        assertThrows(IllegalArgumentException.class,
+                () -> DatabaseConfig.desdeEntorno(entornoConUrl("jdbc:postgresql://localhost:5432/latch_db?sslrootcert=C%3A%5Croot.crt")));
+    }
+
     private Map<String, String> entorno() {
-        return Map.of("LATCH_DB_URL", "jdbc:postgresql://localhost:5432/latch_db",
+        return entornoConUrl("jdbc:postgresql://localhost:5432/latch_db");
+    }
+
+    private Map<String, String> entornoConUrl(String url) {
+        return Map.of("LATCH_DB_URL", url,
                 "LATCH_DB_USER", "usuario", "LATCH_DB_PASSWORD", "sistema");
     }
 }

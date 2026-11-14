@@ -36,6 +36,16 @@ LATCH_API_PORT=8090
 - Las variables de entorno tienen prioridad sobre el archivo.
 - `.env` está ignorado por Git. No introducir credenciales en la URL JDBC ni en
   el código.
+- Para `localhost`, la URL actual sin parámetros sigue siendo válida. Para una
+  base remota, usar `sslmode=verify-full` (recomendado) o `sslmode=verify-ca`
+  y añadir `sslrootcert` con la ruta absoluta a un certificado raíz existente y
+  legible. Codificar los caracteres reservados de la ruta como `%XX` dentro de
+  la URL; por ejemplo, `C:\certs\ca.crt` se escribe como
+  `C%3A%5Ccerts%5Cca.crt`.
+- La URL solo admite los parámetros `sslmode` y `sslrootcert`. Un host remoto
+  rechaza `disable`, `allow`, `prefer` y `require`; `require` cifra la conexión,
+  pero pgJDBC no valida el certificado del servidor en ese modo. Los modos
+  `verify-ca` y `verify-full` requieren `sslrootcert`.
 - `validate` (predeterminado) verifica el esquema sin modificarlo. `update` solo
   debe usarse en una base de desarrollo durante la inicialización.
 

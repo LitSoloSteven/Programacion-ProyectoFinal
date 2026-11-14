@@ -4,13 +4,23 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.HashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.NoSuchFileException;
 import java.nio.charset.StandardCharsets;
 import java.io.IOException;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.nio.file.InvalidPathException;
 
 public final class DatabaseConfig {
+    private static final Pattern JDBC_URL = Pattern.compile(
+            "jdbc:postgresql://(?<host>\\[[^\\]]+\\]|[^:/?#@]+)(?::(?<port>[0-9]+))?/(?<database>[a-zA-Z0-9_-]+)");
+    private static final Set<String> SSL_MODES = Set.of("disable", "allow", "prefer", "require", "verify-ca", "verify-full");
+    private static final Set<String> VERIFIED_SSL_MODES = Set.of("verify-ca", "verify-full");
+
     private DatabaseConfig() {}
 
     /**
@@ -58,18 +68,14 @@ public final class DatabaseConfig {
     }
 
     public static Properties desdeEntorno(Map<String, String> entorno) {
-        String url = requerida(entorno, "LATCH_DB_URL");
-        // Impide introducir credenciales en la URL, que Hibernate puede escribir en logs.
-        if (!url.matches("jdbc:postgresql://[^?@]+/[a-zA-Z0-9_-]+")) {
-            throw new IllegalArgumentException("LATCH_DB_URL debe ser jdbc:postgresql://host:puerto/base, sin credenciales ni parámetros.");
-        }
+        ConexionPostgres conexion = conexionPostgres(requerida(entorno, "LATCH_DB_URL"));
         String schema = entorno.getOrDefault("LATCH_DB_SCHEMA_MODE", "validate");
         if (!Set.of("validate", "update", "none").contains(schema)) {
             throw new IllegalArgumentException("LATCH_DB_SCHEMA_MODE debe ser validate, update o none.");
         }
         Properties p = new Properties();
         p.setProperty("hibernate.connection.driver_class", "org.postgresql.Driver");
-        p.setProperty("hibernate.connection.url", url);
+        p.setProperty("hibernate.connection.url", conexion.url());
         p.setProperty("hibernate.connection.username", requerida(entorno, "LATCH_DB_USER"));
         p.setProperty("hibernate.connection.password", requerida(entorno, "LATCH_DB_PASSWORD"));
         p.setProperty("hibernate.hbm2ddl.auto", schema);
@@ -81,6 +87,111 @@ public final class DatabaseConfig {
         p.setProperty("hibernate.connection.socketTimeout", "10");
         return p;
     }
+
+    private static ConexionPostgres conexionPostgres(String url) {
+        int inicioParametros = url.indexOf('?');
+        String base = inicioParametros < 0 ? url : url.substring(0, inicioParametros);
+        Matcher matcher = JDBC_URL.matcher(base);
+        if (!matcher.matches() || (inicioParametros >= 0 && url.indexOf('?', inicioParametros + 1) >= 0)) {
+            throw urlInvalida();
+        }
+        validarPuerto(matcher.group("port"));
+
+        String sslmode = null;
+        String sslrootcert = null;
+        if (inicioParametros >= 0) {
+            String parametros = url.substring(inicioParametros + 1);
+            if (parametros.isEmpty()) throw urlInvalida();
+            for (String parametro : parametros.split("&", -1)) {
+                int separador = parametro.indexOf('=');
+                if (separador <= 0 || separador == parametro.length() - 1) throw urlInvalida();
+                String clave = decodificarParametro(parametro.substring(0, separador));
+                String valor = decodificarParametro(parametro.substring(separador + 1));
+                if (clave.equals("sslmode") && sslmode == null) {
+                    if (!SSL_MODES.contains(valor)) {
+                        throw new IllegalArgumentException("sslmode debe ser disable, allow, prefer, require, verify-ca o verify-full.");
+                    }
+                    sslmode = valor;
+                } else if (clave.equals("sslrootcert") && sslrootcert == null) {
+                    sslrootcert = valor;
+                } else {
+                    throw new IllegalArgumentException("LATCH_DB_URL solo admite los parámetros sslmode y sslrootcert, sin duplicados.");
+                }
+            }
+        }
+
+        String host = matcher.group("host");
+        if (host.startsWith("[")) host = host.substring(1, host.length() - 1);
+        boolean local = esHostLocal(host);
+        if (!local && (sslmode == null || !VERIFIED_SSL_MODES.contains(sslmode))) {
+            throw new IllegalArgumentException("Para hosts remotos usa sslmode=verify-ca o verify-full con sslrootcert; require no valida el certificado del servidor.");
+        }
+        if (sslrootcert != null && (sslmode == null || !VERIFIED_SSL_MODES.contains(sslmode))) {
+            throw new IllegalArgumentException("sslrootcert solo se permite con sslmode=verify-ca o verify-full.");
+        }
+        if (sslmode != null && VERIFIED_SSL_MODES.contains(sslmode)) {
+            if (sslrootcert == null) {
+                throw new IllegalArgumentException("sslmode=verify-ca o verify-full requiere sslrootcert.");
+            }
+            sslrootcert = validarCertificado(sslrootcert);
+        }
+
+        String urlConfigurada = url;
+        if (sslrootcert != null) {
+            urlConfigurada = base + "?sslmode=" + codificarParametro(sslmode)
+                    + "&sslrootcert=" + codificarParametro(sslrootcert);
+        }
+        return new ConexionPostgres(urlConfigurada);
+    }
+
+    private static void validarPuerto(String puerto) {
+        if (puerto == null) return;
+        try {
+            int valor = Integer.parseInt(puerto);
+            if (valor < 1 || valor > 65535) throw urlInvalida();
+        } catch (NumberFormatException e) {
+            throw urlInvalida();
+        }
+    }
+
+    private static String decodificarParametro(String valor) {
+        try {
+            return URLDecoder.decode(valor, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException e) {
+            throw urlInvalida();
+        }
+    }
+
+    private static String codificarParametro(String valor) {
+        return URLEncoder.encode(valor, StandardCharsets.UTF_8).replace("+", "%20");
+    }
+
+    private static String validarCertificado(String valor) {
+        try {
+            Path ruta = Path.of(valor);
+            if (!ruta.isAbsolute() || !Files.isRegularFile(ruta) || !Files.isReadable(ruta)) {
+                throw new IllegalArgumentException("sslrootcert debe ser la ruta absoluta y legible de un certificado raíz existente.");
+            }
+            return ruta.normalize().toString();
+        } catch (InvalidPathException e) {
+            throw new IllegalArgumentException("sslrootcert debe ser una ruta absoluta y legible.");
+        }
+    }
+
+    private static boolean esHostLocal(String host) {
+        if (host.equalsIgnoreCase("localhost") || host.equals("::1")) return true;
+        if (!host.matches("127(?:\\.[0-9]{1,3}){3}")) return false;
+        for (String segmento : host.split("\\.")) {
+            if (Integer.parseInt(segmento) > 255) return false;
+        }
+        return true;
+    }
+
+    private static IllegalArgumentException urlInvalida() {
+        return new IllegalArgumentException("LATCH_DB_URL debe ser jdbc:postgresql://host[:puerto]/base con solo parámetros sslmode y sslrootcert, sin credenciales.");
+    }
+
+    private record ConexionPostgres(String url) {}
 
     private static String requerida(Map<String, String> entorno, String clave) {
         String valor = entorno.get(clave);
