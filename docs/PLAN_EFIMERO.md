@@ -1,0 +1,62 @@
+# Plan efímero de corrección de auditoría
+
+Rama: `fix/auditoria-seguridad`
+
+Cada elemento se marca `[~]` antes de iniciar y `[x]` al terminar. La columna de commit registra el hash de implementación; las actualizaciones de este plan se mantienen en commits `docs:` separados cuando haga falta registrar el hash ya generado.
+
+## Fase 1: antes de cualquier demo
+
+- [ ] A1. DoS por exponente en BigDecimal. Archivos: `util/ParserMonto.java` (nuevo), `api/pagos/ServicioPagos.java`, `api/catalogos/ServicioCatalogos.java`, `service/TipoCambioService.java` y pruebas de parser/servicios. Estrategia: centralizar parseo, acotar precisión, escala y máximo 1e12 antes de `setScale`; rechazar entradas inválidas con error de validación. Pruebas: `1E+6`, `1E+999999999`, negativos, cero, exceso de decimales y latencia del exponente extremo (<100 ms). Commit: pendiente.
+- [ ] A5. PATCH con valores por defecto destructivos. Archivos: `api/catalogos/ServicioCatalogos.java`, DTOs de estado y `api/ApiCatalogosTest.java`. Estrategia: exigir el campo de estado, validar dominio y responder 422 ante ausencias/valores no admitidos sin mutar entidades. Pruebas: `{}`, valores inválidos y valores válidos para propiedad, inquilino, unidad y contrato. Commit: pendiente.
+- [ ] A2. Alteración de cargos y garantías sin auditoría. Archivos: `service/CargoService.java`, `api/pagos/RutasPagos.java` (o controlador equivalente), `service/GarantiaService.java`, `service/HibernateCrudService.java`, permisos/DTOs y pruebas API/servicio. Estrategia: separar `ANULAR_CARGOS` y `LIQUIDAR_GARANTIA` para Propietario; bloquear cambios de importe/estado con aplicaciones activas; escribir auditoría en la misma transacción y sustituir merge masivo por DTO/campos permitidos. Pruebas: rol Asistente rechazado, cero escrituras y auditoría atómica; Propietario autorizado. Commit: pendiente.
+
+## Fase 2: integridad financiera
+
+- [ ] A3. Carrera en distribución de pagos. Archivos: `api/pagos/ServicioPagos.java`, DAO/consulta de cargos y pruebas concurrentes. Estrategia: bloquear contrato y cargos con `PESSIMISTIC_WRITE` en orden contrato y luego vencimiento/id. Pruebas: dos transacciones concurrentes sobre el mismo cargo sin sobreaplicación. Commit: pendiente.
+- [ ] A4. Estado de cargo desincronizado. Archivos: `modelo/Cargo.java`, servicio de cargos/pagos, `service/DashboardService.java`, consultas de estado de cuenta/reportes y pruebas. Estrategia: derivar una sola vez desde importe y aplicaciones activas con precedencia Anulado, Pagado, Vencido, Parcial, Pendiente; usar ese resultado en todas las salidas y dejar de sumar importe filtrando Pendiente. Pruebas: precedencia, aplicaciones/anulación y agregados de dashboard/estado de cuenta. Commit: pendiente.
+- [ ] M2. Tasas duplicadas por fecha y banda no confirmada. Archivos: `modelo/TipoCambio.java`, migración SQL nueva, `service/TipoCambioService.java`, API/DTO de tasas y pruebas. Estrategia: UNIQUE por fecha efectiva; mapear conflictos a ERR-060/MSG-083; exigir confirmación de Propietario fuera de banda 1–100 NIO/USD sin CHECK. Pruebas: duplicado, límites y autorización de confirmación. Commit: pendiente.
+- [ ] M1. Contratos sin máquina de estados. Archivos: `service/ContratoService.java`, `modelo/Contrato.java`, persistencia/consultas de contratos, sincronización de `Garantia`, pruebas y migración solo si es necesaria. Estrategia: permitir transiciones válidas, impedir solapes por unidad (RN-01), proteger moneda/canon/depósito si hay cargos/pagos y sincronizar `Garantia.montoInicial` con `depositoPactado`. Pruebas: transiciones, solape, campos protegidos y garantía sincronizada. Commit: pendiente.
+- [ ] A6. Edición de propiedad reasigna el dueño. Archivos: `service/PropiedadService.java`, DTO/controlador involucrado y pruebas. Estrategia: conservar dueño persistido salvo cambio explícito validado y autorizado. Pruebas: edición normal mantiene dueño; cambio autorizado cambia dueño; cambio no autorizado se rechaza. Commit: pendiente.
+- [ ] M8. Idempotencia de pagos incompleta. Archivos: `controller/PagoController.java`, DTO/cliente de pagos, servicio de pagos, `modelo/SolicitudIdempotente.java`, migración SQL y pruebas/documentación. Estrategia: enviar UUID desde UI/API y definir retención y limpieza segura de solicitudes idempotentes. Pruebas: repetición devuelve el resultado original; clave distinta registra pago nuevo; limpieza respeta retención. Commit: pendiente.
+
+## Fase 3: robustez de API y configuración
+
+- [ ] A7. TLS a PostgreSQL. Archivos: `config/DatabaseConfig.java`, pruebas de configuración y documentación de configuración si aplica. Estrategia: aceptar solo `sslmode` y `sslrootcert`, validar combinaciones y rechazar `require` sin verificación para hosts remotos. Pruebas: allowlist, host local/remoto y certificado. Commit: pendiente.
+- [ ] M3. Bloqueo de login. Archivos: `api/comun/ControlIntentosLogin.java`, rutas de autenticación, `service/AuditoriaService.java` y pruebas. Estrategia: auditar fallos según RF-M01-02 y contar/limitar intentos por origen además del identificador. Pruebas: auditoría, aislamiento por origen, límite y recuperación. Commit: pendiente.
+- [ ] M4. ServidorApi. Archivos: `api/comun/ServidorApi.java`, router/contexto y pruebas. Estrategia: configurar timeout de lectura, validar Host antes de enrutar y autenticar antes de revelar 404/405 en rutas protegidas. Pruebas: timeout/configuración, Host inválido y respuestas no enumerables sin autenticación. Commit: pendiente.
+- [ ] M5. Tokens de usuario desactivado/cambio de rol. Archivos: `api/comun/TokenService.java`, `service/UsuarioService.java`, `modelo/Usuario.java` y pruebas. Estrategia: revocar tokens al desactivar usuario o cambiar rol, con validación central al autenticar. Pruebas: token previo rechazado tras ambas operaciones; token vigente aceptado antes del cambio. Commit: pendiente.
+- [ ] M6. Zona horaria y desfase del reloj. Archivos: configuración/servicio de reloj, servicios financieros/API, pruebas y documentación. Estrategia: obtener instante y fecha operativa desde PostgreSQL, presentar en America/Managua y bloquear operaciones financieras cuando el desfase exceda 5 minutos (ERR-057). Pruebas: conversión de zona, hora de BD y umbral de bloqueo. Commit: pendiente.
+- [ ] M7. ValidadorEntrada. Archivos: `util/ValidadorEntrada.java`, consumidores pertinentes y pruebas. Estrategia: unificar vacíos, endurecer teléfono, limitar longitud de `valor` y manejar `mesesMinimos` extremo sin 500/DateTimeException. Pruebas: equivalencia de vacíos, teléfonos adversos, longitud y entero extremo. Commit: pendiente.
+
+## Fase 4: mantenibilidad
+
+- [ ] B1/B2. I/O fuera del hilo JavaFX y errores de handlers. Archivos: `controller/PagoController.java`, `CargoController.java`, `ContratoController.java`, `DashboardController.java`, FXML solo si se requiere y pruebas pertinentes. Estrategia: mover I/O a `Task`/`Service`, actualizar UI en hilo JavaFX y capturar errores en `handleAnular` y `handleTerminarContrato`. Pruebas: servicios ejecutados fuera del FX thread y estado/error visible en fallos. Commit: pendiente.
+- [ ] B3. Paginación y N+1 en pagos/cargos. Archivos: consultas/DAO de pagos y cargos, DTOs/API y pruebas. Estrategia: limitar páginas a 50 filas y cargar relaciones en lote/proyección sin N+1. Pruebas: límite máximo, páginas sucesivas y número acotado de consultas. Commit: pendiente.
+- [ ] B4. Router decodifica URL dos veces. Archivos: `api/comun/Router.java` y pruebas. Estrategia: normalizar/decodificar una vez y pasar el path ya procesado. Pruebas: rutas normales, caracteres codificados y rechazo de doble codificación. Commit: pendiente.
+- [ ] B5. Una transacción por petición en servicios API. Archivos: `api/pagos/ServicioPagos.java`, `api/catalogos/ServicioCatalogos.java`, `config/HibernateTransactions.java` y pruebas. Estrategia: establecer límites transaccionales por operación y retirar transacciones anidadas/duplicadas. Pruebas: una transacción por petición y rollback ante fallo. Commit: pendiente.
+- [ ] B6. Escapado de `%` y `_` en LIKE. Archivos: servicios/consultas de búsqueda y pruebas. Estrategia: escapar comodines y carácter de escape en términos del usuario. Pruebas: búsquedas literales que incluyan `%`, `_` y el carácter de escape. Commit: pendiente.
+- [ ] B7/B8. Cableado único y lógica compartida UI/API. Archivos: `HelloApplication.java`, `herramientas/IniciarApi.java`, servicios/controladores y pruebas. Estrategia: construir dependencias desde un único composition root y hacer que UI/API invoquen la misma lógica de dominio sin duplicación. Pruebas: ambas entradas comparten servicios/configuración y regresión de operaciones comunes. Commit: pendiente.
+- [ ] B9. Densidad de ContratoService y excepción de configuración. Archivos: `service/ContratoService.java`, `service/ConfiguracionService.java` y pruebas. Estrategia: extraer/formatear operaciones legibles y lanzar excepción de dominio adecuada en vez de una excepción genérica. Pruebas: transiciones/validaciones existentes y tipo/mensaje del error. Commit: pendiente.
+- [ ] B10. Pruebas PostgreSQL además de H2. Archivos: `pom.xml`, configuración/perfil de pruebas, documentación de desarrollo y pruebas de concurrencia/índices. Estrategia: habilitar perfil PostgreSQL reproducible, documentar variables y comando; conservar H2 para pruebas rápidas. Pruebas: suite H2 y perfil PostgreSQL, incluyendo concurrencia e índices parciales, si hay servidor disponible. Commit: pendiente.
+
+## Revisión complementaria: recibos
+
+La observación de `Recibo.contratoInfo` (300 caracteres) frente a `Contrato.toString()` y la numeración RN-07 se revisará junto con el contador transaccional decidido en M8 o en el elemento que corresponda. Se añadirá evidencia y pruebas al plan antes de modificar esos componentes.
+
+## Decisiones pendientes del usuario
+
+Todas las decisiones iniciales ya fueron respondidas el 2026-11-13:
+
+1. Hash de contraseñas: migrar a Argon2id (19 MiB, t=2, p=1).
+2. Esquema: Hibernate `validate` y migraciones SQL.
+3. Pool: HikariCP.
+4. Numeración: contador transaccional PostgreSQL `fn_reservar_numero` para cumplir RN-07.
+5. Paquete raíz y servidor embebido: conservar el paquete actual y la API HTTP embebida.
+
+No quedan decisiones pendientes. Las decisiones que requieren cambios adicionales fuera de A1–A7/M1–M8/B1–B10 se documentarán junto con el hallazgo relacionado, con pruebas y commits separados que respeten el límite de tres archivos.
+
+## Verificación global
+
+- Por cada elemento: anotar en el propio ítem los casos ejecutados, lo no verificado y evidencia si ya estaba corregido/no se reproduce.
+- Ejecutar la suite completa al cierre de cada fase y registrar comando y resultado.
+- No borrar este plan hasta que todos los ítems estén hechos o explícitamente diferidos y todas las pruebas aplicables pasen. En ese momento eliminarlo con `git rm` en el commit final propio `docs: eliminar plan efímero`.
