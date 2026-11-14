@@ -49,6 +49,8 @@
                         styleClass="nav-btn" text="📑  Cargos" />
                 <Button fx:id="btnNavPagos" maxWidth="Infinity" onAction="#navegarPagos"
                         styleClass="nav-btn" text="💵  Pagos" />
+                <Button fx:id="btnNavTasas" maxWidth="Infinity" onAction="#navegarTasas"
+                        styleClass="nav-btn" text="💱  Tasas de Cambio" />
             </VBox>
 
             <!-- CERRAR SESIÓN -->
@@ -130,7 +132,7 @@
                 <VBox spacing="8.0" styleClass="welcome-banner">
                     <Label styleClass="welcome-title" text="Bienvenido al entorno de gestión inmobiliaria Latch" />
                     <Label styleClass="welcome-text"
-                           text="Utilice el menú lateral para acceder a la gestión de Propiedades, Unidades, Inquilinos, Contratos, Cargos y Pagos. Las operaciones respetan los permisos de rol Propietario y Asistente y sincronizan automáticamente contra PostgreSQL."
+                           text="Utilice el menú lateral para acceder a la gestión de Propiedades, Unidades, Inquilinos, Contratos, Cargos, Pagos y Tasas de Cambio. Las operaciones respetan los permisos de rol Propietario y Asistente y se comunican con el servicio local de Latch."
                            wrapText="true" />
                 </VBox>
             </VBox>

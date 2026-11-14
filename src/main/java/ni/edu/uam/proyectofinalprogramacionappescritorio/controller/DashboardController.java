@@ -1,6 +1,7 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 
+import javafx.concurrent.Task;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -13,6 +14,10 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteApi;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteAuth;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
+
 import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.MetricasDashboardDTO;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 
@@ -53,6 +58,9 @@ public class DashboardController {
 
     @FXML
     private Button btnNavPagos;
+
+    @FXML
+    private Button btnNavTasas;
 
     @FXML
     private Button btnCerrarSesion;
@@ -178,6 +186,12 @@ public class DashboardController {
         cargarVista("pago-view.fxml");
     }
 
+    @FXML
+    public void navegarTasas() {
+        activarBoton(btnNavTasas);
+        cargarVista("tasa-view.fxml");
+    }
+
     private void cargarVista(String fxmlFile) {
         try {
             FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource(fxmlFile));
@@ -190,7 +204,7 @@ public class DashboardController {
     }
 
     private void activarBoton(Button botonActivo) {
-        Button[] botones = {btnNavDashboard, btnNavPropiedades, btnNavUnidades, btnNavInquilinos, btnNavContratos, btnNavCargos, btnNavPagos};
+        Button[] botones = {btnNavDashboard, btnNavPropiedades, btnNavUnidades, btnNavInquilinos, btnNavContratos, btnNavCargos, btnNavPagos, btnNavTasas};
         for (Button b : botones) {
             if (b != null) {
                 b.getStyleClass().remove("nav-btn-active");
@@ -209,26 +223,63 @@ public class DashboardController {
         );
 
         if (confirmar) {
+            cerrarSesionRemota();
             SesionUsuario.cerrarSesion();
-            try {
-                FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource("login-view.fxml"));
-                Parent root = loader.load();
+            mostrarLogin(event);
+        }
+    }
 
-                Stage stage = (Stage) ((Node) event.getSource()).getScene().getWindow();
-                Scene scene = new Scene(root, 850, 620);
+    private void cerrarSesionRemota() {
+        final ClienteApi api;
+        final String token;
+        try {
+            api = ClienteLatch.api();
+            // Se captura y borra el token en el hilo de JavaFX, antes de
+            // programar la revocación, para que ninguna petición posterior
+            // lo reutilice.
+            token = api.tomarToken();
+        } catch (RuntimeException e) {
+            return;
+        }
+        if (token == null || token.isBlank()) return;
 
-                var css = HelloApplication.class.getResource("estilos.css");
-                if (css != null) {
-                    scene.getStylesheets().add(css.toExternalForm());
+        Task<Void> tarea = new Task<>() {
+            @Override
+            protected Void call() {
+                try {
+                    new ClienteAuth(api).logout(token);
+                } catch (RuntimeException e) {
+                    // La sesión local ya está cerrada; el token expira solo.
                 }
-
-                stage.setTitle("Latch — Iniciar Sesión");
-                stage.setScene(scene);
-                stage.centerOnScreen();
-                stage.show();
-            } catch (IOException e) {
-                AlertaUtil.mostrarError("Error", "No se pudo volver a la pantalla de inicio de sesión.");
+                return null;
             }
+        };
+        try {
+            HelloApplication.instancia().getTareas().ejecutar(tarea);
+        } catch (RuntimeException e) {
+            // El servicio local ya no está disponible.
+        }
+    }
+
+    private void mostrarLogin(ActionEvent event) {
+        try {
+            FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource("login-view.fxml"));
+            Parent root = loader.load();
+
+            Stage stage = (Stage) ((Node) event.getSource()).getScene().getWindow();
+            Scene scene = new Scene(root, 850, 620);
+
+            var css = HelloApplication.class.getResource("estilos.css");
+            if (css != null) {
+                scene.getStylesheets().add(css.toExternalForm());
+            }
+
+            stage.setTitle("Latch — Iniciar Sesión");
+            stage.setScene(scene);
+            stage.centerOnScreen();
+            stage.show();
+        } catch (IOException e) {
+            AlertaUtil.mostrarError("Error", "No se pudo volver a la pantalla de inicio de sesión.");
         }
     }
 }
