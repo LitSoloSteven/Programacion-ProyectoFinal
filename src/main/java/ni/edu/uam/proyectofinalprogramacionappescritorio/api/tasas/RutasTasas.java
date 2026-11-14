@@ -100,11 +100,13 @@ public final class RutasTasas {
                     "El motivo de autorización es obligatorio.");
         }
         try {
+            boolean confirmarFueraDeBanda = Boolean.TRUE.equals(
+                    solicitud.confirmarFueraDeBanda());
             Optional<TipoCambio> autorizada = enSesion(contexto,
-                    () -> servicio.autorizar(id, solicitud.motivo()));
+                    () -> servicio.autorizar(id, solicitud.motivo(), confirmarFueraDeBanda));
             return RespuestaJson.ok(respuesta(autorizada.orElseThrow(ExcepcionApi::noEncontrado)));
         } catch (ConflictoDatosException e) {
-            throw ExcepcionApi.conflicto(e.getMessage());
+            throw new ExcepcionApi(409, "ERR-060", TipoCambioService.MENSAJE_TASA_DUPLICADA);
         } catch (IllegalArgumentException e) {
             throw ExcepcionApi.entidadNoProcesable(e.getMessage());
         }
