@@ -3,12 +3,12 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import javafx.collections.transformation.FilteredList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PaginaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Cargo;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
@@ -57,6 +57,15 @@ public class CargoController {
     private Button btnEliminar;
 
     @FXML
+    private Button btnPaginaAnterior;
+
+    @FXML
+    private Button btnPaginaSiguiente;
+
+    @FXML
+    private Label lblPaginacion;
+
+    @FXML
     private TextField txtBuscar;
 
     @FXML
@@ -84,10 +93,11 @@ public class CargoController {
     private final ContratoService contratoService;
 
     private final ObservableList<Cargo> listaCargos = FXCollections.observableArrayList();
-    private FilteredList<Cargo> listaFiltrada;
     private Cargo cargoSeleccionado = null;
+    private int paginaActual = 1;
+    private long versionConsulta;
 
-    private record DatosTabla(List<Contrato> contratos, List<Cargo> cargos) {
+    private record DatosTabla(List<Contrato> contratos, PaginaResponse<Cargo> cargos) {
     }
 
     public CargoController() {
@@ -137,20 +147,13 @@ public class CargoController {
         colVence.setCellValueFactory(new PropertyValueFactory<>("venceEl"));
         colEstado.setCellValueFactory(new PropertyValueFactory<>("estado"));
 
-        listaFiltrada = new FilteredList<>(listaCargos, c -> true);
-        tblCargos.setItems(listaFiltrada);
+        tblCargos.setItems(listaCargos);
     }
 
     private void configurarFiltro() {
         txtBuscar.textProperty().addListener((obs, oldVal, newVal) -> {
-            listaFiltrada.setPredicate(c -> {
-                if (newVal == null || newVal.isBlank()) return true;
-                String filtro = newVal.toLowerCase().trim();
-                boolean matchCon = c.getContratoInfo() != null && c.getContratoInfo().toLowerCase().contains(filtro);
-                boolean matchConcep = c.getConcepto() != null && c.getConcepto().toLowerCase().contains(filtro);
-                boolean matchTip = c.getTipo() != null && c.getTipo().toLowerCase().contains(filtro);
-                return matchCon || matchConcep || matchTip;
-            });
+            paginaActual = 1;
+            cargarDatos();
         });
     }
 
@@ -173,33 +176,46 @@ public class CargoController {
     }
 
     public void cargarDatos() {
-        Task<List<Cargo>> tarea = new Task<>() {
+        int pagina = paginaActual;
+        String texto = txtBuscar.getText();
+        long version = ++versionConsulta;
+        Task<PaginaResponse<Cargo>> tarea = new Task<>() {
             @Override
-            protected List<Cargo> call() throws SQLException {
-                return cargoService.listarTodos();
+            protected PaginaResponse<Cargo> call() {
+                return cargoService.listarTodos(pagina, CargoService.TAMANO_PAGINA_MAXIMO, texto);
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, listaCargos::setAll,
-                error -> AlertaUtil.mostrarError("Error al cargar cargos",
-                        "No fue posible consultar las obligaciones desde PostgreSQL."));
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, resultado -> {
+            if (version == versionConsulta) mostrarPagina(resultado);
+        }, error -> {
+            if (version == versionConsulta) AlertaUtil.mostrarError("Error al cargar cargos",
+                    "No fue posible consultar las obligaciones desde PostgreSQL.");
+        });
     }
 
     @FXML
     public void refrescarTabla() {
+        int pagina = paginaActual;
+        String texto = txtBuscar.getText();
+        long version = ++versionConsulta;
         Task<DatosTabla> tarea = new Task<>() {
             @Override
             protected DatosTabla call() throws SQLException {
-                return new DatosTabla(contratoService.listarVigentes(), cargoService.listarTodos());
+                return new DatosTabla(contratoService.listarVigentes(),
+                        cargoService.listarTodos(pagina, CargoService.TAMANO_PAGINA_MAXIMO, texto));
             }
         };
         TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
+            if (version != versionConsulta) return;
             mostrarContratos(datos.contratos());
-            listaCargos.setAll(datos.cargos());
+            mostrarPagina(datos.cargos());
             limpiarFormulario();
             AlertaUtil.mostrarExito("Tabla actualizada",
                     "El registro de cargos ha sido sincronizado con PostgreSQL.");
-        }, error -> AlertaUtil.mostrarError("Error al cargar cargos",
-                "No fue posible sincronizar el registro de cargos desde PostgreSQL."));
+        }, error -> {
+            if (version == versionConsulta) AlertaUtil.mostrarError("Error al cargar cargos",
+                    "No fue posible sincronizar el registro de cargos desde PostgreSQL.");
+        });
     }
 
     @FXML
@@ -270,6 +286,7 @@ public class CargoController {
                 AlertaUtil.mostrarExito("Actualización exitosa", "El cargo financiero fue actualizado.");
             }
 
+            paginaActual = 1;
             cargarDatos();
             limpiarFormulario();
         }, this::mostrarErrorCargo);
@@ -307,6 +324,33 @@ public class CargoController {
     private void mostrarContratos(List<Contrato> contratos) {
         cmbContrato.setItems(FXCollections.observableArrayList(contratos));
         if (!contratos.isEmpty()) cmbContrato.getSelectionModel().selectFirst();
+    }
+
+    private void mostrarPagina(PaginaResponse<Cargo> pagina) {
+        int paginas = (int) Math.max(1, (pagina.total() + pagina.tamano() - 1) / pagina.tamano());
+        if (paginaActual > paginas) {
+            paginaActual = paginas;
+            cargarDatos();
+            return;
+        }
+        listaCargos.setAll(pagina.elementos());
+        lblPaginacion.setText("Página " + paginaActual + " de " + paginas
+                + " · " + pagina.total() + " cargos");
+        btnPaginaAnterior.setDisable(paginaActual <= 1);
+        btnPaginaSiguiente.setDisable(paginaActual >= paginas);
+    }
+
+    @FXML
+    public void paginaAnterior() {
+        if (paginaActual <= 1) return;
+        paginaActual--;
+        cargarDatos();
+    }
+
+    @FXML
+    public void paginaSiguiente() {
+        paginaActual++;
+        cargarDatos();
     }
 
     private void mostrarErrorCargo(Throwable error) {

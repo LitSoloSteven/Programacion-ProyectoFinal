@@ -120,6 +120,8 @@ Cuerpo uniforme:
 | PATCH | `/api/v1/contratos/{id}` | `OPERAR_ALQUILERES` |
 | POST | `/api/v1/validaciones` | `OPERAR_ALQUILERES` |
 | POST | `/api/v1/pagos` | `OPERAR_ALQUILERES` + `Idempotency-Key` |
+| GET | `/api/v1/pagos?pagina=1&tamano=50&texto=...` | `OPERAR_ALQUILERES` |
+| GET | `/api/v1/cargos?pagina=1&tamano=50&texto=...` | `OPERAR_ALQUILERES` |
 | GET | `/api/v1/pagos/{id}` | `OPERAR_ALQUILERES` |
 | GET | `/api/v1/recibos/{numero}` | `OPERAR_ALQUILERES` |
 | POST | `/api/v1/pagos/{id}/anulacion` | `ANULAR_PAGOS` (solo propietario) |
@@ -215,6 +217,12 @@ Content-Type: application/json
 
 `GET /api/v1/pagos/{id}` devuelve el detalle con `aplicaciones`, `numeroRecibo`,
 `credito` y, si fue anulado, `motivoAnulacion`, `anuladoPor` y `anuladoEn`.
+
+`GET /api/v1/pagos` y `GET /api/v1/cargos` devuelven páginas de hasta 50 filas.
+`pagina` empieza en 1, `tamano` usa 50 por defecto y rechaza valores mayores
+que 50; `texto` filtra por contrato, referencia/método en pagos y por contrato,
+concepto/tipo en cargos. La respuesta tiene `pagina`, `tamano`, `total` y
+`elementos`; fechas e importes son cadenas para conservar su formato.
 
 `GET /api/v1/recibos/{numero}` devuelve el recibo con importes como texto.
 
