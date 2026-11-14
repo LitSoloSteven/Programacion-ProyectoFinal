@@ -11,8 +11,8 @@ import java.util.UUID;
 public class Auditoria {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "usuario_id", nullable = false, updatable = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "usuario_id", nullable = true, updatable = false)
     private Usuario actor;
     @Column(nullable = false, updatable = false)
     private Instant instante;
@@ -26,11 +26,19 @@ public class Auditoria {
     protected Auditoria() {}
 
     public Auditoria(Usuario actor, UUID correlacion, String accion, String referencia) {
-        this.actor = Objects.requireNonNull(actor);
+        this(correlacion, accion, referencia, Objects.requireNonNull(actor));
+    }
+
+    private Auditoria(UUID correlacion, String accion, String referencia, Usuario actor) {
+        this.actor = actor;
         this.instante = Instant.now();
         this.correlacion = Objects.requireNonNull(correlacion);
         this.accion = texto(accion, 80);
         this.referencia = texto(referencia, 160);
+    }
+
+    public static Auditoria intentoLoginFallido(UUID correlacion, String referencia) {
+        return new Auditoria(correlacion, "LOGIN_FALLIDO", referencia, null);
     }
 
     private static String texto(String valor, int maximo) {
