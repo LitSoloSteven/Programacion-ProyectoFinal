@@ -120,9 +120,40 @@ class TipoCambioServiceTest {
         TipoCambio segunda = servicio.registrar(FECHA, new BigDecimal("37.10"), "BCN");
         servicio.autorizar(primera.getId(), "Primera autorización").orElseThrow();
 
-        assertThrows(ConflictoDatosException.class,
+        ConflictoDatosException error = assertThrows(ConflictoDatosException.class,
                 () -> servicio.autorizar(segunda.getId(), "Segunda autorización"));
+        assertEquals(TipoCambioService.MENSAJE_TASA_DUPLICADA, error.getMessage());
         assertEquals(1, servicio.listar(FECHA, true, 50).size());
+    }
+
+    @Test
+    void laBandaEsInclusivaYExigeConfirmacionFueraDeRango() {
+        entrarComoPropietario();
+        TipoCambio limiteInferior = servicio.registrar(FECHA, new BigDecimal("1"), "BCN");
+        TipoCambio limiteSuperior = servicio.registrar(FECHA.plusDays(1),
+                new BigDecimal("100"), "BCN");
+        TipoCambio bajo = servicio.registrar(FECHA.plusDays(2),
+                new BigDecimal("0.99"), "BCN");
+        TipoCambio alto = servicio.registrar(FECHA.plusDays(3),
+                new BigDecimal("100.01"), "BCN");
+
+        assertFalse(limiteInferior.estaFueraDeBanda());
+        assertFalse(limiteSuperior.estaFueraDeBanda());
+        assertTrue(bajo.estaFueraDeBanda());
+        assertTrue(alto.estaFueraDeBanda());
+
+        servicio.autorizar(limiteInferior.getId(), "Límite inferior").orElseThrow();
+        servicio.autorizar(limiteSuperior.getId(), "Límite superior").orElseThrow();
+
+        IllegalArgumentException rechazo = assertThrows(IllegalArgumentException.class,
+                () -> servicio.autorizar(bajo.getId(), "Sin confirmar"));
+        assertEquals(TipoCambioService.MENSAJE_FUERA_DE_BANDA, rechazo.getMessage());
+        assertThrows(IllegalArgumentException.class,
+                () -> servicio.autorizar(alto.getId(), "Sin confirmar"));
+
+        servicio.autorizar(bajo.getId(), "Revisión confirmada", true).orElseThrow();
+        servicio.autorizar(alto.getId(), "Revisión confirmada", true).orElseThrow();
+        assertEquals(4, servicio.listar(null, true, 50).size());
     }
 
     @Test

@@ -20,6 +20,10 @@ import java.util.UUID;
  */
 public final class TipoCambioService {
     public static final int LIMITE_MAXIMO = 200;
+    public static final String MENSAJE_TASA_DUPLICADA =
+            "Ya existe una tasa autorizada para esa fecha.";
+    public static final String MENSAJE_FUERA_DE_BANDA =
+            "La tasa está fuera de la banda 1–100 NIO/USD; el Propietario debe confirmar la revisión.";
 
     private final HibernateTransactions transactions;
     private final PermisoService permisos = new PermisoService();
@@ -102,40 +106,53 @@ public final class TipoCambioService {
         });
     }
 
+    public Optional<TipoCambio> autorizar(UUID id, String motivo) {
+        return autorizar(id, motivo, false);
+    }
+
     /**
      * Autoriza una tasa informativa creando una nueva instantánea. Devuelve
      * vacío si el identificador no existe; lanza conflicto si la fecha ya
-     * tiene una tasa autorizada.
+     * tiene una tasa autorizada. Fuera de la banda 1–100 NIO/USD exige
+     * confirmación explícita del Propietario, sin restricción en la BD.
      */
-    public Optional<TipoCambio> autorizar(UUID id, String motivo) {
+    public Optional<TipoCambio> autorizar(UUID id, String motivo,
+                                          boolean confirmarFueraDeBanda) {
         Objects.requireNonNull(id, "Falta el identificador de la tasa.");
         if (motivo == null || motivo.isBlank()) {
             throw new IllegalArgumentException("El motivo de autorización es obligatorio.");
         }
-        return transactions.ejecutar((Session session) -> {
-            Usuario actor = permisos.exigir(session, SesionUsuario.getActual(),
-                    Permiso.AUTORIZAR_TASA);
-            TipoCambio origen = session.find(TipoCambio.class, id);
-            if (origen == null) return Optional.<TipoCambio>empty();
-            if (origen.isAutorizada()) {
-                throw new ConflictoDatosException("La tasa ya está autorizada.");
-            }
-            Long autorizadas = session.createQuery("""
-                            select count(t) from TipoCambio t
-                            where t.fecha = :fecha and t.autorizadoPor is not null
-                            """, Long.class)
-                    .setParameter("fecha", origen.getFecha())
-                    .getSingleResult();
-            if (autorizadas > 0) {
-                throw new ConflictoDatosException(
-                        "Ya existe una tasa autorizada para esa fecha.");
-            }
-            TipoCambio autorizada = TipoCambio.autorizada(origen.getFecha(),
-                    origen.getNioPorUsd(), origen.getFuente(), Instant.now(), actor, motivo);
-            session.persist(autorizada);
-            auditoria.registrar(session, actor, UUID.randomUUID(), "TASA_AUTORIZADA",
-                    "tasa:" + autorizada.getId());
-            return Optional.of(autorizada);
-        });
+        try {
+            return transactions.ejecutar((Session session) -> {
+                Usuario actor = permisos.exigir(session, SesionUsuario.getActual(),
+                        Permiso.AUTORIZAR_TASA);
+                TipoCambio origen = session.find(TipoCambio.class, id);
+                if (origen == null) return Optional.<TipoCambio>empty();
+                if (origen.isAutorizada()) {
+                    throw new ConflictoDatosException(MENSAJE_TASA_DUPLICADA);
+                }
+                if (origen.estaFueraDeBanda() && !confirmarFueraDeBanda) {
+                    throw new IllegalArgumentException(MENSAJE_FUERA_DE_BANDA);
+                }
+                Long autorizadas = session.createQuery("""
+                                select count(t) from TipoCambio t
+                                where t.fecha = :fecha and t.autorizadoPor is not null
+                                """, Long.class)
+                        .setParameter("fecha", origen.getFecha())
+                        .getSingleResult();
+                if (autorizadas > 0) {
+                    throw new ConflictoDatosException(MENSAJE_TASA_DUPLICADA);
+                }
+                TipoCambio autorizada = TipoCambio.autorizada(origen.getFecha(),
+                        origen.getNioPorUsd(), origen.getFuente(), Instant.now(), actor, motivo);
+                session.persist(autorizada);
+                auditoria.registrar(session, actor, UUID.randomUUID(), "TASA_AUTORIZADA",
+                        "tasa:" + autorizada.getId());
+                return Optional.of(autorizada);
+            });
+        } catch (ConflictoDatosException e) {
+            // También normaliza la violación del índice único ante concurrencia.
+            throw new ConflictoDatosException(MENSAJE_TASA_DUPLICADA);
+        }
     }
 }
