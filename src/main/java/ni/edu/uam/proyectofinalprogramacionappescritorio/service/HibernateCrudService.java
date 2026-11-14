@@ -10,8 +10,16 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 final class HibernateCrudService {
-    private final HibernateTransactions tx = new HibernateTransactions(HibernateUtil.getSessionFactory());
+    private final HibernateTransactions tx;
     private final PermisoService permisos = new PermisoService();
+
+    HibernateCrudService() {
+        this(new HibernateTransactions(HibernateUtil.getSessionFactory()));
+    }
+
+    HibernateCrudService(HibernateTransactions tx) {
+        this.tx = tx;
+    }
 
     <T> List<T> listar(Class<T> tipo, String hql) {
         return tx.ejecutar(s -> {
