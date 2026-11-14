@@ -26,19 +26,30 @@ public class Auditoria {
     protected Auditoria() {}
 
     public Auditoria(Usuario actor, UUID correlacion, String accion, String referencia) {
-        this(correlacion, accion, referencia, Objects.requireNonNull(actor));
+        this(actor, Instant.now(), correlacion, accion, referencia);
     }
 
-    private Auditoria(UUID correlacion, String accion, String referencia, Usuario actor) {
-        this.actor = actor;
-        this.instante = Instant.now();
+    public Auditoria(Usuario actor, Instant instante, UUID correlacion,
+                     String accion, String referencia) {
+        this(actor, instante, correlacion, accion, referencia, false);
+    }
+
+    private Auditoria(Usuario actor, Instant instante, UUID correlacion,
+                      String accion, String referencia, boolean permitirActorNulo) {
+        this.actor = permitirActorNulo ? actor : Objects.requireNonNull(actor);
+        this.instante = Objects.requireNonNull(instante);
         this.correlacion = Objects.requireNonNull(correlacion);
         this.accion = texto(accion, 80);
         this.referencia = texto(referencia, 160);
     }
 
     public static Auditoria intentoLoginFallido(UUID correlacion, String referencia) {
-        return new Auditoria(correlacion, "LOGIN_FALLIDO", referencia, null);
+        return new Auditoria(null, Instant.now(), correlacion, "LOGIN_FALLIDO", referencia, true);
+    }
+
+    public static Auditoria intentoLoginFallido(Instant instante, UUID correlacion,
+                                                String referencia) {
+        return new Auditoria(null, instante, correlacion, "LOGIN_FALLIDO", referencia, true);
     }
 
     private static String texto(String valor, int maximo) {

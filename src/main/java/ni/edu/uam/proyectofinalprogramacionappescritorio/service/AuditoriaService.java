@@ -11,9 +11,12 @@ import java.util.Locale;
 import java.util.UUID;
 
 public final class AuditoriaService {
+    private final RelojService reloj = new RelojService();
+
     // Participa en la transacción de negocio: si ésta falla, tampoco queda una auditoría de éxito.
     public void registrar(Session session, Usuario actor, UUID correlacion, String accion, String referencia) {
-        session.persist(new Auditoria(actor, correlacion, accion, referencia));
+        session.persist(new Auditoria(actor, reloj.leer(session).instante(), correlacion,
+                accion, referencia));
     }
 
     public void registrarIntentoLoginFallido(Session session, UUID correlacion,
@@ -22,7 +25,8 @@ public final class AuditoriaService {
         String origenSeguro = origen == null ? "desconocido" : origen.strip().toLowerCase(Locale.ROOT);
         if (!origenSeguro.matches("[a-z0-9:.%_-]{1,64}")) origenSeguro = "desconocido";
         String referencia = "usuario_sha256:" + sha256(identificador) + ";origen:" + origenSeguro;
-        session.persist(Auditoria.intentoLoginFallido(correlacion, referencia));
+        session.persist(Auditoria.intentoLoginFallido(reloj.leer(session).instante(),
+                correlacion, referencia));
     }
 
     private static String sha256(String texto) {

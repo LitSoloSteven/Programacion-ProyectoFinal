@@ -1,6 +1,8 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.modelo;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.Generated;
+import org.hibernate.generator.EventType;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -22,6 +24,10 @@ public class Pago {
     private String contratoInfo;
     @Column(name = "fecha_pago", updatable = false, nullable = false)
     private LocalDate fechaPago;
+    @Generated(event = EventType.INSERT)
+    @Column(name = "creado_en", insertable = false, updatable = false, nullable = false,
+            columnDefinition = "TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP")
+    private Instant creadoEn;
     @Column(name = "moneda_original", length = 3, updatable = false, nullable = false)
     private String monedaOriginal;
     @Column(name = "monto_original", precision = 19, scale = 2, updatable = false, nullable = false)
@@ -113,6 +119,9 @@ public class Pago {
     public LocalDate getFechaPago() {
         return fechaPago;
     }
+
+    public Instant getCreadoEn() { return creadoEn; }
+
 
     public void setFechaPago(LocalDate fechaPago) {
         this.fechaPago = fechaPago;
