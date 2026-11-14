@@ -3,6 +3,7 @@ package ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.RutasAuth;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ConflictoDatosException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.AutenticacionService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojDesfasadoException;
 
@@ -127,6 +128,8 @@ public final class ServidorApi implements AutoCloseable {
                     "La solicitud contiene datos inválidos."));
         } catch (SecurityException e) {
             escribirError(intercambio, ExcepcionApi.sinPermiso());
+        } catch (ConflictoDatosException e) {
+            escribirError(intercambio, ExcepcionApi.conflicto(e.getMessage()));
         } catch (RelojDesfasadoException e) {
             escribirError(intercambio, ExcepcionApi.relojDesfasado());
         } catch (Exception e) {
