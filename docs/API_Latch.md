@@ -34,7 +34,9 @@ Content-Type: application/json
 - Cada petición protegida envía `Authorization: Bearer <token>`.
 - El rol y el estado `activo` del usuario se **revalidan contra la base de datos en cada operación**.
 - `POST /api/v1/auth/logout` revoca el token de inmediato (`204`).
-- Tras 5 intentos fallidos, el usuario queda bloqueado 15 minutos (`429`).
+- Tras 5 intentos fallidos para el usuario o 25 desde el mismo origen, el login
+  queda bloqueado durante 15 minutos (`429`). Un login correcto restablece ambos
+  contadores. Los fallos se auditan sin guardar usuario ni contraseña en claro.
 - El mensaje de credenciales inválidas es idéntico exista o no el usuario.
 
 ## Convenciones de la petición

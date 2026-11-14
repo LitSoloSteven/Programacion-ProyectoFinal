@@ -61,6 +61,10 @@ aplicar **en orden** las migraciones de `docs/migrations`:
 | `V3__descripcion_unidad.sql` | Descripción de unidades |
 | `V4__tasas_autorizadas.sql` | Una tasa autorizada por fecha y tasa positiva |
 | `V5__pagos_idempotencia_aplicaciones.sql` | Idempotencia, aplicaciones de pago y datos de anulación |
+| `V6__contratos_activos_por_unidad.sql` | Una ocupación activa por unidad |
+| `V7__retencion_idempotencia_pagos.sql` | Índice para limpiar idempotencias vencidas |
+| `V8__consecutivo_recibos_transaccional.sql` | Consecutivo de recibos sin huecos por rollback |
+| `V9__auditoria_login_fallido.sql` | Auditoría de login fallido sin requerir una cuenta existente |
 
 Ejemplo con `psql`:
 
@@ -70,6 +74,10 @@ psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V2__seguimiento_g
 psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V3__descripcion_unidad.sql
 psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V4__tasas_autorizadas.sql
 psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V5__pagos_idempotencia_aplicaciones.sql
+psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V6__contratos_activos_por_unidad.sql
+psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V7__retencion_idempotencia_pagos.sql
+psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V8__consecutivo_recibos_transaccional.sql
+psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V9__auditoria_login_fallido.sql
 ```
 
 Comprobar la conexión:
@@ -223,7 +231,8 @@ El detalle de controles, verificación y riesgos aceptados está en
 - `409` al repetir un pago: la `Idempotency-Key` se usó con otro contenido u
   otro usuario. Usar una clave nueva para un pago distinto.
 - `401` tras 15 minutos: la sesión expiró; cerrar sesión y volver a iniciar.
-- `429` al iniciar sesión: demasiados intentos fallidos; esperar 15 minutos.
+- `429` al iniciar sesión: cinco fallos para la cuenta o 25 desde el mismo
+  origen; esperar 15 minutos.
 - Error de conexión: comprobar el servicio PostgreSQL, puerto, base, usuario y
   contraseña.
 

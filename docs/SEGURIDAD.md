@@ -108,7 +108,9 @@ en errores o logs, duplicación de cobros y manipulación de importes.
 9. El login HTTP no modifica la sesión global de JavaFX.
 10. La respuesta de login no contiene contraseña, hash ni PBKDF2.
 11. Credenciales inválidas no revelan si el usuario existe.
-12. Cinco fallos bloquean el login con `429`.
+12. Cinco fallos para una cuenta y 25 desde un origen bloquean el login con `429`.
+13. Cada credencial inválida genera auditoría con identificador hash y origen,
+    sin asociar el evento a una cuenta que podría no existir.
 
 Además, `ApiPagosTest` verifica que una `Idempotency-Key` de otro usuario
 devuelve `409` y no duplica el pago, y `SesionUsuarioTest` cubre el aislamiento
@@ -131,7 +133,6 @@ Resultado de la suite completa: **108 pruebas, 0 fallos, 0 errores, 0 omitidas**
 ## Recomendaciones futuras
 
 - Emitir tokens con un identificador de sesión revocable desde el servidor.
-- Añadir un límite de intentos también por IP además de por usuario.
 - Firmar los recibos o exportarlos a PDF con verificación.
 - Rotar credenciales de base de datos y usar un usuario con permisos mínimos.
 - Sustituir el pool básico de Hibernate por uno configurado para producción.
