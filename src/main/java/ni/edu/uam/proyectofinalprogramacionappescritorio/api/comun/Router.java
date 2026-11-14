@@ -58,6 +58,22 @@ public final class Router {
         throw ExcepcionApi.noEncontrado();
     }
 
+    public boolean esPublica(String metodo, String ruta) {
+        List<String> partes;
+        try {
+            partes = segmentos(ruta);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+        for (Ruta candidata : rutas) {
+            if (candidata.publica() && candidata.metodo().equalsIgnoreCase(metodo)
+                    && candidata.coincidir(partes) != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static Map<String, String> analizarConsulta(String consultaCruda) {
         if (consultaCruda == null || consultaCruda.isBlank()) return Map.of();
         Map<String, String> valores = new LinkedHashMap<>();

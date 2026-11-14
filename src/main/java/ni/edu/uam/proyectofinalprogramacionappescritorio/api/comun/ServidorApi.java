@@ -25,8 +25,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class ServidorApi implements AutoCloseable {
     private static final int HILOS_API = 4;
     private static final int COLA_API = 64;
+    private static final int TIEMPO_MAXIMO_LECTURA_SEGUNDOS = 30;
     /** Consumo acotado del cuerpo rechazado para que el cliente pueda leer el 413. */
     private static final long LIMITE_DRENADO = 1024L * 1024;
+
+    static {
+        // HttpServer lee esta propiedad al inicializarse; el valor está expresado en segundos.
+        System.setProperty("sun.net.httpserver.maxReqTime",
+                Integer.toString(TIEMPO_MAXIMO_LECTURA_SEGUNDOS));
+    }
 
     private final ApiConfig config;
     private final TokenService tokens;
@@ -85,18 +92,22 @@ public final class ServidorApi implements AutoCloseable {
 
     private void manejar(HttpExchange intercambio) {
         try {
-            Router.Resultado resultado = router.resolver(
-                    intercambio.getRequestMethod(), intercambio.getRequestURI().getPath());
-            Map<String, String> consulta = Router.analizarConsulta(
-                    intercambio.getRequestURI().getRawQuery());
-
             SesionApi sesion = null;
             String token = null;
-            if (!resultado.ruta().publica()) {
+            String metodo = intercambio.getRequestMethod();
+            String ruta = intercambio.getRequestURI().getPath();
+            validarHost(intercambio);
+            if (!router.esPublica(metodo, ruta)) {
                 token = extraerToken(intercambio);
                 sesion = tokens.validar(token).orElseThrow(ExcepcionApi::noAutorizado);
             }
 
+            Router.Resultado resultado = router.resolver(metodo, ruta);
+            if (!resultado.ruta().publica() && sesion == null) {
+                throw ExcepcionApi.noAutorizado();
+            }
+            Map<String, String> consulta = Router.analizarConsulta(
+                    intercambio.getRequestURI().getRawQuery());
             ContextoPeticion contexto = new ContextoPeticion(
                     intercambio, resultado.parametros(), consulta, sesion, token);
             escribir(intercambio, resultado.ruta().manejador().manejar(contexto));
@@ -114,6 +125,15 @@ public final class ServidorApi implements AutoCloseable {
             escribirError(intercambio, ExcepcionApi.interno());
         } finally {
             intercambio.close();
+        }
+    }
+
+    private void validarHost(HttpExchange intercambio) {
+        List<String> valores = intercambio.getRequestHeaders().get("Host");
+        String esperado = config.host() + ":" + puerto();
+        if (valores == null || valores.size() != 1
+                || !valores.get(0).strip().equalsIgnoreCase(esperado)) {
+            throw ExcepcionApi.solicitudInvalida("La cabecera Host no es válida.");
         }
     }
 
