@@ -52,6 +52,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 /**
  * API 4: cobranza y pagos. Las escrituras usan una Idempotency-Key persistente
@@ -81,6 +82,11 @@ public final class ServicioPagos {
         this.pagos = new PagoService(tx);
         this.cargos = new CargoService(tx);
         this.reloj = Objects.requireNonNull(reloj, "Falta el reloj de la API.");
+    }
+
+    public <T> T enTransaccion(Supplier<T> operacion) {
+        Objects.requireNonNull(operacion, "Falta la operación de la API.");
+        return tx.ejecutar(session -> operacion.get());
     }
 
     public PaginaResponse<PagoListaResponse> listarPagos(int pagina, int tamano, String texto) {
@@ -121,10 +127,11 @@ public final class ServicioPagos {
         String idempotencyKey = claveUuid(clave);
         DatosPago datos = validar(solicitud);
         String huella = huella(datos);
-        limpiarSolicitudesExpiradas();
         try {
-            return tx.ejecutar(session ->
-                    registrarEnSesion(session, idempotencyKey, huella, datos));
+            return tx.ejecutar(session -> {
+                limpiarSolicitudesExpiradas(session);
+                return registrarEnSesion(session, idempotencyKey, huella, datos);
+            });
         } catch (ConflictoDatosException e) {
             // Otra petición pudo insertar la misma clave en paralelo. Si ya
             // terminó, se repite su respuesta; si no coincide, se conserva 409.
@@ -140,14 +147,18 @@ public final class ServicioPagos {
      * conserva para no invalidar una operación que pudiera seguir activa.
      */
     public int limpiarSolicitudesExpiradas() {
+        return tx.ejecutar(this::limpiarSolicitudesExpiradas);
+    }
+
+    private int limpiarSolicitudesExpiradas(Session session) {
         Instant limite = reloj.instant().minus(RETENCION_IDEMPOTENCIA);
-        return tx.ejecutar(session -> session.createNativeMutationQuery("""
+        return session.createNativeMutationQuery("""
                         delete from solicitud_idempotente
                         where estado = :estado and completado_en < :limite
                         """)
                 .setParameter("estado", SolicitudIdempotente.COMPLETADA)
                 .setParameter("limite", limite)
-                .executeUpdate());
+                .executeUpdate();
     }
 
     public PagoDetalleResponse obtenerPago(UUID id) {

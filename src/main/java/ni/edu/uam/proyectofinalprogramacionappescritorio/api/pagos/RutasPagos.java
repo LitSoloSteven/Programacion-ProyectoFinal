@@ -64,8 +64,8 @@ public final class RutasPagos {
         }
         PagoRequest solicitud = leer(contexto, PagoRequest.class);
         try {
-            return RespuestaJson.creado(enSesion(contexto,
-                    () -> servicio.registrar(clave, solicitud)));
+            return RespuestaJson.creado(SesionUsuario.ejecutarComo(
+                    contexto.sesion().comoUsuario(), () -> servicio.registrar(clave, solicitud)));
         } catch (ConflictoDatosException e) {
             throw ExcepcionApi.conflicto(e.getMessage());
         } catch (IllegalArgumentException e) {
@@ -107,8 +107,9 @@ public final class RutasPagos {
         return Json.leer(LectorCuerpo.leerJson(contexto.intercambio()), tipo);
     }
 
-    private static <T> T enSesion(ContextoPeticion contexto, Supplier<T> operacion) {
-        return SesionUsuario.ejecutarComo(contexto.sesion().comoUsuario(), operacion);
+    private <T> T enSesion(ContextoPeticion contexto, Supplier<T> operacion) {
+        return SesionUsuario.ejecutarComo(contexto.sesion().comoUsuario(),
+                () -> servicio.enTransaccion(operacion));
     }
 
     private static UUID identificador(String valor) {
