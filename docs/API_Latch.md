@@ -159,11 +159,14 @@ POST /api/v1/tasas
 { "fecha": "2026-11-13", "tasa": "36.62430000", "fuente": "BCN" }
 
 POST /api/v1/tasas/{id}/autorizar
-{ "motivo": "Tasa oficial del día" }
+{ "motivo": "Tasa oficial del día", "confirmarFueraDeBanda": false }
 ```
 
 No se admiten fechas futuras (`422`). Autorizar dos veces la misma fecha
-devuelve `409`.
+devuelve `409` con código `ERR-060` y el mensaje `MSG-083`, sin insertar otro
+registro. La banda 1–100 NIO/USD es inclusiva y solo es una advertencia: fuera
+de ella el propietario debe enviar `"confirmarFueraDeBanda": true`; la base de
+datos no impone un `CHECK` de banda, solo de tasa positiva.
 
 ## Cobranza y pagos
 

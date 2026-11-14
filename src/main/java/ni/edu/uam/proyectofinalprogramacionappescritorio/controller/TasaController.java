@@ -16,6 +16,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.TasaRespo
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteTasas;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.TipoCambio;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoTasa;
@@ -197,15 +198,27 @@ public class TasaController {
             txtMotivo.requestFocus();
             return;
         }
-        boolean confirmar = AlertaUtil.mostrarConfirmacion("Autorizar tasa",
-                "La tasa del " + fechaVisible(seleccionada.fecha())
-                        + " quedará disponible para convertir pagos. ¿Desea continuar?");
+        boolean fueraDeBanda = new BigDecimal(seleccionada.nioPorUsd())
+                .compareTo(TipoCambio.BANDA_MINIMA) < 0
+                || new BigDecimal(seleccionada.nioPorUsd())
+                .compareTo(TipoCambio.BANDA_MAXIMA) > 0;
+        boolean confirmar;
+        if (fueraDeBanda) {
+            confirmar = AlertaUtil.mostrarConfirmacion("Tasa fuera de banda",
+                    "La tasa del " + fechaVisible(seleccionada.fecha())
+                            + " está fuera de la banda comercial 1–100 NIO/USD. "
+                            + "Revise la fuente antes de confirmar. ¿Desea autorizarla?");
+        } else {
+            confirmar = AlertaUtil.mostrarConfirmacion("Autorizar tasa",
+                    "La tasa del " + fechaVisible(seleccionada.fecha())
+                            + " quedará disponible para convertir pagos. ¿Desea continuar?");
+        }
         if (!confirmar) return;
 
         Task<TasaResponse> tarea = new Task<>() {
             @Override
             protected TasaResponse call() {
-                return cliente.autorizar(seleccionada.id(), motivo.strip());
+                return cliente.autorizar(seleccionada.id(), motivo.strip(), fueraDeBanda);
             }
         };
         ejecutar(tarea, autorizada -> {
