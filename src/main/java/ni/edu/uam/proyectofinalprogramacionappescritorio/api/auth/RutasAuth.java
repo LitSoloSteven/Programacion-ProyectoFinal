@@ -70,7 +70,7 @@ public final class RutasAuth {
         }
         intentos.registrarExito(solicitud.usuario(), origen);
         TokenService.TokenEmitido emitido = tokens.emitir(
-                new SesionApi(sesion.getUsuarioId(), sesion.getNombre(), sesion.getRol()));
+                new SesionApi(sesion.getUsuarioId(), sesion.getNombre(), sesion.getRol(), sesion.getVersion()));
         return RespuestaJson.ok(new LoginResponse(
                 emitido.token(),
                 emitido.expiraEn().toString(),
