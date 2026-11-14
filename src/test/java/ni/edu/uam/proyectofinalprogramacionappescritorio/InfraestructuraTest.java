@@ -218,7 +218,10 @@ class InfraestructuraTest {
             service.guardar(propietario, clave, "original", -1);
             long version = service.consultar(propietario, clave).getVersion();
             service.guardar(propietario, clave, "nuevo", version);
-            assertThrows(IllegalArgumentException.class, () -> service.guardar(propietario, clave, "obsoleto", version));
+            ConflictoDatosException conflicto = assertThrows(ConflictoDatosException.class,
+                    () -> service.guardar(propietario, clave, "obsoleto", version));
+            assertEquals("La configuración cambió. Actualiza los datos antes de guardar.",
+                    conflicto.getMessage());
             assertEquals("nuevo", service.consultar(propietario, clave).getValor());
         }
     }

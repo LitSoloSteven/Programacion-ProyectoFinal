@@ -91,29 +91,11 @@ public class ContratoService {
                         "Otro usuario modificó el registro. Actualiza los datos antes de reintentar.");
             }
             contrato.validarTransicionA(estado);
-
-            boolean reservaAntes = Contrato.reservaUnidad(contrato.getEstado());
-            boolean reservaDespues = Contrato.reservaUnidad(estado);
-            if (reservaAntes || reservaDespues) {
-                bloquearUnidades(session, List.of(contrato.getUnidadId(), unidadId));
-            }
-            if (reservaDespues) validarDisponibilidad(session, unidadId, id);
-
-            if (cambiaronTerminosFinancieros(contrato, moneda, canon, deposito)
-                    && tieneCargosOPagos(session, id)) {
-                throw new IllegalStateException(
-                        "No se pueden cambiar moneda, canon ni depósito después de registrar cargos o pagos.");
-            }
-
-            contrato.setUnidadId(unidadId);
-            contrato.setInquilinoId(inquilinoId);
-            contrato.setInicio(inicio);
-            contrato.setFin(fin);
-            contrato.setCanon(canon);
-            contrato.setMoneda(moneda);
-            contrato.setDiaPago(diaPago);
-            contrato.setDepositoPactado(deposito);
-            contrato.transicionarA(estado, tiempo.fecha());
+            protegerDisponibilidad(session, contrato.getUnidadId(), contrato.getEstado(),
+                    unidadId, estado, id);
+            validarTerminosFinancieros(session, contrato, id, moneda, canon, deposito);
+            aplicarActualizacion(contrato, unidadId, inquilinoId, inicio, fin,
+                    canon, moneda, diaPago, deposito, estado, tiempo.fecha());
             return null;
         });
     }
@@ -129,14 +111,8 @@ public class ContratoService {
             if (contrato == null) throw new IllegalArgumentException("El registro ya no existe.");
             contrato.validarTransicionA(estado);
             validarFechaActivacion(contrato.getInicio(), estado, tiempo.fecha());
-
-            boolean reservaAntes = Contrato.reservaUnidad(contrato.getEstado());
-            boolean reservaDespues = Contrato.reservaUnidad(estado);
-            if (reservaAntes || reservaDespues) {
-                bloquearUnidades(session, List.of(contrato.getUnidadId()));
-            }
-            if (reservaDespues) validarDisponibilidad(session, contrato.getUnidadId(), id);
-
+            protegerDisponibilidad(session, contrato.getUnidadId(), contrato.getEstado(),
+                    contrato.getUnidadId(), estado, id);
             contrato.transicionarA(estado, tiempo.fecha());
             return null;
         });
@@ -175,6 +151,43 @@ public class ContratoService {
                 throw new IllegalArgumentException("La unidad seleccionada ya no existe.");
             }
         });
+    }
+
+    private static void protegerDisponibilidad(Session session, UUID unidadActual,
+                                               String estadoActual, UUID unidadNueva,
+                                               String estadoNuevo, UUID contratoId) {
+        boolean reservaAntes = Contrato.reservaUnidad(estadoActual);
+        boolean reservaDespues = Contrato.reservaUnidad(estadoNuevo);
+        if (!reservaAntes && !reservaDespues) return;
+
+        bloquearUnidades(session, List.of(unidadActual, unidadNueva));
+        if (reservaDespues) validarDisponibilidad(session, unidadNueva, contratoId);
+    }
+
+    private static void validarTerminosFinancieros(Session session, Contrato contrato,
+                                                   UUID contratoId, String moneda,
+                                                   BigDecimal canon, BigDecimal deposito) {
+        if (cambiaronTerminosFinancieros(contrato, moneda, canon, deposito)
+                && tieneCargosOPagos(session, contratoId)) {
+            throw new IllegalStateException(
+                    "No se pueden cambiar moneda, canon ni depósito después de registrar cargos o pagos.");
+        }
+    }
+
+    private static void aplicarActualizacion(Contrato contrato, UUID unidadId,
+                                             UUID inquilinoId, LocalDate inicio,
+                                             LocalDate fin, BigDecimal canon, String moneda,
+                                             int diaPago, BigDecimal deposito, String estado,
+                                             LocalDate fechaOperativa) {
+        contrato.setUnidadId(unidadId);
+        contrato.setInquilinoId(inquilinoId);
+        contrato.setInicio(inicio);
+        contrato.setFin(fin);
+        contrato.setCanon(canon);
+        contrato.setMoneda(moneda);
+        contrato.setDiaPago(diaPago);
+        contrato.setDepositoPactado(deposito);
+        contrato.transicionarA(estado, fechaOperativa);
     }
 
     private static Contrato buscarContratoBloqueado(Session session, UUID id) {
