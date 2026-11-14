@@ -6,6 +6,9 @@ module ni.edu.uam.proyectofinalprogramacionappescritorio {
     requires java.sql;
     requires java.naming;
     requires org.postgresql.jdbc;
+    requires jdk.httpserver;
+    requires java.net.http;
+    requires com.google.gson;
 
 
     opens ni.edu.uam.proyectofinalprogramacionappescritorio to javafx.fxml;
@@ -17,4 +20,12 @@ module ni.edu.uam.proyectofinalprogramacionappescritorio {
     exports ni.edu.uam.proyectofinalprogramacionappescritorio.config;
     exports ni.edu.uam.proyectofinalprogramacionappescritorio.service;
     exports ni.edu.uam.proyectofinalprogramacionappescritorio.util;
+    opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun to com.google.gson;
+    opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.dto to com.google.gson;
+    opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto to com.google.gson;
+    opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto to com.google.gson;
+    opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.validaciones.dto to com.google.gson;
+    opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto to com.google.gson;
+    opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.indicadores.dto to com.google.gson;
+    opens ni.edu.uam.proyectofinalprogramacionappescritorio.dto to com.google.gson;
 }
