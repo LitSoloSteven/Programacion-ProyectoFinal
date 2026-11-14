@@ -230,32 +230,15 @@ public class CargoController {
         }
 
         try {
-            if (cargoSeleccionado == null) {
-                // Nuevo cargo
-                Cargo nuevo = new Cargo();
-                nuevo.setContratoId(contrato.getId());
-                nuevo.setTipo(tipo);
-                nuevo.setImporte(importe);
-                nuevo.setEstado(estado);
-                nuevo.setConcepto(concepto.trim());
-                nuevo.setPeriodo(periodo.withDayOfMonth(1));
-                nuevo.setFechaEmision(emision);
-                nuevo.setVenceEl(vence);
-
-                cargoService.guardar(nuevo);
+            boolean nuevo = cargoSeleccionado == null;
+            cargoService.guardar(new CargoService.Solicitud(
+                    nuevo ? null : cargoSeleccionado.getId(),
+                    nuevo ? 0 : cargoSeleccionado.getVersion(),
+                    contrato.getId(), tipo, periodo.withDayOfMonth(1), emision,
+                    vence, importe, concepto.trim(), estado));
+            if (nuevo) {
                 AlertaUtil.mostrarExito("Registro exitoso", "El cargo financiero fue registrado correctamente en PostgreSQL.");
             } else {
-                // Edición
-                cargoSeleccionado.setContratoId(contrato.getId());
-                cargoSeleccionado.setTipo(tipo);
-                cargoSeleccionado.setImporte(importe);
-                cargoSeleccionado.setEstado(estado);
-                cargoSeleccionado.setConcepto(concepto.trim());
-                cargoSeleccionado.setPeriodo(periodo.withDayOfMonth(1));
-                cargoSeleccionado.setFechaEmision(emision);
-                cargoSeleccionado.setVenceEl(vence);
-
-                cargoService.guardar(cargoSeleccionado);
                 AlertaUtil.mostrarExito("Actualización exitosa", "El cargo financiero fue actualizado.");
             }
 
@@ -280,14 +263,14 @@ public class CargoController {
         }
 
         boolean confirma = AlertaUtil.mostrarConfirmacion(
-                "Confirmar eliminación",
-                "¿Está seguro de que desea eliminar este cargo de " + cargoSeleccionado.getImporteFormateado() + "?"
+                "Confirmar anulación",
+                "¿Está seguro de que desea anular este cargo de " + cargoSeleccionado.getImporteFormateado() + "?"
         );
 
         if (confirma) {
             try {
-                cargoService.eliminar(cargoSeleccionado.getId());
-                AlertaUtil.mostrarExito("Registro eliminado", "El cargo fue eliminado de PostgreSQL.");
+                cargoService.anular(cargoSeleccionado.getId());
+                AlertaUtil.mostrarExito("Cargo anulado", "El cargo fue anulado y auditado.");
                 cargarDatos();
                 limpiarFormulario();
             } catch (SecurityException e) {

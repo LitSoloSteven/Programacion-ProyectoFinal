@@ -1,9 +1,150 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.service;
+
+import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.AplicacionPago;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Cargo;
-import java.sql.SQLException; import java.util.*;
-public class CargoService {
- private final HibernateCrudService db=new HibernateCrudService();
- public List<Cargo> listarTodos()throws SQLException{return db.listar(Cargo.class,"from Cargo order by periodo desc");}
- public void guardar(Cargo c)throws SQLException{if(c==null||c.getContratoId()==null||c.getImporte()==null)throw new IllegalArgumentException("Contrato e importe son obligatorios.");db.guardar(c,Cargo::getId,x->{});}
- public void eliminar(UUID id)throws SQLException{db.eliminar(Cargo.class,id,Permiso.GESTIONAR_USUARIOS);}
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Pago;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
+import org.hibernate.Session;
+
+import java.math.BigDecimal;
+import java.sql.SQLException;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+
+public final class CargoService {
+    private static final BigDecimal MONTO_MAXIMO = new BigDecimal("1000000000000");
+    private static final Set<String> ESTADOS = Set.of("Pendiente", "Pagado", "Cancelado");
+
+    private final HibernateTransactions tx;
+    private final HibernateCrudService db;
+    private final PermisoService permisos = new PermisoService();
+    private final AuditoriaService auditoria = new AuditoriaService();
+
+    public CargoService() {
+        this(new HibernateTransactions(HibernateUtil.getSessionFactory()));
+    }
+
+    CargoService(HibernateTransactions tx) {
+        this.tx = Objects.requireNonNull(tx);
+        this.db = new HibernateCrudService(tx);
+    }
+
+    public List<Cargo> listarTodos() throws SQLException {
+        return db.listar(Cargo.class, "from Cargo order by periodo desc");
+    }
+
+    public UUID guardar(Solicitud solicitud) throws SQLException {
+        validar(solicitud);
+        return tx.ejecutar(session -> {
+            Usuario actor = permisos.exigir(session, SesionUsuario.getActual(),
+                    Permiso.OPERAR_ALQUILERES);
+            Cargo cargo;
+            String accion;
+            if (solicitud.id() == null) {
+                cargo = new Cargo();
+                aplicar(cargo, solicitud);
+                if ("Cancelado".equals(solicitud.estado())) {
+                    permisos.exigir(session, SesionUsuario.getActual(), Permiso.ANULAR_CARGOS);
+                }
+                session.persist(cargo);
+                accion = "CARGO_CREADO";
+            } else {
+                cargo = session.find(Cargo.class, solicitud.id());
+                if (cargo == null) throw new IllegalArgumentException("El cargo ya no existe.");
+                if (cargo.getVersion() != solicitud.version()) {
+                    throw new ConflictoDatosException(
+                            "Otro usuario modificó el cargo. Actualiza los datos antes de reintentar.");
+                }
+                if (tieneAplicacionesActivas(session, cargo.getId())
+                        && (cargo.getImporte().compareTo(solicitud.importe()) != 0
+                        || !Objects.equals(cargo.getEstado(), solicitud.estado())
+                        || !Objects.equals(cargo.getContratoId(), solicitud.contratoId()))) {
+                    throw new IllegalStateException(
+                            "No se puede cambiar el importe, estado o contrato de un cargo con pagos aplicados.");
+                }
+                if (!Objects.equals(cargo.getEstado(), solicitud.estado())
+                        && "Cancelado".equals(solicitud.estado())) {
+                    permisos.exigir(session, SesionUsuario.getActual(), Permiso.ANULAR_CARGOS);
+                }
+                aplicar(cargo, solicitud);
+                accion = "CARGO_ACTUALIZADO";
+            }
+            session.flush();
+            auditoria.registrar(session, actor, UUID.randomUUID(), accion,
+                    "cargo:" + cargo.getId());
+            return cargo.getId();
+        });
+    }
+
+    public void anular(UUID id) throws SQLException {
+        Objects.requireNonNull(id, "Falta el identificador del cargo.");
+        tx.ejecutar(session -> {
+            Usuario actor = permisos.exigir(session, SesionUsuario.getActual(),
+                    Permiso.ANULAR_CARGOS);
+            Cargo cargo = session.find(Cargo.class, id);
+            if (cargo == null) throw new IllegalArgumentException("El cargo ya no existe.");
+            if ("Cancelado".equals(cargo.getEstado())) return null;
+            if (tieneAplicacionesActivas(session, id)) {
+                throw new IllegalStateException(
+                        "No se puede anular un cargo con pagos aplicados.");
+            }
+            cargo.setEstado("Cancelado");
+            auditoria.registrar(session, actor, UUID.randomUUID(), "CARGO_ANULADO",
+                    "cargo:" + id);
+            return null;
+        });
+    }
+
+    private static void validar(Solicitud solicitud) {
+        if (solicitud == null || solicitud.contratoId() == null
+                || solicitud.importe() == null || solicitud.tipo() == null
+                || solicitud.periodo() == null || solicitud.fechaEmision() == null
+                || solicitud.venceEl() == null || solicitud.concepto() == null
+                || solicitud.estado() == null) {
+            throw new IllegalArgumentException("Complete todos los campos del cargo.");
+        }
+        if (solicitud.importe().signum() <= 0
+                || solicitud.importe().abs().compareTo(MONTO_MAXIMO) > 0
+                || solicitud.importe().stripTrailingZeros().scale() > 2) {
+            throw new IllegalArgumentException("El importe debe ser positivo, válido y no superar 1e12.");
+        }
+        if (solicitud.venceEl().isBefore(solicitud.fechaEmision())) {
+            throw new IllegalArgumentException("El vencimiento no puede preceder a la emisión.");
+        }
+        if (!ESTADOS.contains(solicitud.estado())) {
+            throw new IllegalArgumentException("El estado del cargo no es válido.");
+        }
+    }
+
+    private static void aplicar(Cargo cargo, Solicitud solicitud) {
+        cargo.setContratoId(solicitud.contratoId());
+        cargo.setTipo(solicitud.tipo());
+        cargo.setPeriodo(solicitud.periodo());
+        cargo.setFechaEmision(solicitud.fechaEmision());
+        cargo.setVenceEl(solicitud.venceEl());
+        cargo.setImporte(solicitud.importe().setScale(2));
+        cargo.setConcepto(solicitud.concepto().strip());
+        cargo.setEstado(solicitud.estado());
+    }
+
+    private static boolean tieneAplicacionesActivas(Session session, UUID cargoId) {
+        Long total = session.createQuery("""
+                        select count(a) from AplicacionPago a, Pago p
+                        where a.pagoId = p.id and a.cargoId = :cargoId
+                          and p.estado <> :anulado
+                        """, Long.class)
+                .setParameter("cargoId", cargoId)
+                .setParameter("anulado", "Anulado")
+                .getSingleResult();
+        return total > 0;
+    }
+
+    public record Solicitud(UUID id, long version, UUID contratoId, String tipo,
+                            LocalDate periodo, LocalDate fechaEmision, LocalDate venceEl,
+                            BigDecimal importe, String concepto, String estado) { }
 }
