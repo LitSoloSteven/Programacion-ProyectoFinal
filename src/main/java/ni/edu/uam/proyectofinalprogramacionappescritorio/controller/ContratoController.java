@@ -338,18 +338,10 @@ public class ContratoController {
                 contratoService.guardar(nuevo);
                 AlertaUtil.mostrarExito("Registro exitoso", "El contrato de arrendamiento ha sido registrado en PostgreSQL.");
             } else {
-                // Actualización
-                contratoSeleccionado.setUnidadId(unidad.getId());
-                contratoSeleccionado.setInquilinoId(inquilino.getId());
-                contratoSeleccionado.setInicio(inicio);
-                contratoSeleccionado.setFin(fin);
-                contratoSeleccionado.setCanon(canon);
-                contratoSeleccionado.setMoneda(moneda);
-                contratoSeleccionado.setDiaPago(diaPago);
-                contratoSeleccionado.setDepositoPactado(deposito);
-                contratoSeleccionado.setEstado(estado);
-
-                contratoService.guardar(contratoSeleccionado);
+                contratoService.actualizar(contratoSeleccionado.getId(),
+                        contratoSeleccionado.getVersion(), unidad.getId(),
+                        inquilino.getId(), inicio, fin, canon, moneda, diaPago,
+                        deposito, estado);
                 AlertaUtil.mostrarExito("Actualización exitosa", "Los términos del contrato fueron actualizados.");
             }
 

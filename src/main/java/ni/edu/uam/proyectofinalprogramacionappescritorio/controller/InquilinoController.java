@@ -172,15 +172,13 @@ public class InquilinoController {
                 inquilinoService.guardar(nuevo);
                 AlertaUtil.mostrarExito("Registro exitoso", "El inquilino ha sido registrado correctamente en PostgreSQL.");
             } else {
-                // Edición
-                inquilinoSeleccionado.setNombre(nombre.trim());
-                inquilinoSeleccionado.setIdentificacion(identificacion != null && !identificacion.isBlank() ? identificacion.trim() : null);
-                inquilinoSeleccionado.setTelefono(telefono != null && !telefono.isBlank() ? telefono.trim() : null);
-                inquilinoSeleccionado.setCorreo(correo != null && !correo.isBlank() ? correo.trim() : null);
-                inquilinoSeleccionado.setContactoEmergencia(emergencia != null && !emergencia.isBlank() ? emergencia.trim() : null);
-                inquilinoSeleccionado.setActivo(activo);
-
-                inquilinoService.guardar(inquilinoSeleccionado);
+                inquilinoService.actualizar(inquilinoSeleccionado.getId(),
+                        inquilinoSeleccionado.getVersion(), nombre.trim(),
+                        identificacion != null && !identificacion.isBlank() ? identificacion.trim() : null,
+                        telefono != null && !telefono.isBlank() ? telefono.trim() : null,
+                        correo != null && !correo.isBlank() ? correo.trim() : null,
+                        emergencia != null && !emergencia.isBlank() ? emergencia.trim() : null,
+                        activo);
                 AlertaUtil.mostrarExito("Actualización exitosa", "Los datos del inquilino fueron actualizados.");
             }
 
