@@ -151,7 +151,10 @@ public final class ServicioCatalogos {
 
     public PropiedadResponse cambiarEstadoPropiedad(UUID id, Boolean activa) {
         obtenerPropiedad(id);
-        boolean nuevo = activa != null && activa;
+        if (activa == null) {
+            throw ExcepcionApi.entidadNoProcesable("El campo activa es obligatorio.");
+        }
+        boolean nuevo = activa;
         ejecutar(() -> propiedades.cambiarEstado(id, nuevo));
         return obtenerPropiedad(id);
     }
@@ -222,8 +225,7 @@ public final class ServicioCatalogos {
 
     public UnidadResponse cambiarEstadoUnidad(UUID id, String estado) {
         obtenerUnidad(id);
-        String nuevo = textoOpcional(estado, "estado", 24);
-        if (nuevo == null) nuevo = "Inactiva";
+        String nuevo = textoRequerido(estado, "estado", 24);
         exigirEstadoUnidad(nuevo);
         String definitivo = nuevo;
         ejecutar(() -> unidades.cambiarEstado(id, definitivo));
@@ -284,7 +286,10 @@ public final class ServicioCatalogos {
 
     public InquilinoResponse cambiarEstadoInquilino(UUID id, Boolean activo) {
         obtenerInquilino(id);
-        boolean nuevo = activo != null && activo;
+        if (activo == null) {
+            throw ExcepcionApi.entidadNoProcesable("El campo activo es obligatorio.");
+        }
+        boolean nuevo = activo;
         ejecutar(() -> inquilinos.cambiarEstado(id, nuevo));
         return obtenerInquilino(id);
     }
@@ -354,8 +359,7 @@ public final class ServicioCatalogos {
 
     public ContratoResponse cambiarEstadoContrato(UUID id, String estado) {
         obtenerContrato(id);
-        String nuevo = textoOpcional(estado, "estado", 24);
-        if (nuevo == null) nuevo = "Cancelado";
+        String nuevo = textoRequerido(estado, "estado", 24);
         exigirEstadoContrato(nuevo);
         String definitivo = nuevo;
         ejecutar(() -> contratos.cambiarEstado(id, definitivo));

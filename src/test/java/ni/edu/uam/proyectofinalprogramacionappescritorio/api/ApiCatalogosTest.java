@@ -180,6 +180,34 @@ class ApiCatalogosTest {
                 new TypeToken<PaginaResponse<ContratoResponse>>() { }.getType());
         assertEquals(1, vigentes.total());
 
+        assertEquals(422, patchJson("/api/v1/propiedades/" + propiedad.id(), "{}", token)
+                .statusCode());
+        assertEquals(422, patchJson("/api/v1/propiedades/" + propiedad.id(),
+                "{\"activa\":\"quizas\"}", token).statusCode());
+        assertEquals(422, patchJson("/api/v1/inquilinos/" + inquilino.id(), "{}", token)
+                .statusCode());
+        assertEquals(422, patchJson("/api/v1/inquilinos/" + inquilino.id(),
+                "{\"activo\":\"quizas\"}", token).statusCode());
+        assertEquals(422, patchJson("/api/v1/unidades/" + unidad.id(), "{}", token)
+                .statusCode());
+        assertEquals(422, patchJson("/api/v1/unidades/" + unidad.id(),
+                "{\"estado\":\"Desconocido\"}", token).statusCode());
+        assertEquals(422, patchJson("/api/v1/contratos/" + contrato.id(), "{}", token)
+                .statusCode());
+        assertEquals(422, patchJson("/api/v1/contratos/" + contrato.id(),
+                "{\"estado\":\"Desconocido\"}", token).statusCode());
+
+        assertTrue(GSON.fromJson(get("/api/v1/propiedades/" + propiedad.id(), token).body(),
+                PropiedadResponse.class).activa());
+        assertTrue(GSON.fromJson(get("/api/v1/inquilinos/" + inquilino.id(), token).body(),
+                InquilinoResponse.class).activo());
+        assertEquals("Disponible", GSON.fromJson(
+                get("/api/v1/unidades/" + unidad.id(), token).body(),
+                UnidadResponse.class).estado());
+        assertEquals("Vigente", GSON.fromJson(
+                get("/api/v1/contratos/" + contrato.id(), token).body(),
+                ContratoResponse.class).estado());
+
         assertEquals("En mantenimiento",
                 parchearUnidad(token, unidad.id(), "En mantenimiento").estado());
         assertFalse(parchearInquilino(token, inquilino.id(), false).activo());
