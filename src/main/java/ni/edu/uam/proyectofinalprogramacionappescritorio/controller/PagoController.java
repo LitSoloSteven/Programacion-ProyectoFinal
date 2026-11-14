@@ -3,12 +3,12 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import javafx.collections.transformation.FilteredList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PaginaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Pago;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoRegistroResponse;
@@ -60,6 +60,15 @@ public class PagoController {
     private Button btnAnular;
 
     @FXML
+    private Button btnPaginaAnterior;
+
+    @FXML
+    private Button btnPaginaSiguiente;
+
+    @FXML
+    private Label lblPaginacion;
+
+    @FXML
     private TextField txtBuscar;
 
     @FXML
@@ -90,10 +99,11 @@ public class PagoController {
     private final Map<PagoRequest, UUID> clavesPagosPendientes = new HashMap<>();
 
     private final ObservableList<Pago> listaPagos = FXCollections.observableArrayList();
-    private FilteredList<Pago> listaFiltrada;
     private Pago pagoSeleccionado = null;
+    private int paginaActual = 1;
+    private long versionConsulta;
 
-    private record DatosTabla(List<Contrato> contratos, List<Pago> pagos) {
+    private record DatosTabla(List<Contrato> contratos, PaginaResponse<Pago> pagos) {
     }
 
     public PagoController() {
@@ -158,20 +168,13 @@ public class PagoController {
         colReferencia.setCellValueFactory(new PropertyValueFactory<>("referencia"));
         colEstado.setCellValueFactory(new PropertyValueFactory<>("estado"));
 
-        listaFiltrada = new FilteredList<>(listaPagos, p -> true);
-        tblPagos.setItems(listaFiltrada);
+        tblPagos.setItems(listaPagos);
     }
 
     private void configurarFiltro() {
         txtBuscar.textProperty().addListener((obs, oldVal, newVal) -> {
-            listaFiltrada.setPredicate(p -> {
-                if (newVal == null || newVal.isBlank()) return true;
-                String filtro = newVal.toLowerCase().trim();
-                boolean matchCon = p.getContratoInfo() != null && p.getContratoInfo().toLowerCase().contains(filtro);
-                boolean matchRef = p.getReferencia() != null && p.getReferencia().toLowerCase().contains(filtro);
-                boolean matchMet = p.getMetodo() != null && p.getMetodo().toLowerCase().contains(filtro);
-                return matchCon || matchRef || matchMet;
-            });
+            paginaActual = 1;
+            cargarDatos();
         });
     }
 
@@ -196,34 +199,47 @@ public class PagoController {
     }
 
     public void cargarDatos() {
-        Task<List<Pago>> tarea = new Task<>() {
+        int pagina = paginaActual;
+        String texto = txtBuscar.getText();
+        long version = ++versionConsulta;
+        Task<PaginaResponse<Pago>> tarea = new Task<>() {
             @Override
-            protected List<Pago> call() throws SQLException {
-                return pagoService.listarTodos();
+            protected PaginaResponse<Pago> call() {
+                return pagoService.listarTodos(pagina, PagoService.TAMANO_PAGINA_MAXIMO, texto);
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea,
-                listaPagos::setAll, error -> AlertaUtil.mostrarError("Error al cargar pagos",
-                        "No fue posible consultar el historial de pagos desde PostgreSQL."));
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, resultado -> {
+            if (version == versionConsulta) mostrarPagina(resultado);
+        }, error -> {
+            if (version == versionConsulta) AlertaUtil.mostrarError("Error al cargar pagos",
+                    "No fue posible consultar el historial de pagos desde PostgreSQL.");
+        });
     }
 
     @FXML
     public void refrescarTabla() {
+        int pagina = paginaActual;
+        String texto = txtBuscar.getText();
+        long version = ++versionConsulta;
         Task<DatosTabla> tarea = new Task<>() {
             @Override
             protected DatosTabla call() throws SQLException {
-                return new DatosTabla(contratoService.listarVigentes(), pagoService.listarTodos());
+                return new DatosTabla(contratoService.listarVigentes(),
+                        pagoService.listarTodos(pagina, PagoService.TAMANO_PAGINA_MAXIMO, texto));
             }
         };
         TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
+            if (version != versionConsulta) return;
             cmbContrato.setItems(FXCollections.observableArrayList(datos.contratos()));
             if (!datos.contratos().isEmpty()) cmbContrato.getSelectionModel().selectFirst();
-            listaPagos.setAll(datos.pagos());
+            mostrarPagina(datos.pagos());
             limpiarFormulario();
             AlertaUtil.mostrarExito("Tabla actualizada",
                     "El historial de pagos ha sido sincronizado con PostgreSQL.");
-        }, error -> AlertaUtil.mostrarError("Error al cargar pagos",
-                "No fue posible sincronizar el historial de pagos desde PostgreSQL."));
+        }, error -> {
+            if (version == versionConsulta) AlertaUtil.mostrarError("Error al cargar pagos",
+                    "No fue posible sincronizar el historial de pagos desde PostgreSQL.");
+        });
     }
 
     @FXML
@@ -281,6 +297,7 @@ public class PagoController {
             AlertaUtil.mostrarExito("Pago Registrado",
                     "El pago por " + String.format("%.2f %s", monto, moneda)
                             + " fue guardado. Recibo #" + registro.numeroRecibo() + ".");
+            paginaActual = 1;
             cargarDatos();
             limpiarFormulario();
         }, this::mostrarErrorPago);
@@ -328,6 +345,33 @@ public class PagoController {
         } else {
             AlertaUtil.mostrarError("Error", "No fue posible completar la operación de pago en PostgreSQL.");
         }
+    }
+
+    private void mostrarPagina(PaginaResponse<Pago> pagina) {
+        int paginas = (int) Math.max(1, (pagina.total() + pagina.tamano() - 1) / pagina.tamano());
+        if (paginaActual > paginas) {
+            paginaActual = paginas;
+            cargarDatos();
+            return;
+        }
+        listaPagos.setAll(pagina.elementos());
+        lblPaginacion.setText("Página " + paginaActual + " de " + paginas
+                + " · " + pagina.total() + " pagos");
+        btnPaginaAnterior.setDisable(paginaActual <= 1);
+        btnPaginaSiguiente.setDisable(paginaActual >= paginas);
+    }
+
+    @FXML
+    public void paginaAnterior() {
+        if (paginaActual <= 1) return;
+        paginaActual--;
+        cargarDatos();
+    }
+
+    @FXML
+    public void paginaSiguiente() {
+        paginaActual++;
+        cargarDatos();
     }
 
     @FXML
