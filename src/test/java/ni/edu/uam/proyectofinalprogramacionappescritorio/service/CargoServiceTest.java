@@ -166,6 +166,29 @@ class CargoServiceTest {
     }
 
     @Test
+    void estadoDerivadoRespetaPrioridadDeAnulacionSaldoYVencimiento() {
+        LocalDate corte = LocalDate.of(2026, 11, 13);
+        Cargo cargo = new Cargo();
+        cargo.setImporte(new BigDecimal("100.00"));
+        cargo.setVenceEl(corte);
+        cargo.setEstado("Pendiente");
+
+        cargo.establecerEstadoDerivado(BigDecimal.ZERO, corte);
+        assertEquals("Pendiente", cargo.getEstado());
+        cargo.establecerEstadoDerivado(new BigDecimal("25.00"), corte);
+        assertEquals("Parcial", cargo.getEstado());
+        cargo.setVenceEl(corte.minusDays(1));
+        cargo.establecerEstadoDerivado(new BigDecimal("25.00"), corte);
+        assertEquals("Vencido", cargo.getEstado());
+        cargo.establecerEstadoDerivado(new BigDecimal("100.00"), corte);
+        assertEquals("Pagado", cargo.getEstado());
+        cargo.setEstado("Cancelado");
+        cargo.establecerEstadoDerivado(new BigDecimal("25.00"), corte);
+        assertEquals("Anulado", cargo.getEstado());
+        assertEquals("Cancelado", cargo.getEstadoPersistido());
+    }
+
+    @Test
     void asistenteNoPuedeAjustarGarantiaYNoDejaCambiosNiAuditoria() throws Exception {
         long auditoriasAntes = contar("GARANTIA_SALDO_AJUSTADO");
 
