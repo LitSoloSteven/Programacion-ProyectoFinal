@@ -16,6 +16,14 @@ public final class AutenticacionService {
     public AutenticacionService(HibernateTransactions transactions) { this.transactions = transactions; }
 
     public SesionUsuario autenticar(String nombre, char[] password) {
+        return autenticar(nombre, password, true);
+    }
+
+    /**
+     * Autentica sin modificar la sesión global cuando se invoca desde la API.
+     * La auditoría de inicio de sesión correcto se conserva en la transacción.
+     */
+    public SesionUsuario autenticar(String nombre, char[] password, boolean establecerSesionGlobal) {
         String normalizado;
         try { normalizado = Usuario.normalizarNombre(nombre); }
         catch (IllegalArgumentException e) { throw credencialesInvalidas(); }
@@ -25,7 +33,7 @@ public final class AutenticacionService {
             if (!valido || usuario == null || !usuario.isActivo()) throw credencialesInvalidas();
             auditoria.registrar(session, usuario, UUID.randomUUID(), "INICIO_SESION", "usuario:" + usuario.getId());
             SesionUsuario identidad = new SesionUsuario(usuario.getId(), usuario.getNombre(), usuario.getRol());
-            SesionUsuario.establecer(identidad);
+            if (establecerSesionGlobal) SesionUsuario.establecer(identidad);
             return identidad;
         });
     }
