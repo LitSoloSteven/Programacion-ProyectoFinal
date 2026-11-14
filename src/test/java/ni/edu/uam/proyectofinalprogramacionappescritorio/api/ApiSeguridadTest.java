@@ -289,6 +289,7 @@ class ApiSeguridadTest {
 
     @Test
     void lasCredencialesInvalidasNoRevelanSiElUsuarioExiste() throws Exception {
+        long auditoriasAntes = contarIntentosLoginFallidos();
         HttpResponse<String> existente = postJson("/api/v1/auth/login",
                 GSON.toJson(new LoginRequest(nombrePropietario, "ClaveEquivocada-2026")),
                 null, null);
@@ -300,6 +301,17 @@ class ApiSeguridadTest {
         assertEquals(401, inexistente.statusCode());
         assertEquals(error(existente).error().mensaje(), error(inexistente).error().mensaje());
         assertEquals("CREDENCIALES_INVALIDAS", error(existente).error().codigo());
+        assertEquals(auditoriasAntes + 2, contarIntentosLoginFallidos());
+
+        List<String> referencias = tx.ejecutar(session -> session.createQuery(
+                        "select a.referencia from Auditoria a where a.accion = 'LOGIN_FALLIDO' order by a.id desc",
+                        String.class)
+                .setMaxResults(2).getResultList());
+        assertEquals(2, referencias.size());
+        assertTrue(referencias.stream().allMatch(ref -> ref.startsWith("usuario_sha256:")
+                && ref.endsWith(";origen:127.0.0.1")));
+        assertFalse(referencias.stream().anyMatch(ref -> ref.contains(nombrePropietario)
+                || ref.contains("no.existe.") || ref.contains("ClaveEquivocada")));
     }
 
     @Test
@@ -323,6 +335,12 @@ class ApiSeguridadTest {
                 token, null);
         assertEquals(201, respuesta.statusCode(), respuesta.body());
         return GSON.fromJson(respuesta.body(), TasaResponse.class);
+    }
+
+    private static long contarIntentosLoginFallidos() {
+        return tx.ejecutar(session -> session.createQuery(
+                "select count(a) from Auditoria a where a.accion = 'LOGIN_FALLIDO' and a.actor is null",
+                Long.class).getSingleResult());
     }
 
     private static void cambiarRol(Long id, String rol) {
