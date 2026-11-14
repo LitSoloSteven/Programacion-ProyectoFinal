@@ -226,6 +226,26 @@ class InfraestructuraTest {
         }
     }
 
+    @Test void eliminarConfiguracionProduceConflictoAlGuardarConVersionAnterior() {
+        try (SesionUsuario propietario = login(crearUsuario(Rol.PROPIETARIO))) {
+            ConfiguracionService service = new ConfiguracionService(tx);
+            String clave = UUID.randomUUID().toString();
+            service.guardar(propietario, clave, "original", -1);
+            long version = service.consultar(propietario, clave).getVersion();
+
+            tx.ejecutar(session -> {
+                session.remove(session.find(Configuracion.class, clave));
+                return null;
+            });
+
+            ConflictoDatosException conflicto = assertThrows(ConflictoDatosException.class,
+                    () -> service.guardar(propietario, clave, "obsoleto", version));
+            assertEquals("La configuración cambió o ya no existe. Actualiza los datos antes de guardar.",
+                    conflicto.getMessage());
+            assertNull(service.consultar(propietario, clave));
+        }
+    }
+
     @Test void versionJpaRechazaDosEscriturasConcurrentes() {
         String clave = UUID.randomUUID().toString();
         tx.ejecutar(session -> { session.persist(new Configuracion(clave, "base")); return null; });
