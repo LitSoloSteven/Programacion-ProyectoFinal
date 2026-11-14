@@ -27,6 +27,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
+import java.net.Socket;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -183,16 +184,49 @@ class ApiSeguridadTest {
     @Test
     void rutasYMetodosInvalidosUsanElCuerpoUniforme() throws Exception {
         HttpResponse<String> inexistente = get("/api/v1/no-existe", null);
+        assertEquals(401, inexistente.statusCode());
+        assertEquals("NO_AUTENTICADO", error(inexistente).error().codigo());
+
+        String token = login(nombrePropietario);
+        inexistente = get("/api/v1/no-existe", token);
         assertEquals(404, inexistente.statusCode());
         assertEquals("NO_ENCONTRADO", error(inexistente).error().codigo());
 
-        HttpResponse<String> metodo = cliente.send(HttpRequest.newBuilder(
+        HttpResponse<String> sinAutenticar = cliente.send(HttpRequest.newBuilder(
                         URI.create(base + "/api/v1/tasas"))
                 .timeout(Duration.ofSeconds(10))
                 .DELETE()
                 .build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        assertEquals(401, sinAutenticar.statusCode());
+
+        HttpResponse<String> metodo = cliente.send(HttpRequest.newBuilder(
+                        URI.create(base + "/api/v1/tasas"))
+                .timeout(Duration.ofSeconds(10))
+                .header("Authorization", "Bearer " + token)
+                .DELETE()
+                .build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         assertEquals(405, metodo.statusCode());
         assertEquals("METODO_NO_PERMITIDO", error(metodo).error().codigo());
+    }
+
+    @Test
+    void rechazaHostAjenoAntesDeResolverLaRuta() throws Exception {
+        String respuesta;
+        try (Socket socket = new Socket("127.0.0.1", servidor.puerto())) {
+            socket.setSoTimeout(5000);
+            String peticion = "GET /api/v1/no-existe HTTP/1.1\r\n"
+                    + "Host: atacante.example:" + servidor.puerto() + "\r\n"
+                    + "Connection: close\r\n\r\n";
+            socket.getOutputStream().write(peticion.getBytes(StandardCharsets.US_ASCII));
+            respuesta = new String(socket.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        }
+        assertTrue(respuesta.startsWith("HTTP/1.1 400") || respuesta.startsWith("HTTP/1.1 421"), respuesta);
+        assertFalse(respuesta.startsWith("HTTP/1.1 404"), respuesta);
+    }
+
+    @Test
+    void configuraUnLimiteDeTreintaSegundosParaLeerLaPeticion() {
+        assertEquals("30", System.getProperty("sun.net.httpserver.maxReqTime"));
     }
 
     @Test
