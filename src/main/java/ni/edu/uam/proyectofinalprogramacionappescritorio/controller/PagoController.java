@@ -4,9 +4,11 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
+import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Pago;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoRegistroResponse;
@@ -17,6 +19,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ContratoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PagoService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
 
 import java.math.BigDecimal;
 import java.sql.SQLException;
@@ -89,6 +92,9 @@ public class PagoController {
     private final ObservableList<Pago> listaPagos = FXCollections.observableArrayList();
     private FilteredList<Pago> listaFiltrada;
     private Pago pagoSeleccionado = null;
+
+    private record DatosTabla(List<Contrato> contratos, List<Pago> pagos) {
+    }
 
     public PagoController() {
         this(new PagoService(), new ContratoService(), new ClientePagos());
@@ -176,32 +182,48 @@ public class PagoController {
     }
 
     public void cargarContratosReales() {
-        try {
-            List<Contrato> contratos = contratoService.listarVigentes();
-            cmbContrato.setItems(FXCollections.observableArrayList(contratos));
-            if (!contratos.isEmpty()) {
-                cmbContrato.getSelectionModel().selectFirst();
+        Task<List<Contrato>> tarea = new Task<>() {
+            @Override
+            protected List<Contrato> call() throws SQLException {
+                return contratoService.listarVigentes();
             }
-        } catch (SQLException e) {
-            AlertaUtil.mostrarError("Error", "No se pudieron obtener los contratos vigentes desde PostgreSQL.");
-        }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, contratos -> {
+            cmbContrato.setItems(FXCollections.observableArrayList(contratos));
+            if (!contratos.isEmpty()) cmbContrato.getSelectionModel().selectFirst();
+        }, error -> AlertaUtil.mostrarError("Error",
+                "No se pudieron obtener los contratos vigentes desde PostgreSQL."));
     }
 
     public void cargarDatos() {
-        try {
-            List<Pago> datos = pagoService.listarTodos();
-            listaPagos.setAll(datos);
-        } catch (SQLException e) {
-            AlertaUtil.mostrarError("Error al cargar pagos", "No fue posible consultar el historial de pagos desde PostgreSQL.");
-        }
+        Task<List<Pago>> tarea = new Task<>() {
+            @Override
+            protected List<Pago> call() throws SQLException {
+                return pagoService.listarTodos();
+            }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea,
+                listaPagos::setAll, error -> AlertaUtil.mostrarError("Error al cargar pagos",
+                        "No fue posible consultar el historial de pagos desde PostgreSQL."));
     }
 
     @FXML
     public void refrescarTabla() {
-        cargarContratosReales();
-        cargarDatos();
-        limpiarFormulario();
-        AlertaUtil.mostrarExito("Tabla actualizada", "El historial de pagos ha sido sincronizado con PostgreSQL.");
+        Task<DatosTabla> tarea = new Task<>() {
+            @Override
+            protected DatosTabla call() throws SQLException {
+                return new DatosTabla(contratoService.listarVigentes(), pagoService.listarTodos());
+            }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
+            cmbContrato.setItems(FXCollections.observableArrayList(datos.contratos()));
+            if (!datos.contratos().isEmpty()) cmbContrato.getSelectionModel().selectFirst();
+            listaPagos.setAll(datos.pagos());
+            limpiarFormulario();
+            AlertaUtil.mostrarExito("Tabla actualizada",
+                    "El historial de pagos ha sido sincronizado con PostgreSQL.");
+        }, error -> AlertaUtil.mostrarError("Error al cargar pagos",
+                "No fue posible sincronizar el historial de pagos desde PostgreSQL."));
     }
 
     @FXML
@@ -240,37 +262,28 @@ public class PagoController {
             return;
         }
 
-        try {
-            String referenciaLimpia = referencia != null && !referencia.isBlank()
-                    ? referencia.trim() : null;
-            String notasLimpias = notas != null && !notas.isBlank() ? notas.trim() : null;
-            PagoRequest solicitud = new PagoRequest(contrato.getId().toString(),
-                    fecha.toString(), moneda, monto.toPlainString(), metodo,
-                    referenciaLimpia, List.of(), notasLimpias);
-            UUID clave = clavesPagosPendientes.computeIfAbsent(solicitud,
-                    ignorada -> UUID.randomUUID());
-            PagoRegistroResponse registro = clientePagos.registrar(
-                    solicitud, clave);
+        String referenciaLimpia = referencia != null && !referencia.isBlank()
+                ? referencia.trim() : null;
+        String notasLimpias = notas != null && !notas.isBlank() ? notas.trim() : null;
+        PagoRequest solicitud = new PagoRequest(contrato.getId().toString(),
+                fecha.toString(), moneda, monto.toPlainString(), metodo,
+                referenciaLimpia, List.of(), notasLimpias);
+        UUID clave = clavesPagosPendientes.computeIfAbsent(solicitud,
+                ignorada -> UUID.randomUUID());
+        Task<PagoRegistroResponse> tarea = new Task<>() {
+            @Override
+            protected PagoRegistroResponse call() {
+                return clientePagos.registrar(solicitud, clave);
+            }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, registro -> {
             clavesPagosPendientes.remove(solicitud, clave);
-
-            AlertaUtil.mostrarExito(
-                    "Pago Registrado",
+            AlertaUtil.mostrarExito("Pago Registrado",
                     "El pago por " + String.format("%.2f %s", monto, moneda)
-                            + " fue guardado. Recibo #" + registro.numeroRecibo() + "."
-            );
-
+                            + " fue guardado. Recibo #" + registro.numeroRecibo() + ".");
             cargarDatos();
             limpiarFormulario();
-        } catch (ErrorClienteException e) {
-            AlertaUtil.mostrarError("No se pudo confirmar el pago",
-                    e.getMessage() + " Si el resultado es incierto, reintenta sin cambiar los datos.");
-        } catch (IllegalArgumentException e) {
-            AlertaUtil.mostrarAdvertencia("Datos inválidos", e.getMessage());
-        } catch (SecurityException e) {
-            AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
-        } catch (IllegalStateException e) {
-            AlertaUtil.mostrarError("Error de persistencia", e.getMessage());
-        }
+        }, this::mostrarErrorPago);
     }
 
     @FXML
@@ -286,16 +299,34 @@ public class PagoController {
         );
 
         if (confirma) {
-            try {
-                pagoService.anular(pagoSeleccionado.getId());
+            UUID pagoId = pagoSeleccionado.getId();
+            Task<Void> tarea = new Task<>() {
+                @Override
+                protected Void call() throws SQLException {
+                    pagoService.anular(pagoId);
+                    return null;
+                }
+            };
+            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
                 AlertaUtil.mostrarExito("Pago anulado", "El estado del pago fue cambiado a 'Anulado'.");
                 cargarDatos();
                 limpiarFormulario();
-            } catch (SecurityException e) {
-                AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
-            } catch (SQLException e) {
-                AlertaUtil.mostrarError("Error", "No fue posible anular el pago en PostgreSQL.");
-            }
+            }, this::mostrarErrorPago);
+        }
+    }
+
+    private void mostrarErrorPago(Throwable error) {
+        if (error instanceof ErrorClienteException cliente) {
+            AlertaUtil.mostrarError("No se pudo confirmar el pago",
+                    cliente.getMessage() + " Si el resultado es incierto, reintenta sin cambiar los datos.");
+        } else if (error instanceof IllegalArgumentException argumento) {
+            AlertaUtil.mostrarAdvertencia("Datos inválidos", argumento.getMessage());
+        } else if (error instanceof SecurityException permiso) {
+            AlertaUtil.mostrarAdvertencia("Permiso denegado", permiso.getMessage());
+        } else if (error instanceof IllegalStateException persistencia) {
+            AlertaUtil.mostrarError("Error de persistencia", persistencia.getMessage());
+        } else {
+            AlertaUtil.mostrarError("Error", "No fue posible completar la operación de pago en PostgreSQL.");
         }
     }
 
