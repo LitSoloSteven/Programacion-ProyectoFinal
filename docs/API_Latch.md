@@ -37,6 +37,10 @@ Content-Type: application/json
 - Tras 5 intentos fallidos para el usuario o 25 desde el mismo origen, el login
   queda bloqueado durante 15 minutos (`429`). Un login correcto restablece ambos
   contadores. Los fallos se auditan sin guardar usuario ni contraseña en claro.
+- La cabecera `Host` debe coincidir con `127.0.0.1:<puerto>` y el servidor cierra
+  solicitudes que tarden más de 30 segundos en recibirse por completo.
+- Las rutas protegidas validan el token antes de devolver `404` o `405`; sin
+  sesión válida, esos casos responden `401`.
 - El mensaje de credenciales inválidas es idéntico exista o no el usuario.
 
 ## Convenciones de la petición

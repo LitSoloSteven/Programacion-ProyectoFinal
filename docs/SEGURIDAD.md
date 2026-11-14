@@ -111,6 +111,9 @@ en errores o logs, duplicación de cobros y manipulación de importes.
 12. Cinco fallos para una cuenta y 25 desde un origen bloquean el login con `429`.
 13. Cada credencial inválida genera auditoría con identificador hash y origen,
     sin asociar el evento a una cuenta que podría no existir.
+14. `Host` distinto de `127.0.0.1:<puerto>` se rechaza antes de resolver rutas.
+15. Las rutas protegidas devuelven `401` antes de distinguir una ruta o método
+    inexistente; el servidor limita a 30 segundos la recepción completa.
 
 Además, `ApiPagosTest` verifica que una `Idempotency-Key` de otro usuario
 devuelve `409` y no duplica el pago, y `SesionUsuarioTest` cubre el aislamiento
