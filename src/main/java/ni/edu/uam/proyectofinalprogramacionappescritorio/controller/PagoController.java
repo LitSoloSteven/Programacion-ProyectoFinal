@@ -14,6 +14,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoReque
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClientePagos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ContratoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PagoService;
 
@@ -140,7 +141,7 @@ public class PagoController {
         cmbMetodo.setItems(FXCollections.observableArrayList("Efectivo", "Transferencia", "Depósito bancario", "Otro"));
         cmbMetodo.getSelectionModel().selectFirst();
 
-        dpFechaPago.setValue(LocalDate.now());
+        dpFechaPago.setValue(LocalDate.now(RelojService.ZONA_OPERATIVA));
     }
 
     private void configurarTabla() {
@@ -308,7 +309,7 @@ public class PagoController {
         }
         txtMonto.clear();
         if (!cmbMoneda.getItems().isEmpty()) cmbMoneda.getSelectionModel().selectFirst();
-        dpFechaPago.setValue(LocalDate.now());
+        dpFechaPago.setValue(LocalDate.now(RelojService.ZONA_OPERATIVA));
         if (!cmbMetodo.getItems().isEmpty()) cmbMetodo.getSelectionModel().selectFirst();
         txtReferencia.clear();
         txtNotas.clear();

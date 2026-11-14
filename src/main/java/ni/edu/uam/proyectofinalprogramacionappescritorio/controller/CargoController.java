@@ -11,6 +11,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Cargo;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.CargoService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ContratoService;
 
 import java.math.BigDecimal;
@@ -116,9 +117,9 @@ public class CargoController {
         cmbEstado.setItems(FXCollections.observableArrayList("Pendiente", "Pagado", "Cancelado"));
         cmbEstado.getSelectionModel().selectFirst();
 
-        dpPeriodo.setValue(LocalDate.now().withDayOfMonth(1));
-        dpFechaEmision.setValue(LocalDate.now());
-        dpVenceEl.setValue(LocalDate.now().plusDays(5));
+        dpPeriodo.setValue(LocalDate.now(RelojService.ZONA_OPERATIVA).withDayOfMonth(1));
+        dpFechaEmision.setValue(LocalDate.now(RelojService.ZONA_OPERATIVA));
+        dpVenceEl.setValue(LocalDate.now(RelojService.ZONA_OPERATIVA).plusDays(5));
     }
 
     private void configurarTabla() {
@@ -295,9 +296,9 @@ public class CargoController {
         if (!cmbEstado.getItems().isEmpty()) cmbEstado.getSelectionModel().selectFirst();
         txtImporte.clear();
         txtConcepto.clear();
-        dpPeriodo.setValue(LocalDate.now().withDayOfMonth(1));
-        dpFechaEmision.setValue(LocalDate.now());
-        dpVenceEl.setValue(LocalDate.now().plusDays(5));
+        dpPeriodo.setValue(LocalDate.now(RelojService.ZONA_OPERATIVA).withDayOfMonth(1));
+        dpFechaEmision.setValue(LocalDate.now(RelojService.ZONA_OPERATIVA));
+        dpVenceEl.setValue(LocalDate.now(RelojService.ZONA_OPERATIVA).plusDays(5));
         tblCargos.getSelectionModel().clearSelection();
     }
 
