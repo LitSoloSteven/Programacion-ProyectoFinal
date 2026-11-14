@@ -26,6 +26,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Inquilino;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propiedad;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propietario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Pago;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Rol;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.SolicitudIdempotente;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.TipoCambio;
@@ -271,14 +272,21 @@ class ApiPagosTest {
                 new DistribucionRequest(cargoRentaId.toString(), "400.00"),
                 new DistribucionRequest(cargoServicioId.toString(), "600.00")));
 
+        Instant inicioSolicitud = Instant.now();
         HttpResponse<String> primera = postJson("/api/v1/pagos",
                 GSON.toJson(solicitud), token, clave);
+        Instant finSolicitud = Instant.now();
         assertEquals(201, primera.statusCode(), primera.body());
         PagoRegistroResponse registro = GSON.fromJson(primera.body(), PagoRegistroResponse.class);
         assertNotNull(registro.pagoId());
         assertTrue(registro.numeroRecibo() > 0);
         assertEquals("1000.00", registro.montoContrato());
         assertEquals("0.00", registro.credito());
+        Pago pagoGuardado = tx.ejecutar(session ->
+                session.find(Pago.class, UUID.fromString(registro.pagoId())));
+        assertNotNull(pagoGuardado.getCreadoEn());
+        assertTrue(!pagoGuardado.getCreadoEn().isBefore(inicioSolicitud));
+        assertTrue(!pagoGuardado.getCreadoEn().isAfter(finSolicitud));
 
         HttpResponse<String> repetida = postJson("/api/v1/pagos",
                 GSON.toJson(solicitud), token, clave);
@@ -487,6 +495,7 @@ class ApiPagosTest {
         assertEquals("Pago duplicado", detalle.motivoAnulacion());
         assertEquals(idPropietario, detalle.anuladoPor());
         assertNotNull(detalle.anuladoEn());
+        assertTrue(detalle.anuladoEn().endsWith("-06:00"));
 
         assertEquals(409, postJson("/api/v1/pagos/" + pago.pagoId() + "/anulacion",
                 "{\"motivo\":\"Otra vez\"}", tokenPropietario, null).statusCode());

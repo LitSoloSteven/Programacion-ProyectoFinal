@@ -17,6 +17,8 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Rol;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.AutenticacionService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.DashboardService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojDesfasadoException;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.TipoCambioService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PasswordHasher;
@@ -94,6 +96,8 @@ class ApiSeguridadTest {
         Router router = new Router();
         new RutasTasas(new TipoCambioService(tx)).registrar(router);
         new RutasIndicadores(new DashboardService(tx)).registrar(router);
+        router.registrar("GET", "/api/v1/pruebas/reloj-desfasado", false,
+                contexto -> { throw new RelojDesfasadoException(); });
         servidor = new ServidorApi(ApiConfig.paraPruebas(0),
                 new AutenticacionService(tx), new TokenService(), router);
         servidor.iniciar();
@@ -124,6 +128,24 @@ class ApiSeguridadTest {
         assertEquals(204, salida.statusCode());
 
         assertEquals(401, get("/api/v1/dashboard/metricas", token).statusCode());
+    }
+
+    @Test
+    void traduceElDesfaseDelRelojAlCodigoErr057() throws Exception {
+        HttpResponse<String> respuesta = get(
+                "/api/v1/pruebas/reloj-desfasado", login(nombrePropietario));
+
+        assertEquals(503, respuesta.statusCode());
+        assertEquals("ERR-057", error(respuesta).error().codigo());
+        assertEquals(RelojDesfasadoException.MENSAJE, error(respuesta).error().mensaje());
+    }
+
+    @Test
+    void presentaElInstanteDeTasaEnZonaManagua() throws Exception {
+        TasaResponse tasa = registrarTasa(login(nombrePropietario),
+                LocalDate.now(RelojService.ZONA_OPERATIVA).toString());
+
+        assertTrue(tasa.registradoEn().endsWith("-06:00"));
     }
 
     @Test
