@@ -68,4 +68,25 @@ public class ValidadorEntradaTest {
         assertTrue(ValidadorEntrada.esTelefonoValido("+505 8899-0011"));
         assertFalse(ValidadorEntrada.esTelefonoValido("12"));
     }
+
+    @Test
+    void testValidarCedula() {
+        assertTrue(ValidadorEntrada.esCedulaValida("001-010190-0001A"));
+        assertTrue(ValidadorEntrada.esCedulaValida("0010101900001A"));
+        assertFalse(ValidadorEntrada.esCedulaValida("001-010190-0001"));
+        assertFalse(ValidadorEntrada.esCedulaValida("abc"));
+        assertTrue(ValidadorEntrada.esCedulaValida(""));
+    }
+
+    @Test
+    void testValidarMonto() {
+        assertTrue(ValidadorEntrada.esMontoValido("150.75"));
+        assertTrue(ValidadorEntrada.esMontoValido("150"));
+        assertTrue(ValidadorEntrada.esMontoValido("150.5"));
+        assertFalse(ValidadorEntrada.esMontoValido("0"));
+        assertFalse(ValidadorEntrada.esMontoValido("-10.00"));
+        assertFalse(ValidadorEntrada.esMontoValido("10.123"));
+        assertFalse(ValidadorEntrada.esMontoValido("abc"));
+        assertFalse(ValidadorEntrada.esMontoValido(""));
+    }
 }

@@ -1,6 +1,7 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.config;
 
 import jakarta.persistence.OptimisticLockException;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ConflictoDatosException;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.StaleStateException;
@@ -28,16 +29,16 @@ public final class HibernateTransactions {
                 }
                 throw e;
             }
-        } catch (SecurityException | IllegalArgumentException e) {
+        } catch (SecurityException | IllegalArgumentException | ConflictoDatosException e) {
             throw e;
         } catch (OptimisticLockException | StaleStateException e) {
-            throw new IllegalStateException("Otro usuario modificó el registro. Actualiza los datos antes de reintentar.", e);
+            throw new ConflictoDatosException(
+                    "Otro usuario modificó el registro. Actualiza los datos antes de reintentar.");
         } catch (ConstraintViolationException e) {
-            String mensaje = switch (e.getKind()) {
-                case UNIQUE -> "Ya existe un registro con esos datos.";
-                default -> "La operación viola una restricción de la base de datos.";
-            };
-            throw new IllegalStateException(mensaje, e);
+            if (e.getKind() == ConstraintViolationException.ConstraintKind.UNIQUE) {
+                throw new ConflictoDatosException("Ya existe un registro con esos datos.");
+            }
+            throw new IllegalStateException("La operación viola una restricción de la base de datos.", e);
         } catch (RuntimeException e) {
             throw new IllegalStateException("No se pudo completar la operación. Revisa la conexión e inténtalo nuevamente.", e);
         }
