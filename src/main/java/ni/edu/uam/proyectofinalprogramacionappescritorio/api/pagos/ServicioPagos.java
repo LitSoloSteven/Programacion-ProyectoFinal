@@ -158,7 +158,10 @@ public final class ServicioPagos {
 
             Set<UUID> cargosVigentes = new HashSet<>();
             for (Cargo cargo : cargos) {
-                if (!"Cancelado".equals(cargo.getEstado())) cargosVigentes.add(cargo.getId());
+                if (!"Cancelado".equals(cargo.getEstadoPersistido())
+                        && !"Anulado".equals(cargo.getEstadoPersistido())) {
+                    cargosVigentes.add(cargo.getId());
+                }
             }
 
             Map<UUID, BigDecimal> aplicadoPorCargo = new HashMap<>();
@@ -199,12 +202,10 @@ public final class ServicioPagos {
             for (Cargo cargo : cargos) {
                 BigDecimal importe = nz(cargo.getImporte());
                 BigDecimal aplicado = nz(aplicadoPorCargo.get(cargo.getId()));
-                BigDecimal saldo = importe.subtract(aplicado);
-                boolean cancelado = "Cancelado".equals(cargo.getEstado());
-                String estado = cancelado ? "Cancelado"
-                        : aplicado.compareTo(importe) >= 0 ? "Pagado"
-                        : aplicado.signum() > 0 ? "Parcial" : cargo.getEstado();
-                if (!cancelado) {
+                cargo.establecerEstadoDerivado(aplicado, fechaCorte);
+                String estado = cargo.getEstado();
+                BigDecimal saldo = cargo.saldoPendiente(aplicado);
+                if (!"Anulado".equals(estado)) {
                     totalCargos = totalCargos.add(importe);
                     totalPagado = totalPagado.add(aplicado);
                 }

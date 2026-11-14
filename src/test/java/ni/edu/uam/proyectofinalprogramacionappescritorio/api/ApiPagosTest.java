@@ -419,7 +419,7 @@ class ApiPagosTest {
         assertEquals("600.00", estado.totales().saldo());
         assertEquals("600.00", estado.totales().credito());
         assertEquals("Pagado", estado.cargos().get(0).estado());
-        assertEquals("Pendiente", estado.cargos().get(1).estado());
+        assertEquals("Vencido", estado.cargos().get(1).estado());
         assertEquals("400.00", estado.pagos().get(0).aplicado());
         assertEquals("600.00", estado.pagos().get(0).credito());
 
@@ -427,6 +427,27 @@ class ApiPagosTest {
                 + "/estado-cuenta?corte=" + CORTE, token).statusCode());
         assertEquals(400, get("/api/v1/contratos/" + contratoId
                 + "/estado-cuenta?corte=no-es-fecha", token).statusCode());
+    }
+
+    @Test
+    void estadoCuentaDerivaVencimientoYAnulacionAlCorte() throws Exception {
+        String token = login(nombrePropietario);
+        tx.ejecutar(session -> {
+            session.find(Cargo.class, cargoServicioId).setEstado("Cancelado");
+            return null;
+        });
+
+        HttpResponse<String> respuesta = get("/api/v1/contratos/" + contratoId
+                + "/estado-cuenta?corte=" + CORTE, token);
+
+        assertEquals(200, respuesta.statusCode(), respuesta.body());
+        EstadoCuentaResponse estado = GSON.fromJson(respuesta.body(),
+                EstadoCuentaResponse.class);
+        assertEquals(2, estado.cargos().size());
+        assertTrue(estado.cargos().stream().anyMatch(c -> "Vencido".equals(c.estado())));
+        assertTrue(estado.cargos().stream().anyMatch(c -> "Anulado".equals(c.estado())));
+        assertEquals("400.00", estado.totales().cargos());
+        assertEquals("400.00", estado.totales().saldo());
     }
 
     @Test
