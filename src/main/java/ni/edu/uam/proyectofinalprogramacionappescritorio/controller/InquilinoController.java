@@ -1,4 +1,5 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 
 import javafx.collections.FXCollections;
@@ -74,7 +75,7 @@ public class InquilinoController {
     private Inquilino inquilinoSeleccionado = null;
 
     public InquilinoController() {
-        this.inquilinoService = new InquilinoService();
+        this(HelloApplication.instancia().getComposicion().inquilinos());
     }
 
     public InquilinoController(InquilinoService inquilinoService) {
