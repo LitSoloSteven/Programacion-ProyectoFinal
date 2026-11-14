@@ -223,8 +223,9 @@ public final class RutasCatalogos {
         return Json.leer(LectorCuerpo.leerJson(contexto.intercambio()), tipo);
     }
 
-    private static <T> T enSesion(ContextoPeticion contexto, Supplier<T> operacion) {
-        return SesionUsuario.ejecutarComo(contexto.sesion().comoUsuario(), operacion);
+    private <T> T enSesion(ContextoPeticion contexto, Supplier<T> operacion) {
+        return SesionUsuario.ejecutarComo(contexto.sesion().comoUsuario(),
+                () -> servicio.enTransaccion(operacion));
     }
 
     private static long version(Long valor) {

@@ -44,6 +44,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Orquesta las lecturas y escrituras de la API 3. Las lecturas usan
@@ -77,6 +78,11 @@ public final class ServicioCatalogos {
         this.unidades = new UnidadService(tx);
         this.inquilinos = new InquilinoService(tx);
         this.contratos = new ContratoService(tx);
+    }
+
+    public <T> T enTransaccion(Supplier<T> operacion) {
+        Objects.requireNonNull(operacion, "Falta la operación de la API.");
+        return tx.ejecutar(session -> operacion.get());
     }
 
     // ------------------------------------------------------------------
@@ -210,7 +216,14 @@ public final class ServicioCatalogos {
         DatosUnidad datos = validarUnidad(solicitud);
         Unidad unidad = new Unidad();
         aplicar(unidad, datos);
-        ejecutar(() -> unidades.guardar(unidad));
+        tx.ejecutar(session -> {
+            permisos.exigir(session, SesionUsuario.getActual(), Permiso.OPERAR_ALQUILERES);
+            Propiedad propiedad = session.find(Propiedad.class, datos.propiedadId());
+            if (propiedad == null) throw ExcepcionApi.noEncontrado();
+            unidad.setPropiedad(propiedad);
+            ejecutar(() -> unidades.guardar(unidad));
+            return null;
+        });
         if (unidad.getId() == null) throw ExcepcionApi.interno();
         return obtenerUnidad(unidad.getId());
     }
@@ -218,8 +231,13 @@ public final class ServicioCatalogos {
     public UnidadResponse actualizarUnidad(UUID id, long version, UnidadRequest solicitud) {
         obtenerUnidad(id);
         DatosUnidad datos = validarUnidad(solicitud);
-        ejecutar(() -> unidades.actualizar(id, version, datos.propiedadId(), datos.codigo(),
-                datos.descripcion(), datos.tipo(), datos.estado(), datos.canon(), datos.moneda()));
+        tx.ejecutar(session -> {
+            ejecutar(() -> unidades.actualizar(id, version, datos.propiedadId(), datos.codigo(),
+                    datos.descripcion(), datos.tipo(), datos.estado(), datos.canon(), datos.moneda()));
+            Unidad unidad = session.find(Unidad.class, id);
+            unidad.setPropiedad(session.getReference(Propiedad.class, datos.propiedadId()));
+            return null;
+        });
         return obtenerUnidad(id);
     }
 
@@ -343,7 +361,12 @@ public final class ServicioCatalogos {
         DatosContrato datos = validarContrato(solicitud);
         Contrato contrato = new Contrato();
         aplicar(contrato, datos);
-        ejecutar(() -> contratos.guardar(contrato));
+        tx.ejecutar(session -> {
+            contrato.setUnidad(session.getReference(Unidad.class, datos.unidadId()));
+            contrato.setInquilino(session.getReference(Inquilino.class, datos.inquilinoId()));
+            ejecutar(() -> contratos.guardar(contrato));
+            return null;
+        });
         if (contrato.getId() == null) throw ExcepcionApi.interno();
         return obtenerContrato(contrato.getId());
     }
@@ -351,9 +374,15 @@ public final class ServicioCatalogos {
     public ContratoResponse actualizarContrato(UUID id, long version, ContratoRequest solicitud) {
         obtenerContrato(id);
         DatosContrato datos = validarContrato(solicitud);
-        ejecutar(() -> contratos.actualizar(id, version, datos.unidadId(), datos.inquilinoId(),
-                datos.inicio(), datos.fin(), datos.canon(), datos.moneda(), datos.diaPago(),
-                datos.depositoPactado(), datos.estado()));
+        tx.ejecutar(session -> {
+            ejecutar(() -> contratos.actualizar(id, version, datos.unidadId(), datos.inquilinoId(),
+                    datos.inicio(), datos.fin(), datos.canon(), datos.moneda(), datos.diaPago(),
+                    datos.depositoPactado(), datos.estado()));
+            Contrato contrato = session.find(Contrato.class, id);
+            contrato.setUnidad(session.getReference(Unidad.class, datos.unidadId()));
+            contrato.setInquilino(session.getReference(Inquilino.class, datos.inquilinoId()));
+            return null;
+        });
         return obtenerContrato(id);
     }
 
