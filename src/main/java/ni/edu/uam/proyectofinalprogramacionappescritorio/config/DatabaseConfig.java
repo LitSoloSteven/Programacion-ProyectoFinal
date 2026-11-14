@@ -13,7 +13,12 @@ import java.io.IOException;
 public final class DatabaseConfig {
     private DatabaseConfig() {}
 
-    public static Properties desdeArchivo(Path archivo, Map<String, String> entorno) {
+    /**
+     * Lee las variables del archivo local y las combina con las del entorno.
+     * El entorno tiene prioridad. Es la base común para la configuración de
+     * base de datos y para la configuración de la API.
+     */
+    public static Map<String, String> leerVariables(Path archivo, Map<String, String> entorno) {
         Map<String, String> valores = new HashMap<>();
         try {
             int numero = 0;
@@ -41,7 +46,11 @@ public final class DatabaseConfig {
             throw new IllegalStateException("No se pudo leer el archivo .env. Revisa sus permisos.");
         }
         valores.putAll(entorno);
-        return desdeEntorno(valores);
+        return valores;
+    }
+
+    public static Properties desdeArchivo(Path archivo, Map<String, String> entorno) {
+        return desdeEntorno(leerVariables(archivo, entorno));
     }
 
     private static IllegalArgumentException lineaInvalida(int numero) {
