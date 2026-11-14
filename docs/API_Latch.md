@@ -143,8 +143,9 @@ Respuesta:
 }
 ```
 
-`PATCH` hace baja lógica o cambio de estado, según el recurso, y también
-requiere `version`.
+`PATCH` hace baja lógica o cambio de estado, según el recurso. El cuerpo debe
+incluir el campo correspondiente (`activa`, `activo` o `estado`); si falta o
+su valor no es válido, la API responde `422` y conserva el estado actual.
 
 ## Tasas de cambio
 
