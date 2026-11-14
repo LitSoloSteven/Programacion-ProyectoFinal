@@ -11,6 +11,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Pago;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Recibo;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.TipoCambio;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PatronLike;
 import org.hibernate.Session;
 
 import java.math.BigDecimal;
@@ -59,16 +60,16 @@ public class PagoService {
     public PaginaResponse<Pago> listarTodos(int pagina, int tamano, String texto) {
         validarPaginacion(pagina, tamano);
         String criterio = texto == null || texto.isBlank()
-                ? null : "%" + texto.strip().toLowerCase(Locale.ROOT) + "%";
+                ? null : PatronLike.contieneLiteral(texto.strip().toLowerCase(Locale.ROOT));
         return tx.ejecutar(session -> {
             permisos.exigir(session, SesionUsuario.getActual(), Permiso.OPERAR_ALQUILERES);
             String filtro = criterio == null ? "" : """
-                     where lower(p.referencia) like :texto
-                        or lower(p.metodo) like :texto
-                        or lower(i.nombre) like :texto
-                        or lower(prop.nombre) like :texto
-                        or lower(u.codigo) like :texto
-                        or lower(u.tipo) like :texto
+                     where lower(p.referencia) like :texto escape '!'
+                        or lower(p.metodo) like :texto escape '!'
+                        or lower(i.nombre) like :texto escape '!'
+                        or lower(prop.nombre) like :texto escape '!'
+                        or lower(u.codigo) like :texto escape '!'
+                        or lower(u.tipo) like :texto escape '!'
                     """;
             var conteo = session.createQuery("""
                     select count(p) from Pago p
