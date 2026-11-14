@@ -41,7 +41,7 @@ Cada elemento se marca `[~]` antes de iniciar y `[x]` al terminar. La columna de
 
 ## Revisión complementaria: recibos
 
-La observación de `Recibo.contratoInfo` (300 caracteres) frente a `Contrato.toString()` y la numeración RN-07 se revisará junto con el contador transaccional decidido en M8 o en el elemento que corresponda. Se añadirá evidencia y pruebas al plan antes de modificar esos componentes.
+Evidencia revisada el 2026-11-14 antes de modificar recibos: RN-07 en `Latch_PRD_APA7_v3.md` exige consecutivos contiguos, reserva en la misma transacción y rollback sin consumo; rechaza `nextval`/`IDENTITY`. `Recibo.numero` aún usa `GenerationType.IDENTITY` y `PagoService.registrarPagoEnSesion` persiste pago, recibo, aplicaciones y auditoría en una sesión, así que la identidad puede dejar huecos cuando falla la transacción. El esquema de referencia `Latch_Backend_Schema_APA7_v3.md` ya define el patrón transaccional `fn_reservar_numero`. Además, `Contrato.toString()` compone el nombre del inquilino (hasta 160), el nombre de propiedad (120), código de unidad (30) y tipo (24), con separadores: puede llegar a 343 caracteres; `Recibo.contratoInfo` solo permite 300. `ReciboDTO` no trunca el texto. M8 añadirá pruebas de numeración consecutiva, rollback sin consumo y persistencia del snapshot largo antes del cierre de fase. La ejecución sobre PostgreSQL queda para B10.
 
 ## Decisiones pendientes del usuario
 
