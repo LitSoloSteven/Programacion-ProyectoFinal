@@ -248,6 +248,18 @@ class ApiPagosTest {
     }
 
     @Test
+    void rechazaExponenteExtremoSinGuardarPago() throws Exception {
+        String token = login(nombrePropietario);
+        long pagosAntes = contar("select count(p) from Pago p");
+
+        HttpResponse<String> respuesta = postJson("/api/v1/pagos",
+                GSON.toJson(pago("1E+999999999", null)), token, UUID.randomUUID().toString());
+
+        assertEquals(422, respuesta.statusCode(), respuesta.body());
+        assertEquals(pagosAntes, contar("select count(p) from Pago p"));
+    }
+
+    @Test
     void registraUnaSolaVezYConsultaPagoYRecibo() throws Exception {
         String token = login(nombrePropietario);
         String clave = UUID.randomUUID().toString();

@@ -22,6 +22,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PagoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.Permiso;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PermisoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ParserMonto;
 import org.hibernate.Session;
 
 import java.math.BigDecimal;
@@ -466,20 +467,18 @@ public final class ServicioPagos {
         String limpio = textoRequerido(valor, campo, 40);
         BigDecimal numero;
         try {
-            numero = new BigDecimal(limpio);
+            numero = ParserMonto.parsear(limpio, campo);
         } catch (NumberFormatException e) {
             throw ExcepcionApi.solicitudInvalida(
                     "El campo " + campo + " debe ser un número decimal.");
+        } catch (IllegalArgumentException e) {
+            throw ExcepcionApi.entidadNoProcesable(e.getMessage());
         }
         if (numero.signum() <= 0) {
             throw ExcepcionApi.entidadNoProcesable(
                     "El campo " + campo + " debe ser mayor que cero.");
         }
-        if (numero.stripTrailingZeros().scale() > 2) {
-            throw ExcepcionApi.entidadNoProcesable(
-                    "El campo " + campo + " admite como máximo 2 decimales.");
-        }
-        return numero.setScale(2, RoundingMode.HALF_EVEN);
+        return numero;
     }
 
     private static String textoRequerido(String valor, String campo, int maximo) {
