@@ -74,4 +74,21 @@ public class ValidadorEntrada {
         if (telefono == null || telefono.trim().isEmpty()) return true;
         return TELEFONO_PATTERN.matcher(telefono.trim()).matches();
     }
+
+    /** Acepta el formato 000-000000-0000A con o sin guiones. */
+    public static boolean esCedulaValida(String cedula) {
+        if (cedula == null || cedula.trim().isEmpty()) return true;
+        return CEDULA_PATTERN.matcher(cedula.trim()).matches();
+    }
+
+    /** Acepta un decimal positivo con dos decimales significativos como máximo. */
+    public static boolean esMontoValido(String monto) {
+        if (monto == null || monto.trim().isEmpty()) return false;
+        try {
+            BigDecimal valor = new BigDecimal(monto.trim());
+            return valor.signum() > 0 && valor.stripTrailingZeros().scale() <= 2;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
 }
