@@ -36,6 +36,7 @@ public final class ServidorApi implements AutoCloseable {
     }
 
     private final ApiConfig config;
+    private final AutenticacionService autenticacion;
     private final TokenService tokens;
     private final Router router;
     private final ThreadPoolExecutor ejecutor;
@@ -52,9 +53,9 @@ public final class ServidorApi implements AutoCloseable {
     public ServidorApi(ApiConfig config, AutenticacionService autenticacion,
                        TokenService tokens, Router router) {
         this.config = Objects.requireNonNull(config, "Falta la configuración de la API.");
+        this.autenticacion = Objects.requireNonNull(autenticacion, "Falta el servicio de autenticación.");
         this.tokens = Objects.requireNonNull(tokens, "Falta el servicio de tokens.");
         this.router = Objects.requireNonNull(router, "Falta el router de la API.");
-        Objects.requireNonNull(autenticacion, "Falta el servicio de autenticación.");
         new RutasAuth(autenticacion, tokens).registrar(router);
 
         AtomicInteger contador = new AtomicInteger();
@@ -99,7 +100,12 @@ public final class ServidorApi implements AutoCloseable {
             validarHost(intercambio);
             if (!router.esPublica(metodo, ruta)) {
                 token = extraerToken(intercambio);
-                sesion = tokens.validar(token).orElseThrow(ExcepcionApi::noAutorizado);
+                SesionApi candidata = tokens.validar(token).orElseThrow(ExcepcionApi::noAutorizado);
+                if (!autenticacion.sesionVigente(candidata)) {
+                    tokens.revocarUsuario(candidata.usuarioId());
+                    throw ExcepcionApi.noAutorizado();
+                }
+                sesion = candidata;
             }
 
             Router.Resultado resultado = router.resolver(metodo, ruta);
