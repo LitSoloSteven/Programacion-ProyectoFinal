@@ -2,6 +2,7 @@ package ni.edu.uam.proyectofinalprogramacionappescritorio.config;
 
 import jakarta.persistence.OptimisticLockException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ConflictoDatosException;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojDesfasadoException;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.StaleStateException;
@@ -29,7 +30,8 @@ public final class HibernateTransactions {
                 }
                 throw e;
             }
-        } catch (SecurityException | IllegalArgumentException | ConflictoDatosException e) {
+        } catch (SecurityException | IllegalArgumentException | ConflictoDatosException
+                 | RelojDesfasadoException e) {
             throw e;
         } catch (OptimisticLockException | StaleStateException e) {
             throw new ConflictoDatosException(
