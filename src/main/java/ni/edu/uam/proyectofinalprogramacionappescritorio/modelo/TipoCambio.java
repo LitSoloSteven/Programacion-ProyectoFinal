@@ -106,6 +106,9 @@ public class TipoCambio {
     public String getFuente() { return fuente; }
     public Instant getRegistradoEn() { return registradoEn; }
     public Long getAutorizadoPor() { return autorizadoPor == null ? null : autorizadoPor.getId(); }
+    public String getAutorizadoPorNombre() {
+        return autorizadoPor == null ? null : autorizadoPor.getNombre();
+    }
     public String getMotivo() { return motivo; }
     public boolean isAutorizada() { return autorizadoPor != null; }
 }
