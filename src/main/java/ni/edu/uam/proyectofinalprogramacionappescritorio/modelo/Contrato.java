@@ -111,6 +111,11 @@ public class Contrato {
         this.unidadId = unidadId;
     }
 
+    public void setUnidad(Unidad unidad) {
+        this.unidad = unidad;
+        this.unidadId = unidad == null ? null : unidad.getId();
+    }
+
     public String getUnidadInfo() {
         return unidad == null ? unidadInfo : unidad.toString();
     }
@@ -125,6 +130,11 @@ public class Contrato {
 
     public void setInquilinoId(UUID inquilinoId) {
         this.inquilinoId = inquilinoId;
+    }
+
+    public void setInquilino(Inquilino inquilino) {
+        this.inquilino = inquilino;
+        this.inquilinoId = inquilino == null ? null : inquilino.getId();
     }
 
     public String getInquilinoNombre() {

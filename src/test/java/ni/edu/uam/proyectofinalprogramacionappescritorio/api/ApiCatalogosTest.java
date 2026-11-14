@@ -123,6 +123,21 @@ class ApiCatalogosTest {
     }
 
     @Test
+    void crearPropiedadUsaUnaTransaccionDeNegocio() throws Exception {
+        String token = login(nombrePropietario);
+        factory.getStatistics().setStatisticsEnabled(true);
+        factory.getStatistics().clear();
+
+        HttpResponse<String> respuesta = postJson("/api/v1/propiedades",
+                GSON.toJson(new PropiedadRequest("Edificio Transaccional", "Calle 1", true,
+                        "Ana Propietaria", CORREO_PROPIETARIO, "+505 8888-1111", null)), token);
+
+        assertEquals(201, respuesta.statusCode(), respuesta.body());
+        assertEquals(2, factory.getStatistics().getTransactionCount(),
+                "una transacción valida la sesión y una cubre toda la operación del catálogo");
+    }
+
+    @Test
     void flujoCompletoDeCatalogos() throws Exception {
         String token = login(nombrePropietario);
 
