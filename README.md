@@ -8,7 +8,7 @@ con `com.sun.net.httpserver.HttpServer`; no se usan servicios externos.
 - JavaFX 21 + Hibernate 7.4.6.Final + PostgreSQL 18.
 - JSON con Gson 2.13.2.
 - Paquete raíz: `ni.edu.uam.proyectofinalprogramacionappescritorio`.
-- **108 pruebas automatizadas**, todas en verde.
+- **163 pruebas automatizadas**, todas en verde.
 
 ## Requisitos
 
@@ -65,6 +65,7 @@ aplicar **en orden** las migraciones de `docs/migrations`:
 | `V7__retencion_idempotencia_pagos.sql` | Índice para limpiar idempotencias vencidas |
 | `V8__consecutivo_recibos_transaccional.sql` | Consecutivo de recibos sin huecos por rollback |
 | `V9__auditoria_login_fallido.sql` | Auditoría de login fallido sin requerir una cuenta existente |
+| `V10__instante_operativo_pago.sql` | Instante UTC de registro del pago, separado de su fecha efectiva |
 
 Ejemplo con `psql`:
 
@@ -78,6 +79,7 @@ psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V6__contratos_act
 psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V7__retencion_idempotencia_pagos.sql
 psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V8__consecutivo_recibos_transaccional.sql
 psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V9__auditoria_login_fallido.sql
+psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V10__instante_operativo_pago.sql
 ```
 
 Comprobar la conexión:
@@ -214,6 +216,9 @@ La referencia completa está en [docs/API_Latch.md](docs/API_Latch.md).
 - El rol y el estado del usuario se revalidan contra la base en cada operación.
 - Al cambiar el rol o desactivar un usuario, la versión de su cuenta invalida
   todas las sesiones anteriores; reactivarlo no restaura los tokens revocados.
+- Las escrituras financieras toman su instante y fecha operativa de PostgreSQL.
+  Si el reloj local difiere más de cinco minutos, devuelven `ERR-057` y no
+  escriben la operación; las fechas efectivas de pago se conservan aparte.
 - Una petición HTTP nunca hereda la sesión global de JavaFX: si su identidad
   aislada no es válida, la operación falla cerrada.
 - Sin cabeceras CORS, con `Cache-Control: no-store` y
