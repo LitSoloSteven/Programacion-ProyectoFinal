@@ -129,6 +129,9 @@ class ApiValidacionesTest {
         assertFalse(validar(token, new ValidacionRequest(
                 "rangoFechas", null, "2026-01-01", "2026-01-02", 1)).valido());
         assertFalse(validar(token, new ValidacionRequest(
+                "rangoFechas", null, "2026-01-01", "2026-01-02",
+                Integer.MAX_VALUE)).valido());
+        assertFalse(validar(token, new ValidacionRequest(
                 "correo", "  ", null, null, null)).valido());
     }
 
@@ -136,6 +139,16 @@ class ApiValidacionesTest {
     void tipoDesconocidoDevuelve400() throws Exception {
         HttpResponse<String> respuesta = postJson(
                 new ValidacionRequest("desconocido", "x", null, null, null), login());
+
+        assertEquals(400, respuesta.statusCode());
+        assertEquals("SOLICITUD_INVALIDA", error(respuesta).error().codigo());
+    }
+
+    @Test
+    void rechazaValorPorEncimaDelLimite() throws Exception {
+        String valorLargo = "x".repeat(256);
+        HttpResponse<String> respuesta = postJson(
+                new ValidacionRequest("correo", valorLargo, null, null, null), login());
 
         assertEquals(400, respuesta.statusCode());
         assertEquals("SOLICITUD_INVALIDA", error(respuesta).error().codigo());

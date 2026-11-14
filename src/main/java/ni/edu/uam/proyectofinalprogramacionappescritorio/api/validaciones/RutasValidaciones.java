@@ -43,6 +43,10 @@ public final class RutasValidaciones {
                 ? "" : solicitud.tipo().strip().toLowerCase(Locale.ROOT);
 
         exigirUsuarioActivo(contexto);
+        if (ValidadorEntrada.excedeLongitudValor(solicitud.valor())) {
+            throw ExcepcionApi.solicitudInvalida("El valor no puede superar "
+                    + ValidadorEntrada.LONGITUD_MAXIMA_VALOR + " caracteres.");
+        }
         return RespuestaJson.ok(resultado(tipo, solicitud));
     }
 
@@ -67,7 +71,7 @@ public final class RutasValidaciones {
     }
 
     private static ValidacionResponse correo(String valor) {
-        if (valor == null || valor.isBlank()) {
+        if (ValidadorEntrada.esVacio(valor)) {
             return new ValidacionResponse(false, "El correo es obligatorio.");
         }
         return ValidadorEntrada.esCorreoValido(valor)
@@ -76,7 +80,7 @@ public final class RutasValidaciones {
     }
 
     private static ValidacionResponse telefono(String valor) {
-        if (valor == null || valor.isBlank()) {
+        if (ValidadorEntrada.esVacio(valor)) {
             return new ValidacionResponse(false, "El teléfono es obligatorio.");
         }
         return ValidadorEntrada.esTelefonoValido(valor)
@@ -85,7 +89,7 @@ public final class RutasValidaciones {
     }
 
     private static ValidacionResponse cedula(String valor) {
-        if (valor == null || valor.isBlank()) {
+        if (ValidadorEntrada.esVacio(valor)) {
             return new ValidacionResponse(false, "La cédula es obligatoria.");
         }
         return ValidadorEntrada.esCedulaValida(valor)
@@ -94,7 +98,7 @@ public final class RutasValidaciones {
     }
 
     private static ValidacionResponse monto(String valor) {
-        if (valor == null || valor.isBlank()) {
+        if (ValidadorEntrada.esVacio(valor)) {
             return new ValidacionResponse(false, "El monto es obligatorio.");
         }
         return ValidadorEntrada.esMontoValido(valor)
