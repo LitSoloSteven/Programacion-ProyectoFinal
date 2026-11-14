@@ -38,6 +38,9 @@ en errores o logs, duplicación de cobros y manipulación de importes.
   persiste ni se escribe en disco.
 - Vigencia de 15 minutos verificada en cada petición.
 - `logout` revoca el token de inmediato.
+- Cada token conserva la versión de la cuenta al iniciar sesión. Un cambio de
+  rol, desactivación u otra modificación versionada invalida todas las sesiones
+  anteriores; restaurar el rol o reactivar la cuenta no rehabilita esos tokens.
 - Se rechazan tokens vacíos o de longitud anómala.
 - Los tokens se pierden al reiniciar el servidor (comportamiento intencional).
 
@@ -102,9 +105,9 @@ en errores o logs, duplicación de cobros y manipulación de importes.
 4. `Content-Type` obligatorio y límite de 256 KiB.
 5. Rutas inexistentes (`404`) y métodos no permitidos (`405`).
 6. Los errores no contienen SQLSTATE, excepciones, Hibernate ni rutas internas.
-7. El rol se revalida en cada petición (degradar a asistente bloquea la
-   autorización de tasas; restaurar el rol la habilita).
-8. Un usuario desactivado pierde el acceso aunque su token siga vigente.
+7. Cambiar el rol invalida el token anterior (degradarlo bloquea la autorización
+   de tasas y restaurarlo no rehabilita ese token).
+8. Desactivar y luego reactivar al usuario tampoco rehabilita el token anterior.
 9. El login HTTP no modifica la sesión global de JavaFX.
 10. La respuesta de login no contiene contraseña, hash ni PBKDF2.
 11. Credenciales inválidas no revelan si el usuario existe.

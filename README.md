@@ -212,6 +212,8 @@ La referencia completa está en [docs/API_Latch.md](docs/API_Latch.md).
 - Contraseñas con PBKDF2-HMAC-SHA256 (600 000 iteraciones, sal aleatoria y
   comparación en tiempo constante).
 - El rol y el estado del usuario se revalidan contra la base en cada operación.
+- Al cambiar el rol o desactivar un usuario, la versión de su cuenta invalida
+  todas las sesiones anteriores; reactivarlo no restaura los tokens revocados.
 - Una petición HTTP nunca hereda la sesión global de JavaFX: si su identidad
   aislada no es válida, la operación falla cerrada.
 - Sin cabeceras CORS, con `Cache-Control: no-store` y
@@ -231,6 +233,8 @@ El detalle de controles, verificación y riesgos aceptados está en
 - `409` al repetir un pago: la `Idempotency-Key` se usó con otro contenido u
   otro usuario. Usar una clave nueva para un pago distinto.
 - `401` tras 15 minutos: la sesión expiró; cerrar sesión y volver a iniciar.
+- `401` después de cambiar el rol o el estado de la cuenta: iniciar sesión otra
+  vez para obtener un token vigente.
 - `429` al iniciar sesión: cinco fallos para la cuenta o 25 desde el mismo
   origen; esperar 15 minutos.
 - Error de conexión: comprobar el servicio PostgreSQL, puerto, base, usuario y
