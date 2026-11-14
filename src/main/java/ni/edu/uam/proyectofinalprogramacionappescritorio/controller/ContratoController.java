@@ -408,6 +408,8 @@ public class ContratoController {
                 AlertaUtil.mostrarExito("Garantía actualizada", "El saldo retenido se actualizó correctamente.");
             } catch (IllegalArgumentException e) {
                 AlertaUtil.mostrarAdvertencia("Saldo inválido", e.getMessage() == null ? "Ingrese un monto decimal válido." : e.getMessage());
+            } catch (SecurityException e) {
+                AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
             } catch (SQLException e) {
                 AlertaUtil.mostrarError("No se pudo actualizar", "No fue posible guardar el saldo de la garantía.");
             } catch (IllegalStateException e) {

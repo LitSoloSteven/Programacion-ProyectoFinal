@@ -5,6 +5,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.AplicacionPago;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Cargo;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Garantia;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Inquilino;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Pago;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propiedad;
@@ -29,7 +30,9 @@ class CargoServiceTest {
     private SessionFactory factory;
     private HibernateTransactions tx;
     private CargoService servicio;
+    private GarantiaService garantiaService;
     private UUID contratoId;
+    private UUID garantiaId;
     private long propietarioId;
     private long asistenteId;
     private String propietarioNombre;
@@ -49,6 +52,7 @@ class CargoServiceTest {
         factory = HibernateUtil.construir(properties);
         tx = new HibernateTransactions(factory);
         servicio = new CargoService(tx);
+        garantiaService = new GarantiaService(tx);
 
         propietarioNombre = "prop-" + UUID.randomUUID().toString().substring(0, 8);
         asistenteNombre = "asis-" + UUID.randomUUID().toString().substring(0, 8);
@@ -94,6 +98,7 @@ class CargoServiceTest {
             contrato.inicializarGarantiaSeguimiento();
             session.persist(contrato);
             session.flush();
+            garantiaId = contrato.getGarantiaSeguimiento().getId();
             return contrato.getId();
         });
 
@@ -160,6 +165,25 @@ class CargoServiceTest {
         assertEquals(auditoriasAntes, contar("CARGO_ACTUALIZADO"));
     }
 
+    @Test
+    void asistenteNoPuedeAjustarGarantiaYNoDejaCambiosNiAuditoria() throws Exception {
+        long auditoriasAntes = contar("GARANTIA_SALDO_AJUSTADO");
+
+        assertThrows(SecurityException.class,
+                () -> ajustarGarantiaComo(asistente, new BigDecimal("50.00")));
+
+        assertEquals(new BigDecimal("100.00"), leerGarantia().getSaldoActual());
+        assertEquals(auditoriasAntes, contar("GARANTIA_SALDO_AJUSTADO"));
+    }
+
+    @Test
+    void propietarioAjustaGarantiaConAuditoria() throws Exception {
+        ajustarGarantiaComo(propietario, new BigDecimal("75.00"));
+
+        assertEquals(new BigDecimal("75.00"), leerGarantia().getSaldoActual());
+        assertEquals(1L, contar("GARANTIA_SALDO_AJUSTADO"));
+    }
+
     private CargoService.Solicitud solicitud(UUID id, long version,
                                               BigDecimal importe, String estado) {
         return new CargoService.Solicitud(id, version, contratoId, "Renta",
@@ -175,6 +199,14 @@ class CargoServiceTest {
     private void anularComo(SesionUsuario identidad, UUID id) throws SQLException {
         ejecutarComo(identidad, () -> {
             servicio.anular(id);
+            return null;
+        });
+    }
+
+    private void ajustarGarantiaComo(SesionUsuario identidad, BigDecimal saldo)
+            throws SQLException {
+        ejecutarComo(identidad, () -> {
+            garantiaService.ajustarSaldo(garantiaId, saldo);
             return null;
         });
     }
@@ -196,6 +228,10 @@ class CargoServiceTest {
 
     private Cargo leerCargo(UUID id) {
         return tx.ejecutar(session -> session.find(Cargo.class, id));
+    }
+
+    private Garantia leerGarantia() {
+        return tx.ejecutar(session -> session.find(Garantia.class, garantiaId));
     }
 
     private long contar(String accion) {
