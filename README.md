@@ -5,7 +5,7 @@ inquilinos, contratos, cargos, tasas de cambio, pagos, recibos, estado de cuenta
 y métricas. La interfaz JavaFX consume una **API REST local propia** levantada
 con `com.sun.net.httpserver.HttpServer`; no se usan servicios externos.
 
-- JavaFX 21 + Hibernate 6.6.59.Final + PostgreSQL 18.
+- JavaFX 21 + Hibernate 7.4.6.Final + PostgreSQL 18.
 - JSON con Gson 2.13.2.
 - Paquete raíz: `ni.edu.uam.proyectofinalprogramacionappescritorio`.
 - **108 pruebas automatizadas**, todas en verde.
@@ -15,7 +15,8 @@ con `com.sun.net.httpserver.HttpServer`; no se usan servicios externos.
 - JDK 21 (configurar `JAVA_HOME`).
 - PostgreSQL 18 para la persistencia real.
 - Maven Wrapper incluido: `./mvnw.cmd` en Windows y `./mvnw` en Linux/macOS.
-- JavaFX 21.0.6 y controlador PostgreSQL 42.7.14, declarados en `pom.xml`.
+- JavaFX 21.0.13, Hibernate ORM 7.4.6.Final, JasperReports 7.0.8 y controlador
+  PostgreSQL 42.7.14, declarados en `pom.xml`.
 
 ## Configuración
 
