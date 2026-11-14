@@ -107,7 +107,8 @@ public class PagoController {
     }
 
     public PagoController() {
-        this(new PagoService(), new ContratoService(), new ClientePagos());
+        this(HelloApplication.instancia().getComposicion().pagos(),
+                HelloApplication.instancia().getComposicion().contratos(), new ClientePagos());
     }
 
     public PagoController(PagoService pagoService, ContratoService contratoService) {

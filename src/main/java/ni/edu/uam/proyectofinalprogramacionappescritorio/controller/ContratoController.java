@@ -116,17 +116,22 @@ public class ContratoController {
     }
 
     public ContratoController() {
-        this.contratoService = new ContratoService();
-        this.unidadService = new UnidadService();
-        this.inquilinoService = new InquilinoService();
-        this.garantiaService = new GarantiaService();
+        this(HelloApplication.instancia().getComposicion().contratos(),
+                HelloApplication.instancia().getComposicion().unidades(),
+                HelloApplication.instancia().getComposicion().inquilinos(),
+                HelloApplication.instancia().getComposicion().garantias());
     }
 
     public ContratoController(ContratoService contratoService, UnidadService unidadService, InquilinoService inquilinoService) {
+        this(contratoService, unidadService, inquilinoService, new GarantiaService());
+    }
+
+    public ContratoController(ContratoService contratoService, UnidadService unidadService,
+                             InquilinoService inquilinoService, GarantiaService garantiaService) {
         this.contratoService = contratoService;
         this.unidadService = unidadService;
         this.inquilinoService = inquilinoService;
-        this.garantiaService = new GarantiaService();
+        this.garantiaService = garantiaService;
     }
 
     @FXML

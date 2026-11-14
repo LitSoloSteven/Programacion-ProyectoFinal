@@ -101,8 +101,8 @@ public class CargoController {
     }
 
     public CargoController() {
-        this.cargoService = new CargoService();
-        this.contratoService = new ContratoService();
+        this(HelloApplication.instancia().getComposicion().cargos(),
+                HelloApplication.instancia().getComposicion().contratos());
     }
 
     public CargoController(CargoService cargoService, ContratoService contratoService) {
