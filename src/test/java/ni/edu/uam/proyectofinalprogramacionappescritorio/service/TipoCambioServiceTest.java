@@ -143,6 +143,12 @@ class TipoCambioServiceTest {
                         new BigDecimal("36.75"), "BCN"));
         assertThrows(IllegalArgumentException.class,
                 () -> servicio.registrar(FECHA, BigDecimal.ZERO, "BCN"));
+        long inicio = System.nanoTime();
+        assertThrows(IllegalArgumentException.class,
+                () -> servicio.registrar(FECHA, new BigDecimal("1E+999999999"), "BCN"));
+        assertTrue(System.nanoTime() - inicio < 100_000_000L,
+                "La tasa con exponente extremo debe rechazarse en menos de 100 ms.");
+        assertEquals(0L, contarAuditoria("TASA_REGISTRADA"));
         assertThrows(IllegalArgumentException.class,
                 () -> servicio.registrar(FECHA, new BigDecimal("36.75"), " "));
         assertThrows(IllegalArgumentException.class,

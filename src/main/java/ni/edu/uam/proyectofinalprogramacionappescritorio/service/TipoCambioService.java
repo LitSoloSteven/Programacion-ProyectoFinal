@@ -3,6 +3,7 @@ package ni.edu.uam.proyectofinalprogramacionappescritorio.service;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.TipoCambio;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ParserMonto;
 import org.hibernate.Session;
 
 import java.math.BigDecimal;
@@ -80,7 +81,11 @@ public final class TipoCambioService {
         if (fecha.isAfter(LocalDate.now())) {
             throw new IllegalArgumentException("La fecha de la tasa no puede ser futura.");
         }
-        if (tasa == null || tasa.signum() <= 0) {
+        if (tasa == null) {
+            throw new IllegalArgumentException("La tasa es obligatoria.");
+        }
+        ParserMonto.validarTasa(tasa, "tasa");
+        if (tasa.signum() <= 0) {
             throw new IllegalArgumentException("La tasa debe ser un número positivo.");
         }
         if (fuente == null || fuente.isBlank()) {
