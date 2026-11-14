@@ -53,7 +53,7 @@ Content-Type: application/json
 | Importes | Texto decimal con 2 decimales (`"1000.00"`); nunca números flotantes |
 | Tasas | Texto decimal con 8 decimales (`"36.62430000"`) |
 | Fechas | `AAAA-MM-DD` |
-| Instantes | ISO-8601 UTC (`2026-11-13T19:30:00Z`) |
+| Instantes de operación | ISO-8601 con zona `America/Managua` (`2026-11-13T13:30-06:00`); `expiraEn` de login sigue en UTC |
 | Identificadores | UUID como texto |
 
 ### Idempotencia
@@ -87,6 +87,7 @@ Cuerpo uniforme:
 | 415 | `CONTENIDO_NO_SOPORTADO` | `Content-Type` distinto de JSON |
 | 422 | `ENTIDAD_NO_PROCESABLE` | Regla de negocio incumplida |
 | 429 | `DEMASIADOS_INTENTOS` | Bloqueo temporal de login |
+| 503 | `ERR-057` | La fecha del equipo difiere más de cinco minutos de PostgreSQL |
 | 500 | `ERROR_INTERNO` | Fallo técnico; nunca incluye SQLSTATE ni stack trace |
 
 ## Resumen de endpoints
@@ -252,7 +253,9 @@ suman USD con NIO.
 ```
 
 Tipos: `correo`, `telefono`, `cedula`, `monto`, `rangoFechas`. Para
-`rangoFechas` se envían `valor` y `valorSecundario` con las dos fechas.
+`rangoFechas` se envían `inicio`, `fin` y `mesesMinimos` opcional. `valor`
+admite hasta 255 caracteres; una solicitud más larga devuelve
+`400 SOLICITUD_INVALIDA`.
 
 ```json
 { "valido": true, "mensaje": null }

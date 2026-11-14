@@ -86,6 +86,11 @@ en errores o logs, duplicación de cobros y manipulación de importes.
 - Distribución de pagos validada contra cargos del mismo contrato, sin
   duplicados, sin cargos cancelados y sin superar saldos.
 - Anulación exclusiva del propietario, con motivo obligatorio y auditoría.
+- Instante y fecha operativa desde PostgreSQL; la fecha efectiva del pago queda
+  separada. Un desfase absoluto mayor de cinco minutos bloquea las nuevas
+  escrituras con `ERR-057` antes de persistir.
+- Los instantes de operación se presentan en `America/Managua`; la base conserva
+  el instante UTC. `pago.creado_en` requiere aplicar V10.
 
 ### Auditoría
 
@@ -96,7 +101,7 @@ en errores o logs, duplicación de cobros y manipulación de importes.
 
 ## Verificación automatizada
 
-`ApiSeguridadTest` (12 pruebas) comprueba:
+`ApiSeguridadTest` comprueba:
 
 1. `logout` revoca el token.
 2. Token ausente, inventado, alterado o demasiado largo devuelve `401` con
@@ -117,12 +122,19 @@ en errores o logs, duplicación de cobros y manipulación de importes.
 14. `Host` distinto de `127.0.0.1:<puerto>` se rechaza antes de resolver rutas.
 15. Las rutas protegidas devuelven `401` antes de distinguir una ruta o método
     inexistente; el servidor limita a 30 segundos la recepción completa.
+16. El reloj desfasado se devuelve como `503 ERR-057` sin detalles técnicos y
+    los instantes de tasas se presentan con el desplazamiento de Managua.
 
 Además, `ApiPagosTest` verifica que una `Idempotency-Key` de otro usuario
 devuelve `409` y no duplica el pago, y `SesionUsuarioTest` cubre el aislamiento
 y el fallo cerrado del contexto.
 
-Resultado de la suite completa: **108 pruebas, 0 fallos, 0 errores, 0 omitidas**.
+`RelojServiceTest` comprueba la lectura de hora de BD, la conversión de zona,
+ambos lados del umbral de cinco minutos y el bloqueo. `ApiValidacionesTest`
+comprueba el rechazo de `valor` por encima de 255 caracteres y el manejo de un
+`mesesMinimos` extremo sin propagar `DateTimeException`.
+
+Resultado de la suite completa: **163 pruebas, 0 fallos, 0 errores, 0 omitidas**.
 
 ## Riesgos residuales aceptados
 
