@@ -3,8 +3,11 @@ package ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ExcepcionApi;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.Json;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.AplicacionResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PaginaResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.CargoListaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.EstadoCuentaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoDetalleResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoListaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoRegistroResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.ReciboResponse;
@@ -18,6 +21,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Pago;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Recibo;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.SolicitudIdempotente;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ConflictoDatosException;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.CargoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PagoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.Permiso;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PermisoService;
@@ -54,6 +58,9 @@ import java.util.UUID;
  * y comparten transacción con el pago para que no existan cobros duplicados.
  */
 public final class ServicioPagos {
+    public static final int TAMANO_PAGINA_MAXIMO = 50;
+    public static final int TAMANO_PAGINA_PREDETERMINADO = 50;
+    public static final int PAGINA_MAXIMA = 100_000;
     private static final String RECURSO = "PAGOS";
     private static final Set<String> MONEDAS = Set.of("USD", "NIO");
     private static final int MAXIMO_DISTRIBUCIONES = 100;
@@ -61,6 +68,7 @@ public final class ServicioPagos {
 
     private final HibernateTransactions tx;
     private final PagoService pagos;
+    private final CargoService cargos;
     private final PermisoService permisos = new PermisoService();
     private final Clock reloj;
 
@@ -71,7 +79,42 @@ public final class ServicioPagos {
     public ServicioPagos(HibernateTransactions tx, Clock reloj) {
         this.tx = Objects.requireNonNull(tx, "Faltan las transacciones de la API.");
         this.pagos = new PagoService(tx);
+        this.cargos = new CargoService(tx);
         this.reloj = Objects.requireNonNull(reloj, "Falta el reloj de la API.");
+    }
+
+    public PaginaResponse<PagoListaResponse> listarPagos(int pagina, int tamano, String texto) {
+        validarPaginacion(pagina, tamano);
+        PaginaResponse<Pago> resultados = pagos.listarTodos(pagina, tamano, texto);
+        return new PaginaResponse<>(pagina, tamano, resultados.total(), resultados.elementos().stream()
+                .map(pago -> new PagoListaResponse(pago.getId().toString(),
+                        pago.getContratoId().toString(), pago.getContratoInfo(), pago.getFechaPago().toString(),
+                        pago.getMontoOriginal().toPlainString(), pago.getMonedaOriginal(), pago.getMontoFormateado(),
+                        pago.getMetodo(), pago.getReferencia(), pago.getEstado()))
+                .toList());
+    }
+
+    public PaginaResponse<CargoListaResponse> listarCargos(int pagina, int tamano, String texto) {
+        validarPaginacion(pagina, tamano);
+        PaginaResponse<Cargo> resultados = cargos.listarTodos(pagina, tamano, texto);
+        return new PaginaResponse<>(pagina, tamano, resultados.total(), resultados.elementos().stream()
+                .map(cargo -> new CargoListaResponse(cargo.getId().toString(),
+                        cargo.getContratoId().toString(), cargo.getContratoInfo(), cargo.getTipo(),
+                        cargo.getConcepto(), cargo.getPeriodo().toString(), cargo.getFechaEmision().toString(),
+                        cargo.getVenceEl().toString(), cargo.getImporte().toPlainString(), cargo.getImporteFormateado(),
+                        cargo.getEstado()))
+                .toList());
+    }
+
+    private static void validarPaginacion(int pagina, int tamano) {
+        if (pagina < 1 || pagina > PAGINA_MAXIMA) {
+            throw ExcepcionApi.solicitudInvalida("La página debe ser un entero entre 1 y "
+                    + PAGINA_MAXIMA + ".");
+        }
+        if (tamano < 1 || tamano > TAMANO_PAGINA_MAXIMO) {
+            throw ExcepcionApi.solicitudInvalida("El tamaño debe ser un entero entre 1 y "
+                    + TAMANO_PAGINA_MAXIMO + ".");
+        }
     }
 
     public PagoRegistroResponse registrar(String clave, PagoRequest solicitud) {
