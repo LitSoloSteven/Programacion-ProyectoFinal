@@ -11,7 +11,9 @@ import org.hibernate.Session;
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -21,7 +23,6 @@ public final class CargoService {
     private static final Set<String> ESTADOS = Set.of("Pendiente", "Pagado", "Cancelado");
 
     private final HibernateTransactions tx;
-    private final HibernateCrudService db;
     private final PermisoService permisos = new PermisoService();
     private final AuditoriaService auditoria = new AuditoriaService();
 
@@ -31,11 +32,36 @@ public final class CargoService {
 
     CargoService(HibernateTransactions tx) {
         this.tx = Objects.requireNonNull(tx);
-        this.db = new HibernateCrudService(tx);
     }
 
     public List<Cargo> listarTodos() throws SQLException {
-        return db.listar(Cargo.class, "from Cargo order by periodo desc");
+        return tx.ejecutar(session -> {
+            permisos.exigir(session, SesionUsuario.getActual(), Permiso.OPERAR_ALQUILERES);
+            List<Cargo> cargos = session.createQuery(
+                    "from Cargo order by periodo desc", Cargo.class).getResultList();
+            if (cargos.isEmpty()) return cargos;
+
+            List<UUID> ids = cargos.stream().map(Cargo::getId).toList();
+            Map<UUID, BigDecimal> aplicadoPorCargo = new HashMap<>();
+            for (Object[] fila : session.createQuery("""
+                            select a.cargoId, sum(a.monto)
+                            from AplicacionPago a, Pago p
+                            where a.pagoId = p.id and a.cargoId in :ids
+                              and p.estado <> :anulado
+                            group by a.cargoId
+                            """, Object[].class)
+                    .setParameter("ids", ids)
+                    .setParameter("anulado", "Anulado")
+                    .getResultList()) {
+                aplicadoPorCargo.put((UUID) fila[0], (BigDecimal) fila[1]);
+            }
+
+            LocalDate hoy = LocalDate.now();
+            for (Cargo cargo : cargos) {
+                cargo.establecerEstadoDerivado(aplicadoPorCargo.get(cargo.getId()), hoy);
+            }
+            return cargos;
+        });
     }
 
     public UUID guardar(Solicitud solicitud) throws SQLException {

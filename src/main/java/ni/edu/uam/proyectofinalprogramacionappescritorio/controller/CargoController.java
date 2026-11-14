@@ -304,7 +304,7 @@ public class CargoController {
     private void seleccionarCargo(Cargo c) {
         this.cargoSeleccionado = c;
         cmbTipo.setValue(c.getTipo());
-        cmbEstado.setValue(c.getEstado());
+        cmbEstado.setValue(c.getEstadoPersistido());
         txtImporte.setText(c.getImporte() != null ? c.getImporte().toPlainString() : "");
         txtConcepto.setText(c.getConcepto());
         dpPeriodo.setValue(c.getPeriodo());

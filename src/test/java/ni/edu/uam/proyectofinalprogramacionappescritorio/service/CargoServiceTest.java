@@ -189,6 +189,43 @@ class CargoServiceTest {
     }
 
     @Test
+    void listaCargoConEstadoDerivadoIgnorandoAplicacionesDePagosAnulados()
+            throws Exception {
+        UUID cargoId = guardarComo(propietario, solicitud(null, 0,
+                new BigDecimal("100.00"), "Pendiente"));
+        tx.ejecutar(session -> {
+            Pago activo = new Pago(null, contratoId, null, LocalDate.now(), "USD",
+                    new BigDecimal("25.00"), new BigDecimal("25.00"),
+                    "Efectivo", null, null, "Registrado");
+            activo.aplicarConversion("USD", new BigDecimal("25.00"), null);
+            session.persist(activo);
+            session.flush();
+            session.persist(new AplicacionPago(activo.getId(), cargoId,
+                    new BigDecimal("25.00")));
+
+            Pago anulado = new Pago(null, contratoId, null, LocalDate.now(), "USD",
+                    new BigDecimal("75.00"), new BigDecimal("75.00"),
+                    "Efectivo", null, null, "Anulado");
+            anulado.aplicarConversion("USD", new BigDecimal("75.00"), null);
+            session.persist(anulado);
+            session.flush();
+            session.persist(new AplicacionPago(anulado.getId(), cargoId,
+                    new BigDecimal("75.00")));
+            return null;
+        });
+
+        Cargo cargo = ejecutarComo(propietario, servicio::listarTodos).stream()
+                .filter(c -> c.getId().equals(cargoId))
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals("Parcial", cargo.getEstado());
+        assertEquals("Pendiente", cargo.getEstadoPersistido());
+        assertEquals(new BigDecimal("75.00"),
+                cargo.saldoPendiente(new BigDecimal("25.00")));
+    }
+
+    @Test
     void asistenteNoPuedeAjustarGarantiaYNoDejaCambiosNiAuditoria() throws Exception {
         long auditoriasAntes = contar("GARANTIA_SALDO_AJUSTADO");
 
