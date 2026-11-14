@@ -1,5 +1,6 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.service;
 
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PaginaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.AplicacionPago;
@@ -13,12 +14,15 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
 public final class CargoService {
+    public static final int TAMANO_PAGINA_MAXIMO = 50;
+    private static final int PAGINA_MAXIMA = 100_000;
     private static final BigDecimal MONTO_MAXIMO = new BigDecimal("1000000000000");
     private static final Set<String> ESTADOS = Set.of("Pendiente", "Pagado", "Cancelado");
 
@@ -31,16 +35,50 @@ public final class CargoService {
         this(new HibernateTransactions(HibernateUtil.getSessionFactory()));
     }
 
-    CargoService(HibernateTransactions tx) {
+    public CargoService(HibernateTransactions tx) {
         this.tx = Objects.requireNonNull(tx);
     }
 
-    public List<Cargo> listarTodos() throws SQLException {
+    public List<Cargo> listarTodos() {
+        return listarTodos(1, TAMANO_PAGINA_MAXIMO, null).elementos();
+    }
+
+    public PaginaResponse<Cargo> listarTodos(int pagina, int tamano, String texto) {
+        validarPaginacion(pagina, tamano);
+        String criterio = texto == null || texto.isBlank()
+                ? null : "%" + texto.strip().toLowerCase(Locale.ROOT) + "%";
         return tx.ejecutar(session -> {
             permisos.exigir(session, SesionUsuario.getActual(), Permiso.OPERAR_ALQUILERES);
-            List<Cargo> cargos = session.createQuery(
-                    "from Cargo order by periodo desc", Cargo.class).getResultList();
-            if (cargos.isEmpty()) return cargos;
+            String filtro = criterio == null ? "" : """
+                     where lower(c.concepto) like :texto
+                        or lower(c.tipo) like :texto
+                        or lower(i.nombre) like :texto
+                        or lower(prop.nombre) like :texto
+                        or lower(u.codigo) like :texto
+                        or lower(u.tipo) like :texto
+                    """;
+            var conteo = session.createQuery("""
+                    select count(c) from Cargo c
+                    join c.contrato con join con.inquilino i
+                    join con.unidad u join u.propiedad prop
+                    """ + filtro, Long.class);
+            if (criterio != null) conteo.setParameter("texto", criterio);
+            long total = conteo.getSingleResult();
+
+            var consulta = session.createQuery("""
+                    select c from Cargo c
+                    join fetch c.contrato con
+                    left join fetch con.garantiaSeguimiento
+                    join fetch con.inquilino i
+                    join fetch con.unidad u
+                    join fetch u.propiedad prop
+                    """ + filtro + " order by c.periodo desc, c.id", Cargo.class);
+            if (criterio != null) consulta.setParameter("texto", criterio);
+            List<Cargo> cargos = consulta
+                    .setFirstResult((pagina - 1) * tamano)
+                    .setMaxResults(tamano)
+                    .getResultList();
+            if (cargos.isEmpty()) return new PaginaResponse<>(pagina, tamano, total, cargos);
 
             List<UUID> ids = cargos.stream().map(Cargo::getId).toList();
             Map<UUID, BigDecimal> aplicadoPorCargo = new HashMap<>();
@@ -61,8 +99,18 @@ public final class CargoService {
             for (Cargo cargo : cargos) {
                 cargo.establecerEstadoDerivado(aplicadoPorCargo.get(cargo.getId()), hoy);
             }
-            return cargos;
+            return new PaginaResponse<>(pagina, tamano, total, cargos);
         });
+    }
+
+    private static void validarPaginacion(int pagina, int tamano) {
+        if (pagina < 1 || pagina > PAGINA_MAXIMA) {
+            throw new IllegalArgumentException("La página debe estar entre 1 y " + PAGINA_MAXIMA + ".");
+        }
+        if (tamano < 1 || tamano > TAMANO_PAGINA_MAXIMO) {
+            throw new IllegalArgumentException("El tamaño de página debe estar entre 1 y "
+                    + TAMANO_PAGINA_MAXIMO + ".");
+        }
     }
 
     public UUID guardar(Solicitud solicitud) throws SQLException {

@@ -253,6 +253,70 @@ class ApiPagosTest {
     }
 
     @Test
+    void paginaPagosYCargosConLimiteDeCincuentaYConsultasAcotadas() throws Exception {
+        tx.ejecutar(session -> {
+            for (int indice = 0; indice < 51; indice++) {
+                BigDecimal importe = new BigDecimal("10.00");
+                Pago pago = new Pago(null, contratoId, null, FECHA_PAGO.minusDays(indice),
+                        "USD", importe, importe, "Transferencia", "REF-PAG-" + indice,
+                        null, "Registrado");
+                pago.aplicarConversion("USD", importe, null);
+                session.persist(pago);
+            }
+            for (int indice = 0; indice < 49; indice++) {
+                Cargo cargo = new Cargo();
+                cargo.setContratoId(contratoId);
+                cargo.setTipo("Servicio");
+                cargo.setPeriodo(LocalDate.of(2026, 10, 1).minusMonths(indice));
+                cargo.setFechaEmision(LocalDate.of(2026, 10, 1).minusMonths(indice));
+                cargo.setVenceEl(LocalDate.of(2026, 10, 5).minusMonths(indice));
+                cargo.setImporte(new BigDecimal("25.00"));
+                cargo.setConcepto("Cargo de paginación " + indice);
+                cargo.setEstado("Pendiente");
+                session.persist(cargo);
+            }
+            return null;
+        });
+
+        String token = login(nombrePropietario);
+        factory.getStatistics().setStatisticsEnabled(true);
+        factory.getStatistics().clear();
+        HttpResponse<String> pagosPrimera = get("/api/v1/pagos?tamano=50", token);
+        assertEquals(200, pagosPrimera.statusCode(), pagosPrimera.body());
+        var pagosPagina = GSON.fromJson(pagosPrimera.body(), com.google.gson.JsonObject.class);
+        assertEquals(50, pagosPagina.get("tamano").getAsInt());
+        assertEquals(51, pagosPagina.get("total").getAsInt());
+        assertEquals(50, pagosPagina.getAsJsonArray("elementos").size());
+        long consultasPagos = factory.getStatistics().getPrepareStatementCount();
+        assertTrue(consultasPagos < 25,
+                "la consulta de pagos no debe crecer con el número de filas de la página: " + consultasPagos);
+
+        HttpResponse<String> pagosSegunda = get("/api/v1/pagos?pagina=2&tamano=50", token);
+        assertEquals(200, pagosSegunda.statusCode(), pagosSegunda.body());
+        var pagosPaginaDos = GSON.fromJson(pagosSegunda.body(), com.google.gson.JsonObject.class);
+        assertEquals(1, pagosPaginaDos.getAsJsonArray("elementos").size());
+
+        factory.getStatistics().clear();
+        HttpResponse<String> cargosPrimera = get("/api/v1/cargos?tamano=50", token);
+        assertEquals(200, cargosPrimera.statusCode(), cargosPrimera.body());
+        var cargosPagina = GSON.fromJson(cargosPrimera.body(), com.google.gson.JsonObject.class);
+        assertEquals(50, cargosPagina.get("tamano").getAsInt());
+        assertEquals(51, cargosPagina.get("total").getAsInt());
+        assertEquals(50, cargosPagina.getAsJsonArray("elementos").size());
+        long consultasCargos = factory.getStatistics().getPrepareStatementCount();
+        assertTrue(consultasCargos < 25,
+                "la consulta de cargos no debe crecer con el número de filas de la página: " + consultasCargos);
+
+        HttpResponse<String> cargosSegunda = get("/api/v1/cargos?pagina=2&tamano=50", token);
+        assertEquals(200, cargosSegunda.statusCode(), cargosSegunda.body());
+        var cargosPaginaDos = GSON.fromJson(cargosSegunda.body(), com.google.gson.JsonObject.class);
+        assertEquals(1, cargosPaginaDos.getAsJsonArray("elementos").size());
+
+        assertEquals(400, get("/api/v1/pagos?tamano=51", token).statusCode());
+        assertEquals(400, get("/api/v1/cargos?tamano=51", token).statusCode());
+    }
+
+    @Test
     void rechazaExponenteExtremoSinGuardarPago() throws Exception {
         String token = login(nombrePropietario);
         long pagosAntes = contar("select count(p) from Pago p");

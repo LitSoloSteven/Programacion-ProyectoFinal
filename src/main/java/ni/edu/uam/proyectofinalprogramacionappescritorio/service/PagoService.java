@@ -1,5 +1,6 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.service;
 
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PaginaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.AplicacionPago;
@@ -19,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -31,6 +33,8 @@ import java.util.UUID;
  * el recibo y las aplicaciones a cargos dentro de la misma transacción.
  */
 public class PagoService {
+    public static final int TAMANO_PAGINA_MAXIMO = 50;
+    private static final int PAGINA_MAXIMA = 100_000;
     private static final Set<String> MONEDAS = Set.of("USD", "NIO");
 
     private final HibernateCrudService db;
@@ -48,8 +52,58 @@ public class PagoService {
         this.db = new HibernateCrudService(tx);
     }
 
-    public List<Pago> listarTodos() throws SQLException {
-        return db.listar(Pago.class, "from Pago order by fechaPago desc");
+    public List<Pago> listarTodos() {
+        return listarTodos(1, TAMANO_PAGINA_MAXIMO, null).elementos();
+    }
+
+    public PaginaResponse<Pago> listarTodos(int pagina, int tamano, String texto) {
+        validarPaginacion(pagina, tamano);
+        String criterio = texto == null || texto.isBlank()
+                ? null : "%" + texto.strip().toLowerCase(Locale.ROOT) + "%";
+        return tx.ejecutar(session -> {
+            permisos.exigir(session, SesionUsuario.getActual(), Permiso.OPERAR_ALQUILERES);
+            String filtro = criterio == null ? "" : """
+                     where lower(p.referencia) like :texto
+                        or lower(p.metodo) like :texto
+                        or lower(i.nombre) like :texto
+                        or lower(prop.nombre) like :texto
+                        or lower(u.codigo) like :texto
+                        or lower(u.tipo) like :texto
+                    """;
+            var conteo = session.createQuery("""
+                    select count(p) from Pago p
+                    join p.contrato c join c.inquilino i
+                    join c.unidad u join u.propiedad prop
+                    """ + filtro, Long.class);
+            if (criterio != null) conteo.setParameter("texto", criterio);
+            long total = conteo.getSingleResult();
+
+            var consulta = session.createQuery("""
+                    select p from Pago p
+                    join fetch p.contrato c
+                    left join fetch c.garantiaSeguimiento
+                    join fetch c.inquilino i
+                    join fetch c.unidad u
+                    join fetch u.propiedad prop
+                    left join fetch p.tipoCambio
+                    """ + filtro + " order by p.fechaPago desc, p.id", Pago.class);
+            if (criterio != null) consulta.setParameter("texto", criterio);
+            List<Pago> pagos = consulta
+                    .setFirstResult((pagina - 1) * tamano)
+                    .setMaxResults(tamano)
+                    .getResultList();
+            return new PaginaResponse<>(pagina, tamano, total, pagos);
+        });
+    }
+
+    private static void validarPaginacion(int pagina, int tamano) {
+        if (pagina < 1 || pagina > PAGINA_MAXIMA) {
+            throw new IllegalArgumentException("La página debe estar entre 1 y " + PAGINA_MAXIMA + ".");
+        }
+        if (tamano < 1 || tamano > TAMANO_PAGINA_MAXIMO) {
+            throw new IllegalArgumentException("El tamaño de página debe estar entre 1 y "
+                    + TAMANO_PAGINA_MAXIMO + ".");
+        }
     }
 
     public void registrarPago(Pago pago) throws SQLException {
