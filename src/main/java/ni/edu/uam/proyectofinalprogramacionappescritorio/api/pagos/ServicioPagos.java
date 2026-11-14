@@ -30,6 +30,8 @@ import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -54,20 +56,28 @@ public final class ServicioPagos {
     private static final String RECURSO = "PAGOS";
     private static final Set<String> MONEDAS = Set.of("USD", "NIO");
     private static final int MAXIMO_DISTRIBUCIONES = 100;
+    private static final Duration RETENCION_IDEMPOTENCIA = Duration.ofDays(30);
 
     private final HibernateTransactions tx;
     private final PagoService pagos;
     private final PermisoService permisos = new PermisoService();
+    private final Clock reloj;
 
     public ServicioPagos(HibernateTransactions tx) {
+        this(tx, Clock.systemUTC());
+    }
+
+    public ServicioPagos(HibernateTransactions tx, Clock reloj) {
         this.tx = Objects.requireNonNull(tx, "Faltan las transacciones de la API.");
         this.pagos = new PagoService(tx);
+        this.reloj = Objects.requireNonNull(reloj, "Falta el reloj de la API.");
     }
 
     public PagoRegistroResponse registrar(String clave, PagoRequest solicitud) {
         String idempotencyKey = claveUuid(clave);
         DatosPago datos = validar(solicitud);
         String huella = huella(datos);
+        limpiarSolicitudesExpiradas();
         try {
             return tx.ejecutar(session ->
                     registrarEnSesion(session, idempotencyKey, huella, datos));
@@ -78,6 +88,22 @@ public final class ServicioPagos {
             if (repetida != null) return repetida;
             throw e;
         }
+    }
+
+    /**
+     * Conserva las respuestas de idempotencia durante 30 días desde su
+     * finalización. Solo elimina solicitudes completadas; EN_PROCESO se
+     * conserva para no invalidar una operación que pudiera seguir activa.
+     */
+    public int limpiarSolicitudesExpiradas() {
+        Instant limite = reloj.instant().minus(RETENCION_IDEMPOTENCIA);
+        return tx.ejecutar(session -> session.createNativeMutationQuery("""
+                        delete from solicitud_idempotente
+                        where estado = :estado and completado_en < :limite
+                        """)
+                .setParameter("estado", SolicitudIdempotente.COMPLETADA)
+                .setParameter("limite", limite)
+                .executeUpdate());
     }
 
     public PagoDetalleResponse obtenerPago(UUID id) {
@@ -280,7 +306,7 @@ public final class ServicioPagos {
         }
 
         SolicitudIdempotente registro = new SolicitudIdempotente(clave,
-                sesion.getUsuarioId(), RECURSO, huella, Instant.now());
+                sesion.getUsuarioId(), RECURSO, huella, reloj.instant());
         session.persist(registro);
         session.flush();
 
@@ -305,7 +331,7 @@ public final class ServicioPagos {
                 resultado.recibo().getNumero(),
                 decimal(resultado.pago().getMontoContrato()),
                 decimal(resultado.credito()));
-        registro.completar(201, Json.escribir(respuesta), Instant.now());
+        registro.completar(201, Json.escribir(respuesta), reloj.instant());
         return respuesta;
     }
 

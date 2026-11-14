@@ -58,6 +58,8 @@ Content-Type: application/json
 - Misma clave con contenido, usuario o recurso distinto → `409 CONFLICTO`.
 - La clave se persiste en `solicitud_idempotente` dentro de la misma transacción del pago.
 - Si la solicitud falla, no queda registro de idempotencia ni pago.
+- La interfaz JavaFX genera un UUID por solicitud sin cambios y lo conserva para reintentos; al completar el pago, una nueva operación recibe una clave nueva.
+- Las respuestas completadas se conservan 30 días desde `completado_en`. Antes de cada registro se eliminan las completadas anteriores al límite; `EN_PROCESO` no se elimina. Tras la limpieza, una clave vencida puede registrar una nueva operación.
 
 ## Errores
 

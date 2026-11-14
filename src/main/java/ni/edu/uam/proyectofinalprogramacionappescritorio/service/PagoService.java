@@ -107,7 +107,8 @@ public class PagoService {
         session.persist(pago);
         session.flush();
 
-        Recibo recibo = new Recibo(pago, contrato.toString());
+        long numeroRecibo = reservarNumeroRecibo(session);
+        Recibo recibo = new Recibo(numeroRecibo, pago, contrato.toString());
         session.persist(recibo);
         BigDecimal credito = aplicarDistribucion(session, pago, aplicaciones);
         auditoria.registrar(session, actor, UUID.randomUUID(), "PAGO_REGISTRADO",
@@ -298,6 +299,21 @@ public class PagoService {
                 .setParameter("id", contratoId)
                 .uniqueResult();
         return filaBloqueada == null ? null : session.find(Contrato.class, contratoId);
+    }
+
+    private long reservarNumeroRecibo(Session session) {
+        String producto = session.doReturningWork(
+                conexion -> conexion.getMetaData().getDatabaseProductName());
+        String consulta;
+        if ("H2".equalsIgnoreCase(producto)) {
+            // H2 se usa para pruebas rápidas; producción reserva con la función transaccional de PostgreSQL.
+            consulta = "select coalesce(max(numero), 0) + 1 from recibo";
+        } else if ("PostgreSQL".equalsIgnoreCase(producto)) {
+            consulta = "select public.fn_reservar_numero()";
+        } else {
+            throw new IllegalStateException("La numeración de recibos requiere PostgreSQL.");
+        }
+        return session.createNativeQuery(consulta, Long.class).getSingleResult();
     }
 
     private Cargo bloquearCargo(Session session, UUID cargoId) {

@@ -9,6 +9,10 @@ import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Pago;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoRegistroResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClientePagos;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ContratoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PagoService;
@@ -16,7 +20,10 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PagoService;
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * Controlador de la vista de Pagos de Latch.
@@ -74,19 +81,27 @@ public class PagoController {
 
     private final PagoService pagoService;
     private final ContratoService contratoService;
+    private final ClientePagos clientePagos;
+
+    private final Map<PagoRequest, UUID> clavesPagosPendientes = new HashMap<>();
 
     private final ObservableList<Pago> listaPagos = FXCollections.observableArrayList();
     private FilteredList<Pago> listaFiltrada;
     private Pago pagoSeleccionado = null;
 
     public PagoController() {
-        this.pagoService = new PagoService();
-        this.contratoService = new ContratoService();
+        this(new PagoService(), new ContratoService(), new ClientePagos());
     }
 
     public PagoController(PagoService pagoService, ContratoService contratoService) {
+        this(pagoService, contratoService, new ClientePagos());
+    }
+
+    public PagoController(PagoService pagoService, ContratoService contratoService,
+                          ClientePagos clientePagos) {
         this.pagoService = pagoService;
         this.contratoService = contratoService;
+        this.clientePagos = clientePagos;
     }
 
     @FXML
@@ -225,34 +240,35 @@ public class PagoController {
         }
 
         try {
-            Pago nuevo = new Pago();
-            nuevo.setContratoId(contrato.getId());
-            nuevo.setFechaPago(fecha);
-            nuevo.setMonedaOriginal(moneda);
-            nuevo.setMontoOriginal(monto);
-            nuevo.setMontoContrato(monto);
-            nuevo.setMetodo(metodo);
-            nuevo.setReferencia(referencia != null && !referencia.isBlank() ? referencia.trim() : null);
-            nuevo.setNotas(notas != null && !notas.isBlank() ? notas.trim() : null);
-            nuevo.setEstado("Registrado");
-
-            pagoService.registrarPago(nuevo);
+            String referenciaLimpia = referencia != null && !referencia.isBlank()
+                    ? referencia.trim() : null;
+            String notasLimpias = notas != null && !notas.isBlank() ? notas.trim() : null;
+            PagoRequest solicitud = new PagoRequest(contrato.getId().toString(),
+                    fecha.toString(), moneda, monto.toPlainString(), metodo,
+                    referenciaLimpia, List.of(), notasLimpias);
+            UUID clave = clavesPagosPendientes.computeIfAbsent(solicitud,
+                    ignorada -> UUID.randomUUID());
+            PagoRegistroResponse registro = clientePagos.registrar(
+                    solicitud, clave);
+            clavesPagosPendientes.remove(solicitud, clave);
 
             AlertaUtil.mostrarExito(
                     "Pago Registrado",
-                    "El pago por " + String.format("%.2f %s", monto, moneda) + " fue guardado satisfactoriamente en PostgreSQL."
+                    "El pago por " + String.format("%.2f %s", monto, moneda)
+                            + " fue guardado. Recibo #" + registro.numeroRecibo() + "."
             );
 
             cargarDatos();
             limpiarFormulario();
+        } catch (ErrorClienteException e) {
+            AlertaUtil.mostrarError("No se pudo confirmar el pago",
+                    e.getMessage() + " Si el resultado es incierto, reintenta sin cambiar los datos.");
         } catch (IllegalArgumentException e) {
             AlertaUtil.mostrarAdvertencia("Datos inválidos", e.getMessage());
         } catch (SecurityException e) {
             AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
         } catch (IllegalStateException e) {
             AlertaUtil.mostrarError("Error de persistencia", e.getMessage());
-        } catch (SQLException e) {
-            AlertaUtil.mostrarError("Error de persistencia", "No se pudo registrar el pago en la base de datos.");
         }
     }
 

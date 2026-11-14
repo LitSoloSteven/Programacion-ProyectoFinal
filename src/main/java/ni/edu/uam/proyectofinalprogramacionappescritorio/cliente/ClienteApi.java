@@ -62,6 +62,21 @@ public final class ClienteApi {
         return enviar(peticion, tipo);
     }
 
+    public <T> T postConCabecera(String ruta, Object cuerpo, Class<T> tipo,
+                                 String nombreCabecera, String valorCabecera) {
+        if (nombreCabecera == null || nombreCabecera.isBlank()
+                || valorCabecera == null || valorCabecera.isBlank()) {
+            throw new IllegalArgumentException("La cabecera de la petición es obligatoria.");
+        }
+        HttpRequest peticion = construir(ruta)
+                .header("Content-Type", "application/json")
+                .header(nombreCabecera, valorCabecera)
+                .POST(HttpRequest.BodyPublishers.ofString(
+                        gson.toJson(cuerpo), StandardCharsets.UTF_8))
+                .build();
+        return enviar(peticion, tipo);
+    }
+
     public void postSinContenido(String ruta, Object cuerpo) {
         post(ruta, cuerpo, Void.class);
     }
