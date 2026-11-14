@@ -1,5 +1,7 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun;
 
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojDesfasadoException;
+
 /**
  * Error controlado de la capa HTTP. No reemplaza las excepciones de negocio
  * existentes: solo traduce una respuesta concreta a un código y un mensaje
@@ -62,6 +64,11 @@ public final class ExcepcionApi extends RuntimeException {
 
     public static ExcepcionApi conflicto(String mensaje) {
         return new ExcepcionApi(409, "CONFLICTO", mensaje);
+    }
+
+    public static ExcepcionApi relojDesfasado() {
+        return new ExcepcionApi(503, "ERR-057",
+                RelojDesfasadoException.MENSAJE);
     }
 
     public static ExcepcionApi entidadNoProcesable(String mensaje) {

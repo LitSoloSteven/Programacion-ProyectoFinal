@@ -4,6 +4,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.RutasAuth;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.AutenticacionService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojDesfasadoException;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -125,6 +126,8 @@ public final class ServidorApi implements AutoCloseable {
                     "La solicitud contiene datos inválidos."));
         } catch (SecurityException e) {
             escribirError(intercambio, ExcepcionApi.sinPermiso());
+        } catch (RelojDesfasadoException e) {
+            escribirError(intercambio, ExcepcionApi.relojDesfasado());
         } catch (Exception e) {
             // No se registra el cuerpo, la cabecera Authorization ni datos sensibles.
             System.err.println("Error interno en API Latch: " + e.getClass().getSimpleName());

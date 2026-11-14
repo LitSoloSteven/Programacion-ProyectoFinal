@@ -21,6 +21,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ConflictoDatosE
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PagoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.Permiso;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PermisoService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ParserMonto;
 import org.hibernate.Session;
@@ -148,9 +149,11 @@ public final class ServicioPagos {
 
     public EstadoCuentaResponse estadoCuenta(UUID contratoId, LocalDate corte) {
         Objects.requireNonNull(contratoId, "Falta el contrato.");
-        LocalDate fechaCorte = corte == null ? LocalDate.now() : corte;
+        LocalDate fechaSolicitada = corte;
         EstadoCuentaResponse respuesta = tx.ejecutar(session -> {
             permisos.exigir(session, SesionUsuario.getActual(), Permiso.OPERAR_ALQUILERES);
+            LocalDate fechaCorte = fechaSolicitada == null
+                    ? new RelojService().leer(session).fecha() : fechaSolicitada;
             Contrato contrato = session.createQuery("""
                             from Contrato c
                             join fetch c.unidad
@@ -305,8 +308,10 @@ public final class ServicioPagos {
             return repetir(existente, huella, sesion);
         }
 
+        RelojService.TiempoOperativo tiempo = pagos.comprobarReloj(session);
+
         SolicitudIdempotente registro = new SolicitudIdempotente(clave,
-                sesion.getUsuarioId(), RECURSO, huella, reloj.instant());
+                sesion.getUsuarioId(), RECURSO, huella, tiempo.instante());
         session.persist(registro);
         session.flush();
 
@@ -324,14 +329,14 @@ public final class ServicioPagos {
                 .map(d -> new AplicacionPago(null, d.cargoId(), d.monto()))
                 .toList();
         PagoService.RegistroPago resultado = pagos.registrarPagoEnSesion(
-                session, pago, aplicaciones);
+                session, pago, aplicaciones, tiempo);
 
         PagoRegistroResponse respuesta = new PagoRegistroResponse(
                 resultado.pago().getId().toString(),
                 resultado.recibo().getNumero(),
                 decimal(resultado.pago().getMontoContrato()),
                 decimal(resultado.credito()));
-        registro.completar(201, Json.escribir(respuesta), reloj.instant());
+        registro.completar(201, Json.escribir(respuesta), tiempo.instante());
         return respuesta;
     }
 
@@ -392,7 +397,7 @@ public final class ServicioPagos {
                 decimal(credito),
                 aplicacionesDto,
                 pago.getMotivoAnulacion(),
-                pago.getAnuladoEn() == null ? null : pago.getAnuladoEn().toString(),
+                RelojService.presentar(pago.getAnuladoEn()),
                 pago.getAnuladoPor());
     }
 
