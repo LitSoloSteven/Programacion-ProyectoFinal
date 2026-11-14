@@ -252,40 +252,34 @@ class ApiSeguridadTest {
     }
 
     @Test
-    void elRolSeRevalidaEnCadaPeticion() throws Exception {
+    void cambiarElRolRevocaElTokenHastaElSiguienteLogin() throws Exception {
         String token = login(nombrePropietario);
-        TasaResponse tasa = registrarTasa(token, LocalDate.now().minusDays(1).toString());
+        assertEquals(200, get("/api/v1/dashboard/metricas", token).statusCode());
 
         cambiarRol(idPropietario, Rol.ASISTENTE);
-        HttpResponse<String> denegada = postJson(
-                "/api/v1/tasas/" + tasa.id() + "/autorizar",
-                "{\"motivo\":\"Intento tras cambio de rol\"}", token, null);
-        assertEquals(403, denegada.statusCode());
-        assertEquals("SIN_PERMISO", error(denegada).error().codigo());
-
-        // El asistente conserva las operaciones que sí le corresponden.
-        assertEquals(201, postJson("/api/v1/tasas",
-                "{\"fecha\":\"" + LocalDate.now().minusDays(2)
-                        + "\",\"tasa\":\"36.70000000\",\"fuente\":\"BCN\"}",
-                token, null).statusCode());
+        HttpResponse<String> invalidada = get("/api/v1/dashboard/metricas", token);
+        assertEquals(401, invalidada.statusCode());
+        assertEquals("NO_AUTENTICADO", error(invalidada).error().codigo());
 
         cambiarRol(idPropietario, Rol.PROPIETARIO);
-        HttpResponse<String> autorizada = postJson(
-                "/api/v1/tasas/" + tasa.id() + "/autorizar",
-                "{\"motivo\":\"Restablecido el rol\"}", token, null);
-        assertEquals(200, autorizada.statusCode());
-        assertTrue(GSON.fromJson(autorizada.body(), TasaResponse.class).autorizada());
+        assertEquals(401, get("/api/v1/dashboard/metricas", token).statusCode());
+        String tokenNuevo = login(nombrePropietario);
+        assertEquals(200, get("/api/v1/dashboard/metricas", tokenNuevo).statusCode());
     }
 
     @Test
-    void unUsuarioDesactivadoPierdeElAccesoAunqueSuTokenSigaVigente() throws Exception {
+    void desactivarUnUsuarioRevocaSuTokenHastaElSiguienteLogin() throws Exception {
         String token = login(nombreAsistente);
         assertEquals(200, get("/api/v1/dashboard/metricas", token).statusCode());
 
         cambiarActivo(idAsistente, false);
         HttpResponse<String> respuesta = get("/api/v1/dashboard/metricas", token);
-        assertEquals(403, respuesta.statusCode());
-        assertEquals("SIN_PERMISO", error(respuesta).error().codigo());
+        assertEquals(401, respuesta.statusCode());
+        assertEquals("NO_AUTENTICADO", error(respuesta).error().codigo());
+
+        cambiarActivo(idAsistente, true);
+        assertEquals(401, get("/api/v1/dashboard/metricas", token).statusCode());
+        assertEquals(200, get("/api/v1/dashboard/metricas", login(nombreAsistente)).statusCode());
     }
 
     @Test
@@ -379,7 +373,7 @@ class ApiSeguridadTest {
 
     private static void cambiarRol(Long id, String rol) {
         tx.ejecutar(session -> {
-            session.createNativeMutationQuery("update usuario set rol = :rol where id = :id")
+            session.createNativeMutationQuery("update usuario set rol = :rol, version = version + 1 where id = :id")
                     .setParameter("rol", rol)
                     .setParameter("id", id)
                     .executeUpdate();
@@ -389,7 +383,7 @@ class ApiSeguridadTest {
 
     private static void cambiarActivo(Long id, boolean activo) {
         tx.ejecutar(session -> {
-            session.createNativeMutationQuery("update usuario set activo = :activo where id = :id")
+            session.createNativeMutationQuery("update usuario set activo = :activo, version = version + 1 where id = :id")
                     .setParameter("activo", activo)
                     .setParameter("id", id)
                     .executeUpdate();
@@ -400,7 +394,7 @@ class ApiSeguridadTest {
     private static void restaurarUsuario(Long id, String rol, boolean activo) {
         tx.ejecutar(session -> {
             session.createNativeMutationQuery(
-                            "update usuario set rol = :rol, activo = :activo where id = :id")
+                            "update usuario set rol = :rol, activo = :activo, version = version + 1 where id = :id")
                     .setParameter("rol", rol)
                     .setParameter("activo", activo)
                     .setParameter("id", id)
