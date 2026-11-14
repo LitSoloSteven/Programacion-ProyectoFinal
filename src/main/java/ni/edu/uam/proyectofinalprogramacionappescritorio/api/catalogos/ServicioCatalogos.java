@@ -26,6 +26,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PropiedadServic
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.UnidadService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ParserMonto;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PatronLike;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ValidadorEntrada;
 import org.hibernate.Session;
 import org.hibernate.query.Query;
@@ -94,8 +95,9 @@ public final class ServicioCatalogos {
         StringBuilder where = new StringBuilder();
         Map<String, Object> parametros = new LinkedHashMap<>();
         if (texto != null && !texto.isBlank()) {
-            where.append("(lower(p.nombre) like :texto or lower(p.direccion) like :texto)");
-            parametros.put("texto", "%" + texto.strip().toLowerCase(Locale.ROOT) + "%");
+            where.append("(lower(p.nombre) like :texto escape '!' or lower(p.direccion) like :texto escape '!')");
+            parametros.put("texto", PatronLike.contieneLiteral(
+                    texto.strip().toLowerCase(Locale.ROOT)));
         }
         if (activa != null) {
             if (!where.isEmpty()) where.append(" and ");
@@ -189,8 +191,9 @@ public final class ServicioCatalogos {
         }
         if (texto != null && !texto.isBlank()) {
             separar(where);
-            where.append("(lower(u.codigo) like :texto or lower(u.descripcion) like :texto)");
-            parametros.put("texto", "%" + texto.strip().toLowerCase(Locale.ROOT) + "%");
+            where.append("(lower(u.codigo) like :texto escape '!' or lower(u.descripcion) like :texto escape '!')");
+            parametros.put("texto", PatronLike.contieneLiteral(
+                    texto.strip().toLowerCase(Locale.ROOT)));
         }
         return paginar(Unidad.class, "u",
                 "Unidad u join fetch u.propiedad", "Unidad u",
@@ -264,9 +267,10 @@ public final class ServicioCatalogos {
         }
         if (texto != null && !texto.isBlank()) {
             separar(where);
-            where.append("(lower(i.nombre) like :texto or lower(i.identificacion) like :texto")
-                    .append(" or lower(i.correo) like :texto)");
-            parametros.put("texto", "%" + texto.strip().toLowerCase(Locale.ROOT) + "%");
+            where.append("(lower(i.nombre) like :texto escape '!' or lower(i.identificacion) like :texto escape '!'")
+                    .append(" or lower(i.correo) like :texto escape '!')");
+            parametros.put("texto", PatronLike.contieneLiteral(
+                    texto.strip().toLowerCase(Locale.ROOT)));
         }
         return paginar(Inquilino.class, "i",
                 "Inquilino i", "Inquilino i",

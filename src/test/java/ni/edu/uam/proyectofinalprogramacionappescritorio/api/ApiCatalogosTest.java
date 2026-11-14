@@ -285,6 +285,30 @@ class ApiCatalogosTest {
     }
 
     @Test
+    void busquedaDeCatalogoTrataComodinesComoTextoLiteral() throws Exception {
+        String token = login(nombrePropietario);
+        crearInquilino(token, new InquilinoRequest("Ana % porcentaje", "LIKE-PCT-1",
+                null, null, null, true, null));
+        crearInquilino(token, new InquilinoRequest("Ana X porcentaje", "LIKE-PCT-2",
+                null, null, null, true, null));
+        crearInquilino(token, new InquilinoRequest("Linea_baja", "LIKE-UND-1",
+                null, null, null, true, null));
+        crearInquilino(token, new InquilinoRequest("LineaXbaja", "LIKE-UND-2",
+                null, null, null, true, null));
+        crearInquilino(token, new InquilinoRequest("Signo!literal", "LIKE-ESC-1",
+                null, null, null, true, null));
+        crearInquilino(token, new InquilinoRequest("Signo literal", "LIKE-ESC-2",
+                null, null, null, true, null));
+
+        for (String consulta : new String[]{"%25", "%5F", "%21"}) {
+            PaginaResponse<InquilinoResponse> resultado = pagina(
+                    "/api/v1/inquilinos?texto=" + consulta, token,
+                    new TypeToken<PaginaResponse<InquilinoResponse>>() { }.getType());
+            assertEquals(1, resultado.total(), consulta);
+        }
+    }
+
+    @Test
     void validaCuerposYParametros() throws Exception {
         String token = login(nombrePropietario);
 

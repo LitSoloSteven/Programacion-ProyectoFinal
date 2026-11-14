@@ -317,6 +317,32 @@ class ApiPagosTest {
     }
 
     @Test
+    void busquedasDePagosYCargosTratanComodinesComoTextoLiteral() throws Exception {
+        tx.ejecutar(session -> {
+            Cargo cargo = session.find(Cargo.class, cargoRentaId);
+            cargo.setConcepto("Cargo %_! literal");
+            BigDecimal monto = new BigDecimal("10.00");
+            Pago pago = new Pago(null, contratoId, null, FECHA_PAGO, "USD", monto, monto,
+                    "Transferencia", "Referencia %_! literal", null, "Registrado");
+            pago.aplicarConversion("USD", monto, null);
+            session.persist(pago);
+            return null;
+        });
+
+        String token = login(nombrePropietario);
+        for (String consulta : new String[]{"%25", "%5F", "%21"}) {
+            HttpResponse<String> pagos = get("/api/v1/pagos?texto=" + consulta, token);
+            HttpResponse<String> cargos = get("/api/v1/cargos?texto=" + consulta, token);
+            assertEquals(200, pagos.statusCode(), pagos.body());
+            assertEquals(200, cargos.statusCode(), cargos.body());
+            assertEquals(1, GSON.fromJson(pagos.body(), com.google.gson.JsonObject.class)
+                    .get("total").getAsInt(), consulta);
+            assertEquals(1, GSON.fromJson(cargos.body(), com.google.gson.JsonObject.class)
+                    .get("total").getAsInt(), consulta);
+        }
+    }
+
+    @Test
     void rechazaExponenteExtremoSinGuardarPago() throws Exception {
         String token = login(nombrePropietario);
         long pagosAntes = contar("select count(p) from Pago p");
