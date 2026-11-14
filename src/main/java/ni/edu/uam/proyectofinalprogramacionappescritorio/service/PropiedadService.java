@@ -7,8 +7,13 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propietario;
 import java.sql.SQLException;
 import java.util.*;
 public class PropiedadService {
- private final HibernateCrudService db=new HibernateCrudService();
- private final HibernateTransactions transactions=new HibernateTransactions(HibernateUtil.getSessionFactory());
+ private final HibernateCrudService db;
+ private final HibernateTransactions transactions;
+ public PropiedadService(){this(new HibernateTransactions(HibernateUtil.getSessionFactory()));}
+ public PropiedadService(HibernateTransactions transactions){
+  this.transactions=Objects.requireNonNull(transactions);
+  this.db=new HibernateCrudService(transactions);
+ }
  public List<Propiedad> listarTodas() throws SQLException{return db.listar(Propiedad.class,"from Propiedad p left join fetch p.propietario order by p.nombre");}
  public List<Propiedad> listarActivas() throws SQLException{return db.listar(Propiedad.class,"from Propiedad p left join fetch p.propietario where p.activa=true order by p.nombre");}
  public void guardar(Propiedad p, String nombrePropietario, String correoPropietario, String telefonoPropietario)throws SQLException{
@@ -36,6 +41,8 @@ public class PropiedadService {
    }else{
     Propiedad existente=s.find(Propiedad.class,p.getId());
     if(existente==null)throw new IllegalArgumentException("La propiedad ya no existe.");
+    // La versión enviada por el cliente debe coincidir con la vigente.
+    if(p.getVersion()!=existente.getVersion())throw new ConflictoDatosException("Otro usuario modificó el registro. Actualiza los datos antes de reintentar.");
     existente.setNombre(p.getNombre().strip());
     existente.setDireccion(p.getDireccion().strip());
     existente.setActiva(p.isActiva());
