@@ -97,8 +97,9 @@ public final class ServidorApi implements AutoCloseable {
             SesionApi sesion = null;
             String token = null;
             String metodo = intercambio.getRequestMethod();
-            String ruta = intercambio.getRequestURI().getPath();
             validarHost(intercambio);
+            Router.RutaNormalizada ruta = router.normalizar(
+                    intercambio.getRequestURI().getRawPath());
             if (!router.esPublica(metodo, ruta)) {
                 token = extraerToken(intercambio);
                 SesionApi candidata = tokens.validar(token).orElseThrow(ExcepcionApi::noAutorizado);

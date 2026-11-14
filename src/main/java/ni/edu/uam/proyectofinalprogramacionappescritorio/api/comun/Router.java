@@ -21,7 +21,7 @@ public final class Router {
         Objects.requireNonNull(patron, "Falta el patrón de la ruta.");
         Objects.requireNonNull(manejador, "Falta el manejador de la ruta.");
         Ruta nueva = new Ruta(metodo.strip().toUpperCase(Locale.ROOT),
-                segmentos(patron), publica, manejador);
+                segmentosPatron(patron), publica, manejador);
         for (Ruta existente : rutas) {
             if (existente.metodo().equals(nueva.metodo())
                     && existente.segmentos().equals(nueva.segmentos())) {
@@ -31,13 +31,20 @@ public final class Router {
         rutas.add(nueva);
     }
 
-    public Resultado resolver(String metodo, String ruta) {
-        List<String> partes;
+    public RutaNormalizada normalizar(String rutaCruda) {
         try {
-            partes = segmentos(ruta);
+            return new RutaNormalizada(segmentosRuta(rutaCruda));
         } catch (IllegalArgumentException e) {
             throw ExcepcionApi.solicitudInvalida("La ruta solicitada no es válida.");
         }
+    }
+
+    public Resultado resolver(String metodo, String rutaCruda) {
+        return resolver(metodo, normalizar(rutaCruda));
+    }
+
+    public Resultado resolver(String metodo, RutaNormalizada ruta) {
+        List<String> partes = ruta.segmentos();
 
         boolean rutaExistente = false;
         // Primero las rutas literales; después las que contienen variables.
@@ -58,13 +65,16 @@ public final class Router {
         throw ExcepcionApi.noEncontrado();
     }
 
-    public boolean esPublica(String metodo, String ruta) {
-        List<String> partes;
+    public boolean esPublica(String metodo, String rutaCruda) {
         try {
-            partes = segmentos(ruta);
-        } catch (IllegalArgumentException e) {
+            return esPublica(metodo, normalizar(rutaCruda));
+        } catch (ExcepcionApi e) {
             return false;
         }
+    }
+
+    public boolean esPublica(String metodo, RutaNormalizada ruta) {
+        List<String> partes = ruta.segmentos();
         for (Ruta candidata : rutas) {
             if (candidata.publica() && candidata.metodo().equalsIgnoreCase(metodo)
                     && candidata.coincidir(partes) != null) {
@@ -92,7 +102,18 @@ public final class Router {
         return valores;
     }
 
-    private static List<String> segmentos(String ruta) {
+    private static List<String> segmentosPatron(String ruta) {
+        String limpia = ruta == null ? "" : ruta.strip();
+        if (limpia.startsWith("/")) limpia = limpia.substring(1);
+        if (limpia.endsWith("/") && !limpia.isEmpty()) {
+            limpia = limpia.substring(0, limpia.length() - 1);
+        }
+        if (limpia.isEmpty()) return List.of();
+        String[] partes = limpia.split("/", -1);
+        return List.of(partes);
+    }
+
+    private static List<String> segmentosRuta(String ruta) {
         String limpia = ruta == null ? "" : ruta.strip();
         if (limpia.startsWith("/")) limpia = limpia.substring(1);
         if (limpia.endsWith("/") && !limpia.isEmpty()) {
@@ -103,9 +124,42 @@ public final class Router {
         List<String> resultado = new ArrayList<>(partes.length);
         for (String parte : partes) {
             // En una ruta, '+' es un carácter literal; en la consulta sí representa espacio.
-            resultado.add(URLDecoder.decode(parte.replace("+", "%2B"), StandardCharsets.UTF_8));
+            String decodificada = URLDecoder.decode(
+                    parte.replace("+", "%2B"), StandardCharsets.UTF_8);
+            if (contieneEscapePendiente(decodificada)) {
+                throw new IllegalArgumentException("La ruta contiene una codificación anidada.");
+            }
+            resultado.add(decodificada);
         }
         return List.copyOf(resultado);
+    }
+
+    private static boolean contieneEscapePendiente(String valor) {
+        for (int i = 0; i + 2 < valor.length(); i++) {
+            if (valor.charAt(i) == '%' && esHexadecimal(valor.charAt(i + 1))
+                    && esHexadecimal(valor.charAt(i + 2))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean esHexadecimal(char valor) {
+        return valor >= '0' && valor <= '9'
+                || valor >= 'a' && valor <= 'f'
+                || valor >= 'A' && valor <= 'F';
+    }
+
+    public static final class RutaNormalizada {
+        private final List<String> segmentos;
+
+        private RutaNormalizada(List<String> segmentos) {
+            this.segmentos = List.copyOf(segmentos);
+        }
+
+        public List<String> segmentos() {
+            return segmentos;
+        }
     }
 
     public record Resultado(Ruta ruta, Map<String, String> parametros) { }
