@@ -1,5 +1,4 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -17,6 +16,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ContratoService
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.InquilinoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.GarantiaService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.UnidadService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
 
 import java.math.BigDecimal;
@@ -26,8 +26,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Controlador de la vista de Contratos de arrendamiento.
- * Vincula unidades e inquilinos reales de PostgreSQL y valida coherencia contractual.
+ - Controlador de la vista de Contratos de arrendamiento.
+ - Vincula unidades e inquilinos reales de PostgreSQL y valida coherencia contractual.
  */
 public class ContratoController {
 
@@ -506,7 +506,11 @@ public class ContratoController {
         } else if (error instanceof IllegalStateException persistencia) {
             AlertaUtil.mostrarError("Error de persistencia", persistencia.getMessage());
         } else {
-            AlertaUtil.mostrarError("Error de persistencia", errorPersistencia);
+            String detalle = error.getMessage();
+            String mensaje = detalle == null || detalle.isBlank()
+                    ? errorPersistencia
+                    : errorPersistencia + " Detalle: " + detalle;
+            AlertaUtil.mostrarError("Error de persistencia", mensaje);
         }
     }
 

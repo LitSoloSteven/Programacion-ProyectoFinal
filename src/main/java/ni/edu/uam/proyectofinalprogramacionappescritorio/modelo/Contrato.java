@@ -9,7 +9,8 @@ import java.util.Set;
 import java.util.Objects;
 
 /**
- * Entidad de dominio que representa un Contrato de arrendamiento en Latch.
+ - Entidad de dominio que representa un Contrato de arrendamiento en Latch.
+
  */
 @Entity
 @Table(name = "contrato")
@@ -30,33 +31,45 @@ public class Contrato {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+
     @Column(name = "unidad_id", nullable = false)
     private UUID unidadId;
+
     @Transient
     private String unidadInfo;
+
     @Column(name = "inquilino_id", nullable = false)
     private UUID inquilinoId;
+
     @Transient
     private String inquilinoNombre;
+
     @Column(nullable = false)
     private LocalDate inicio;
+
     @Column(nullable = false)
     private LocalDate fin;
+
     @Column(precision = 19, scale = 2, nullable = false)
     private BigDecimal canon;
+
     @Column(length = 3, nullable = false)
     private String moneda;
+
     @Column(name = "dia_pago", nullable = false)
     private int diaPago;
-    @Embedded
-    private DepositoPactado deposito = new DepositoPactado(BigDecimal.ZERO);
+
     @OneToOne(mappedBy = "contrato", cascade = CascadeType.ALL, orphanRemoval = true)
     private Garantia garantiaSeguimiento;
+
+    @Column(name = "deposito_pactado", nullable = false, precision = 19, scale = 2)
+    private BigDecimal depositoPactado = BigDecimal.ZERO;
+
     @Column(length = 24, nullable = false)
     private String estado;
+
     @Version
     private long version;
-
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "unidad_id", insertable = false, updatable = false)
@@ -90,7 +103,7 @@ public class Contrato {
         this.canon = canon;
         this.moneda = moneda;
         this.diaPago = diaPago;
-        this.deposito = new DepositoPactado(depositoPactado);
+        this.depositoPactado = new DepositoPactado(depositoPactado).getMontoPactado();
         this.estado = estado;
         this.version = version;
     }
@@ -185,19 +198,9 @@ public class Contrato {
         this.diaPago = diaPago;
     }
 
-    public BigDecimal getDepositoPactado() {
-        return deposito == null ? BigDecimal.ZERO : deposito.getMontoPactado();
+    public Garantia getGarantiaSeguimiento() {
+        return garantiaSeguimiento;
     }
-
-    public void setDepositoPactado(BigDecimal depositoPactado) {
-        DepositoPactado nuevoDeposito = new DepositoPactado(depositoPactado);
-        if (garantiaSeguimiento != null) {
-            garantiaSeguimiento.actualizarMontoInicial(nuevoDeposito.getMontoPactado());
-        }
-        this.deposito = nuevoDeposito;
-    }
-
-    public Garantia getGarantiaSeguimiento() { return garantiaSeguimiento; }
 
     public String getGarantiaSaldoFormateado() {
         if (garantiaSeguimiento == null || garantiaSeguimiento.getSaldoActual() == null) return "—";
@@ -209,6 +212,19 @@ public class Contrato {
             BigDecimal monto = getDepositoPactado();
             garantiaSeguimiento = new Garantia(this, monto, monto);
         }
+    }
+
+    public BigDecimal getDepositoPactado() {
+        return this.depositoPactado;
+    }
+
+    public void setDepositoPactado(BigDecimal depositoPactado) {
+        DepositoPactado nuevoDeposito = new DepositoPactado(depositoPactado);
+        BigDecimal montoPactado = nuevoDeposito.getMontoPactado();
+        if (garantiaSeguimiento != null) {
+            garantiaSeguimiento.actualizarMontoInicial(montoPactado);
+        }
+        this.depositoPactado = montoPactado;
     }
 
     public String getEstado() {
