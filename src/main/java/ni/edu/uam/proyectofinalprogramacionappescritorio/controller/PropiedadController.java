@@ -9,8 +9,9 @@ import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propiedad;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ConflictoDatosException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PropiedadService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -193,7 +194,8 @@ public class PropiedadController {
 
         boolean confirma = AlertaUtil.mostrarConfirmacion(
                 "Confirmar eliminación",
-                "¿Está seguro de que desea eliminar la propiedad '" + propiedadSeleccionada.getNombre() + "'? Esta acción afectará las unidades vinculadas."
+                "¿Está seguro de que desea eliminar la propiedad '" + propiedadSeleccionada.getNombre()
+                        + "'? Solo se puede eliminar si no tiene unidades asociadas."
         );
 
         if (confirma) {
@@ -204,6 +206,8 @@ public class PropiedadController {
                 limpiarFormulario();
             } catch (SecurityException e) {
                 AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
+            } catch (ConflictoDatosException e) {
+                AlertaUtil.mostrarAdvertencia("Propiedad con unidades", e.getMessage());
             } catch (SQLException e) {
                 AlertaUtil.mostrarError("Restricción de integridad", "No es posible eliminar la propiedad porque tiene unidades o contratos asociados.");
             }

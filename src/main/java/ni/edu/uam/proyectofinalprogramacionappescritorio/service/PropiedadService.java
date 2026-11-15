@@ -1,10 +1,12 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.service;
 
+import jakarta.persistence.LockModeType;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propiedad;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propietario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Rol;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Unidad;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
 import org.hibernate.Session;
 
@@ -147,7 +149,23 @@ public class PropiedadService {
     }
 
     public void eliminar(UUID id) throws SQLException {
-        db.eliminar(Propiedad.class, id, Permiso.GESTIONAR_USUARIOS);
+        transactions.ejecutar(session -> {
+            permisos.exigir(session, SesionUsuario.getActual(), Permiso.GESTIONAR_USUARIOS);
+            Propiedad propiedad = session.find(Propiedad.class, id, LockModeType.PESSIMISTIC_WRITE);
+            if (propiedad == null) return null;
+
+            Long unidades = session.createQuery(
+                            "select count(u) from Unidad u where u.propiedadId = :propiedadId", Long.class)
+                    .setParameter("propiedadId", id)
+                    .getSingleResult();
+            if (unidades > 0) {
+                throw new ConflictoDatosException(
+                        "No se puede eliminar la propiedad porque todavía tiene unidades asociadas.");
+            }
+
+            session.remove(propiedad);
+            return null;
+        });
     }
 
     public void cambiarEstado(UUID id, boolean activa) throws SQLException {

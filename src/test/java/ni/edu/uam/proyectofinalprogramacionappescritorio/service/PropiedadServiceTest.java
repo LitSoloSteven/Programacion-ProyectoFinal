@@ -5,17 +5,21 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propiedad;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propietario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Rol;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Unidad;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
 import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.util.Properties;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -114,6 +118,33 @@ class PropiedadServiceTest {
 
         assertEquals(propietarioId, leerPropietarioId());
         assertEquals("Casa original", leerPropiedad().getNombre());
+    }
+
+    @Test
+    void noEliminaPropiedadMientrasTengaUnidadesAsociadas() {
+        UUID unidadId = tx.ejecutar(session -> {
+            Unidad unidad = new Unidad();
+            unidad.setPropiedadId(propiedadId);
+            unidad.setCodigo("U-01");
+            unidad.setCanonReferencia(new BigDecimal("100.00"));
+            session.persist(unidad);
+            session.flush();
+            return unidad.getId();
+        });
+
+        SesionUsuario.ejecutarComo(propietario, () -> assertThrows(
+                ConflictoDatosException.class, () -> servicio.eliminar(propiedadId)));
+
+        assertNotNull(tx.ejecutar(session -> session.find(Propiedad.class, propiedadId)));
+        assertNotNull(tx.ejecutar(session -> session.find(Unidad.class, unidadId)));
+    }
+
+    @Test
+    void eliminaPropiedadSinUnidadesAsociadas() {
+        SesionUsuario.ejecutarComo(propietario, () -> assertDoesNotThrow(
+                () -> servicio.eliminar(propiedadId)));
+
+        assertNull(leerPropiedad());
     }
 
     private Propiedad edicion(Propietario propietarioDestino) {
