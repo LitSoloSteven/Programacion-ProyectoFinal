@@ -21,6 +21,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoReque
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.ReciboResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.config.PostgresTestSupport;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Cargo;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Inquilino;
@@ -92,16 +93,23 @@ class ApiPagosTest {
     @BeforeAll
     static void iniciar() throws Exception {
         Properties p = new Properties();
-        p.setProperty("hibernate.connection.driver_class", "org.h2.Driver");
-        p.setProperty("hibernate.connection.url",
-                "jdbc:h2:mem:latch_api_pagos_" + UUID.randomUUID() + ";MODE=PostgreSQL");
-        p.setProperty("hibernate.connection.username", "sa");
-        p.setProperty("hibernate.connection.password", "");
+        if (Boolean.getBoolean("latch.test.postgres")) {
+            p = PostgresTestSupport.propiedadesHibernate();
+        } else {
+            p.setProperty("hibernate.connection.driver_class", "org.h2.Driver");
+            p.setProperty("hibernate.connection.url",
+                    "jdbc:h2:mem:latch_api_pagos_" + UUID.randomUUID() + ";MODE=PostgreSQL");
+            p.setProperty("hibernate.connection.username", "sa");
+            p.setProperty("hibernate.connection.password", "");
+        }
         p.setProperty("hibernate.hbm2ddl.auto", "create-drop");
         p.setProperty("hibernate.jdbc.time_zone", "UTC");
         p.setProperty("hibernate.show_sql", "false");
 
         factory = HibernateUtil.construir(p);
+        if (Boolean.getBoolean("latch.test.postgres")) {
+            PostgresTestSupport.aplicarMigraciones(p);
+        }
         tx = new HibernateTransactions(factory);
         String hash = new PasswordHasher().crear(PASSWORD);
         nombrePropietario = "prop-" + UUID.randomUUID().toString().substring(0, 8);
@@ -133,6 +141,9 @@ class ApiPagosTest {
     static void cerrar() {
         if (servidor != null) servidor.detener();
         if (factory != null) factory.close();
+        if (Boolean.getBoolean("latch.test.postgres")) {
+            PostgresTestSupport.eliminarFuncionRecibo();
+        }
         SesionUsuario.cerrarSesion();
     }
 

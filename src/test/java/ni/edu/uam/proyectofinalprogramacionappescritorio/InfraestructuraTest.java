@@ -24,8 +24,7 @@ class InfraestructuraTest {
     @BeforeAll static void iniciar() {
         Properties p;
         if (Boolean.getBoolean("latch.test.postgres")) {
-            // Usar exclusivamente una base desechable: las tablas se crean y eliminan en esta suite.
-            p = DatabaseConfig.desdeEntorno(System.getenv());
+            p = PostgresTestSupport.propiedadesHibernate();
         } else {
             p = new Properties();
             p.setProperty("hibernate.connection.driver_class", "org.h2.Driver");
@@ -36,11 +35,19 @@ class InfraestructuraTest {
         p.setProperty("hibernate.hbm2ddl.auto", "create-drop");
         p.setProperty("hibernate.jdbc.time_zone", "UTC");
         factory = HibernateUtil.construir(p);
+        if (Boolean.getBoolean("latch.test.postgres")) {
+            PostgresTestSupport.aplicarMigraciones(p);
+        }
         tx = new HibernateTransactions(factory);
         hash = new PasswordHasher().crear(PASSWORD);
     }
 
-    @AfterAll static void cerrar() { if (factory != null) factory.close(); }
+    @AfterAll static void cerrar() {
+        if (factory != null) factory.close();
+        if (Boolean.getBoolean("latch.test.postgres")) {
+            PostgresTestSupport.eliminarFuncionRecibo();
+        }
+    }
 
     private Usuario crearUsuario(String rol) {
         return tx.ejecutar(session -> {
