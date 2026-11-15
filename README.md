@@ -134,10 +134,32 @@ rollback, restricciones, versiones concurrentes, tasas, catálogos,
 validaciones, pagos, idempotencia, recibos, anulación, estado de cuenta,
 métricas y seguridad HTTP.
 
-Para repetir la suite contra PostgreSQL, usar **una base desechable exclusiva**:
+La suite normal permanece en H2. Para ejecutar la verificación adicional en PostgreSQL,
+configurar una base **desechable y exclusiva** con permisos para crear y eliminar tablas.
+El perfil genera el esquema con Hibernate, aplica las migraciones V4, V6, V7, V8 y V10,
+y al terminar elimina las tablas creadas y la función de recibos. No usar la base configurada
+para la aplicación:
 
 ```powershell
-./mvnw.cmd test '-Dlatch.test.postgres=true'
+$env:LATCH_TEST_DB_URL = 'jdbc:postgresql://localhost:5432/latch_test'
+$env:LATCH_TEST_DB_USER = 'latch_test'
+$env:LATCH_TEST_DB_PASSWORD = 'contraseña_de_prueba'
+./mvnw.cmd verify -Ppostgres
+Remove-Item Env:LATCH_TEST_DB_URL
+Remove-Item Env:LATCH_TEST_DB_USER
+Remove-Item Env:LATCH_TEST_DB_PASSWORD
+```
+
+El perfil vuelve a ejecutar `InfraestructuraTest` y `ApiPagosTest` sobre PostgreSQL para
+cubrir persistencia y concurrencia, y ejecuta `PostgresMigrationIT` para comprobar los
+índices parciales, el consecutivo transaccional y la columna `pago.creado_en`. La suite
+H2 se ejecuta primero. El perfil requiere que PostgreSQL esté disponible; si faltan las
+variables de `LATCH_TEST_DB_*` o no se puede conectar, la verificación falla.
+
+Para ejecutar solo las pruebas H2:
+
+```powershell
+./mvnw.cmd test
 ```
 
 ## Arquitectura
