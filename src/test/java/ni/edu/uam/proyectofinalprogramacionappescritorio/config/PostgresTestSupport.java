@@ -14,10 +14,15 @@ import java.util.Properties;
 
 public final class PostgresTestSupport {
     private static final String[] MIGRACIONES = {
+            "V1__propietario_perfil.sql",
+            "V2__seguimiento_garantias.sql",
+            "V3__descripcion_unidad.sql",
             "V4__tasas_autorizadas.sql",
+            "V5__pagos_idempotencia_aplicaciones.sql",
             "V6__contratos_activos_por_unidad.sql",
             "V7__retencion_idempotencia_pagos.sql",
             "V8__consecutivo_recibos_transaccional.sql",
+            "V9__auditoria_login_fallido.sql",
             "V10__instante_operativo_pago.sql"
     };
 

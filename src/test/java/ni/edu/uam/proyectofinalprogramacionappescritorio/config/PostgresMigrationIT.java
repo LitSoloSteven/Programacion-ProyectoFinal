@@ -75,6 +75,13 @@ class PostgresMigrationIT {
                         """, String.class).getSingleResult());
         assertEquals("NO", nullable);
         assertTrue(defaultValue.toLowerCase(Locale.ROOT).contains("current_timestamp"), defaultValue);
+
+        String usuarioAuditoriaNullable = tx.ejecutar(session -> session.createNativeQuery("""
+                        select is_nullable from information_schema.columns
+                        where table_schema = current_schema()
+                          and table_name = 'auditoria' and column_name = 'usuario_id'
+                        """, String.class).getSingleResult());
+        assertEquals("YES", usuarioAuditoriaNullable);
     }
 
     @Test

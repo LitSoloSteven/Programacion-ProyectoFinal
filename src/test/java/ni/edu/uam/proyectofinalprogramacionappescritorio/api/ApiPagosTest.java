@@ -443,6 +443,8 @@ class ApiPagosTest {
 
     @Test
     void rollbackNoConsumeNumeroDeRecibo() throws Exception {
+        long numeroEsperado = Boolean.getBoolean("latch.test.postgres")
+                ? siguienteNumeroRecibo() : 1L;
         String token = login(nombrePropietario);
         PagoRequest solicitudInvalida = pago("1000.00", List.of(
                 new DistribucionRequest(UUID.randomUUID().toString(), "100.00")));
@@ -457,7 +459,7 @@ class ApiPagosTest {
         assertEquals(201, confirmada.statusCode(), confirmada.body());
         PagoRegistroResponse resultado = GSON.fromJson(confirmada.body(),
                 PagoRegistroResponse.class);
-        assertEquals(1, resultado.numeroRecibo());
+        assertEquals(numeroEsperado, resultado.numeroRecibo());
     }
 
     @Test
@@ -779,6 +781,12 @@ class ApiPagosTest {
 
     private static long contar(String hql) {
         return tx.ejecutar(session -> session.createQuery(hql, Long.class).getSingleResult());
+    }
+
+    private static long siguienteNumeroRecibo() {
+        return tx.ejecutar(session -> session.createNativeQuery(
+                "select siguiente_numero from consecutivo_recibo where id = 1", Long.class)
+                .getSingleResult());
     }
 
     private static String login(String nombre) throws Exception {
