@@ -67,8 +67,9 @@ public final class PostgresTestSupport {
                 propiedades.getProperty("hibernate.connection.password"));
              Statement sentencia = conexion.createStatement()) {
             sentencia.execute("drop function if exists public.fn_reservar_numero()");
+            sentencia.execute("drop table if exists public.consecutivo_recibo");
         } catch (SQLException e) {
-            throw new IllegalStateException("No se pudo limpiar la función PostgreSQL de prueba.", e);
+            throw new IllegalStateException("No se pudieron limpiar los objetos auxiliares de recibos.", e);
         }
     }
 
