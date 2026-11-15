@@ -3,7 +3,9 @@ package ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.RutasAuth;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ConflictoDatosException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.AutenticacionService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojDesfasadoException;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,10 +27,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class ServidorApi implements AutoCloseable {
     private static final int HILOS_API = 4;
     private static final int COLA_API = 64;
+    private static final int TIEMPO_MAXIMO_LECTURA_SEGUNDOS = 30;
     /** Consumo acotado del cuerpo rechazado para que el cliente pueda leer el 413. */
     private static final long LIMITE_DRENADO = 1024L * 1024;
 
+    static {
+        // HttpServer lee esta propiedad al inicializarse; el valor está expresado en segundos.
+        System.setProperty("sun.net.httpserver.maxReqTime",
+                Integer.toString(TIEMPO_MAXIMO_LECTURA_SEGUNDOS));
+    }
+
     private final ApiConfig config;
+    private final AutenticacionService autenticacion;
     private final TokenService tokens;
     private final Router router;
     private final ThreadPoolExecutor ejecutor;
@@ -45,9 +55,9 @@ public final class ServidorApi implements AutoCloseable {
     public ServidorApi(ApiConfig config, AutenticacionService autenticacion,
                        TokenService tokens, Router router) {
         this.config = Objects.requireNonNull(config, "Falta la configuración de la API.");
+        this.autenticacion = Objects.requireNonNull(autenticacion, "Falta el servicio de autenticación.");
         this.tokens = Objects.requireNonNull(tokens, "Falta el servicio de tokens.");
         this.router = Objects.requireNonNull(router, "Falta el router de la API.");
-        Objects.requireNonNull(autenticacion, "Falta el servicio de autenticación.");
         new RutasAuth(autenticacion, tokens).registrar(router);
 
         AtomicInteger contador = new AtomicInteger();
@@ -85,18 +95,28 @@ public final class ServidorApi implements AutoCloseable {
 
     private void manejar(HttpExchange intercambio) {
         try {
-            Router.Resultado resultado = router.resolver(
-                    intercambio.getRequestMethod(), intercambio.getRequestURI().getPath());
-            Map<String, String> consulta = Router.analizarConsulta(
-                    intercambio.getRequestURI().getRawQuery());
-
             SesionApi sesion = null;
             String token = null;
-            if (!resultado.ruta().publica()) {
+            String metodo = intercambio.getRequestMethod();
+            validarHost(intercambio);
+            Router.RutaNormalizada ruta = router.normalizar(
+                    intercambio.getRequestURI().getRawPath());
+            if (!router.esPublica(metodo, ruta)) {
                 token = extraerToken(intercambio);
-                sesion = tokens.validar(token).orElseThrow(ExcepcionApi::noAutorizado);
+                SesionApi candidata = tokens.validar(token).orElseThrow(ExcepcionApi::noAutorizado);
+                if (!autenticacion.sesionVigente(candidata)) {
+                    tokens.revocarUsuario(candidata.usuarioId());
+                    throw ExcepcionApi.noAutorizado();
+                }
+                sesion = candidata;
             }
 
+            Router.Resultado resultado = router.resolver(metodo, ruta);
+            if (!resultado.ruta().publica() && sesion == null) {
+                throw ExcepcionApi.noAutorizado();
+            }
+            Map<String, String> consulta = Router.analizarConsulta(
+                    intercambio.getRequestURI().getRawQuery());
             ContextoPeticion contexto = new ContextoPeticion(
                     intercambio, resultado.parametros(), consulta, sesion, token);
             escribir(intercambio, resultado.ruta().manejador().manejar(contexto));
@@ -108,12 +128,25 @@ public final class ServidorApi implements AutoCloseable {
                     "La solicitud contiene datos inválidos."));
         } catch (SecurityException e) {
             escribirError(intercambio, ExcepcionApi.sinPermiso());
+        } catch (ConflictoDatosException e) {
+            escribirError(intercambio, ExcepcionApi.conflicto(e.getMessage()));
+        } catch (RelojDesfasadoException e) {
+            escribirError(intercambio, ExcepcionApi.relojDesfasado());
         } catch (Exception e) {
             // No se registra el cuerpo, la cabecera Authorization ni datos sensibles.
             System.err.println("Error interno en API Latch: " + e.getClass().getSimpleName());
             escribirError(intercambio, ExcepcionApi.interno());
         } finally {
             intercambio.close();
+        }
+    }
+
+    private void validarHost(HttpExchange intercambio) {
+        List<String> valores = intercambio.getRequestHeaders().get("Host");
+        String esperado = config.host() + ":" + puerto();
+        if (valores == null || valores.size() != 1
+                || !valores.get(0).strip().equalsIgnoreCase(esperado)) {
+            throw ExcepcionApi.solicitudInvalida("La cabecera Host no es válida.");
         }
     }
 

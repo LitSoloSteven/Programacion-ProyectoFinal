@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TokenServiceTest {
-    private static final SesionApi SESION = new SesionApi(7L, "usuario", "PROPIETARIO");
+    private static final SesionApi SESION = new SesionApi(7L, "usuario", "PROPIETARIO", 4L);
 
     @Test
     void emiteValidaYRevocaUnToken() {
@@ -33,6 +33,23 @@ class TokenServiceTest {
         assertTrue(tokens.validar(null).isEmpty());
         assertTrue(tokens.validar(" ").isEmpty());
         assertTrue(tokens.validar("x".repeat(600)).isEmpty());
+    }
+
+    @Test
+    void revocaTodosLosTokensDeUnUsuarioSinAfectarLosDemas() {
+        TokenService tokens = new TokenService();
+        TokenService.TokenEmitido primero = tokens.emitir(SESION);
+        TokenService.TokenEmitido segundo = tokens.emitir(
+                new SesionApi(7L, "usuario", "ASISTENTE", 5L));
+        TokenService.TokenEmitido otroUsuario = tokens.emitir(
+                new SesionApi(8L, "otro", "ASISTENTE", 0L));
+
+        tokens.revocarUsuario(7L);
+
+        assertTrue(tokens.validar(primero.token()).isEmpty());
+        assertTrue(tokens.validar(segundo.token()).isEmpty());
+        assertTrue(tokens.validar(otroUsuario.token()).isPresent());
+        assertEquals(1, tokens.cantidadActiva());
     }
 
     @Test

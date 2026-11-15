@@ -123,6 +123,21 @@ class ApiCatalogosTest {
     }
 
     @Test
+    void crearPropiedadUsaUnaTransaccionDeNegocio() throws Exception {
+        String token = login(nombrePropietario);
+        factory.getStatistics().setStatisticsEnabled(true);
+        factory.getStatistics().clear();
+
+        HttpResponse<String> respuesta = postJson("/api/v1/propiedades",
+                GSON.toJson(new PropiedadRequest("Edificio Transaccional", "Calle 1", true,
+                        "Ana Propietaria", CORREO_PROPIETARIO, "+505 8888-1111", null)), token);
+
+        assertEquals(201, respuesta.statusCode(), respuesta.body());
+        assertEquals(2, factory.getStatistics().getTransactionCount(),
+                "una transacción valida la sesión y una cubre toda la operación del catálogo");
+    }
+
+    @Test
     void flujoCompletoDeCatalogos() throws Exception {
         String token = login(nombrePropietario);
 
@@ -180,6 +195,34 @@ class ApiCatalogosTest {
                 new TypeToken<PaginaResponse<ContratoResponse>>() { }.getType());
         assertEquals(1, vigentes.total());
 
+        assertEquals(422, patchJson("/api/v1/propiedades/" + propiedad.id(), "{}", token)
+                .statusCode());
+        assertEquals(422, patchJson("/api/v1/propiedades/" + propiedad.id(),
+                "{\"activa\":\"quizas\"}", token).statusCode());
+        assertEquals(422, patchJson("/api/v1/inquilinos/" + inquilino.id(), "{}", token)
+                .statusCode());
+        assertEquals(422, patchJson("/api/v1/inquilinos/" + inquilino.id(),
+                "{\"activo\":\"quizas\"}", token).statusCode());
+        assertEquals(422, patchJson("/api/v1/unidades/" + unidad.id(), "{}", token)
+                .statusCode());
+        assertEquals(422, patchJson("/api/v1/unidades/" + unidad.id(),
+                "{\"estado\":\"Desconocido\"}", token).statusCode());
+        assertEquals(422, patchJson("/api/v1/contratos/" + contrato.id(), "{}", token)
+                .statusCode());
+        assertEquals(422, patchJson("/api/v1/contratos/" + contrato.id(),
+                "{\"estado\":\"Desconocido\"}", token).statusCode());
+
+        assertTrue(GSON.fromJson(get("/api/v1/propiedades/" + propiedad.id(), token).body(),
+                PropiedadResponse.class).activa());
+        assertTrue(GSON.fromJson(get("/api/v1/inquilinos/" + inquilino.id(), token).body(),
+                InquilinoResponse.class).activo());
+        assertEquals("Disponible", GSON.fromJson(
+                get("/api/v1/unidades/" + unidad.id(), token).body(),
+                UnidadResponse.class).estado());
+        assertEquals("Vigente", GSON.fromJson(
+                get("/api/v1/contratos/" + contrato.id(), token).body(),
+                ContratoResponse.class).estado());
+
         assertEquals("En mantenimiento",
                 parchearUnidad(token, unidad.id(), "En mantenimiento").estado());
         assertFalse(parchearInquilino(token, inquilino.id(), false).activo());
@@ -191,6 +234,27 @@ class ApiCatalogosTest {
                 "/api/v1/propiedades?activa=false&texto=norte", token,
                 new TypeToken<PaginaResponse<PropiedadResponse>>() { }.getType());
         assertEquals(1, inactivas.total());
+    }
+
+    @Test
+    void rechazaExponenteExtremoSinCrearUnidad() throws Exception {
+        String token = login(nombrePropietario);
+        PropiedadResponse propiedad = crearPropiedad(token,
+                new PropiedadRequest("Edificio", "Calle 1", true,
+                        "Ana Propietaria", CORREO_PROPIETARIO, null, null));
+        long unidadesAntes = new HibernateTransactions(factory).ejecutar(session ->
+                session.createQuery("select count(u) from Unidad u", Long.class)
+                        .getSingleResult());
+
+        HttpResponse<String> respuesta = postJson("/api/v1/unidades",
+                GSON.toJson(new UnidadRequest(propiedad.id(), "A-02", null,
+                        "Apartamento", "Disponible", "1E+999999999", "USD", null)), token);
+        long unidadesDespues = new HibernateTransactions(factory).ejecutar(session ->
+                session.createQuery("select count(u) from Unidad u", Long.class)
+                        .getSingleResult());
+
+        assertEquals(422, respuesta.statusCode(), respuesta.body());
+        assertEquals(unidadesAntes, unidadesDespues);
     }
 
     @Test
@@ -218,6 +282,30 @@ class ApiCatalogosTest {
                 new TypeToken<PaginaResponse<InquilinoResponse>>() { }.getType());
         assertEquals(1, texto.total());
         assertEquals("Bruno", texto.elementos().get(0).nombre());
+    }
+
+    @Test
+    void busquedaDeCatalogoTrataComodinesComoTextoLiteral() throws Exception {
+        String token = login(nombrePropietario);
+        crearInquilino(token, new InquilinoRequest("Ana % porcentaje", "LIKE-PCT-1",
+                null, null, null, true, null));
+        crearInquilino(token, new InquilinoRequest("Ana X porcentaje", "LIKE-PCT-2",
+                null, null, null, true, null));
+        crearInquilino(token, new InquilinoRequest("Linea_baja", "LIKE-UND-1",
+                null, null, null, true, null));
+        crearInquilino(token, new InquilinoRequest("LineaXbaja", "LIKE-UND-2",
+                null, null, null, true, null));
+        crearInquilino(token, new InquilinoRequest("Signo!literal", "LIKE-ESC-1",
+                null, null, null, true, null));
+        crearInquilino(token, new InquilinoRequest("Signo literal", "LIKE-ESC-2",
+                null, null, null, true, null));
+
+        for (String consulta : new String[]{"%25", "%5F", "%21"}) {
+            PaginaResponse<InquilinoResponse> resultado = pagina(
+                    "/api/v1/inquilinos?texto=" + consulta, token,
+                    new TypeToken<PaginaResponse<InquilinoResponse>>() { }.getType());
+            assertEquals(1, resultado.total(), consulta);
+        }
     }
 
     @Test

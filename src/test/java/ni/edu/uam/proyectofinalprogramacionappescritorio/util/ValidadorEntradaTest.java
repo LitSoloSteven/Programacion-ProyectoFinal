@@ -12,6 +12,7 @@ public class ValidadorEntradaTest {
     @Test
     void testEsTextoValido() {
         assertTrue(ValidadorEntrada.esTextoValido("Edificio Central", 3, 50));
+        assertFalse(ValidadorEntrada.esTextoValido(" ", 0, 50));
         assertFalse(ValidadorEntrada.esTextoValido("  ", 1, 50));
         assertFalse(ValidadorEntrada.esTextoValido(null, 1, 50));
         assertFalse(ValidadorEntrada.esTextoValido("AB", 3, 50));
@@ -59,6 +60,10 @@ public class ValidadorEntradaTest {
         assertThrows(IllegalArgumentException.class, () -> {
             ValidadorEntrada.validarRangoFechas(ini, ini.plusDays(10), 1);
         });
+        assertThrows(IllegalArgumentException.class, () ->
+                ValidadorEntrada.validarRangoFechas(ini, fin, Integer.MAX_VALUE));
+        assertThrows(IllegalArgumentException.class, () ->
+                ValidadorEntrada.validarRangoFechas(ini, fin, -1));
     }
 
     @Test
@@ -66,7 +71,26 @@ public class ValidadorEntradaTest {
         assertTrue(ValidadorEntrada.esCorreoValido("usuario@empresa.com"));
         assertFalse(ValidadorEntrada.esCorreoValido("invalido@"));
         assertTrue(ValidadorEntrada.esTelefonoValido("+505 8899-0011"));
+        assertTrue(ValidadorEntrada.esTelefonoValido("88990011"));
         assertFalse(ValidadorEntrada.esTelefonoValido("12"));
+        assertFalse(ValidadorEntrada.esTelefonoValido("+--505 8899-0011"));
+        assertFalse(ValidadorEntrada.esTelefonoValido("+505 88--99-0011"));
+        assertFalse(ValidadorEntrada.esTelefonoValido("+505 １２３４５６７"));
+        assertFalse(ValidadorEntrada.esTelefonoValido("505 8899-0011 ext. 123"));
+    }
+
+    @Test
+    void unificaVaciosYLimitaValor() {
+        assertTrue(ValidadorEntrada.esVacio(null));
+        assertTrue(ValidadorEntrada.esVacio(" \t"));
+        assertTrue(ValidadorEntrada.esCorreoValido(null));
+        assertTrue(ValidadorEntrada.esTelefonoValido("  "));
+        assertTrue(ValidadorEntrada.esCedulaValida(""));
+        assertFalse(ValidadorEntrada.esMontoValido(" "));
+        assertFalse(ValidadorEntrada.excedeLongitudValor("x".repeat(
+                ValidadorEntrada.LONGITUD_MAXIMA_VALOR)));
+        assertTrue(ValidadorEntrada.excedeLongitudValor("x".repeat(
+                ValidadorEntrada.LONGITUD_MAXIMA_VALOR + 1)));
     }
 
     @Test

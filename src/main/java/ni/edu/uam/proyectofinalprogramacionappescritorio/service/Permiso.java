@@ -9,6 +9,8 @@ public final class Permiso {
     // Permisos exclusivos del propietario: el conjunto del asistente no los incluye.
     public static final String AUTORIZAR_TASA = "AUTORIZAR_TASA";
     public static final String ANULAR_PAGOS = "ANULAR_PAGOS";
+    public static final String ANULAR_CARGOS = "ANULAR_CARGOS";
+    public static final String LIQUIDAR_GARANTIA = "LIQUIDAR_GARANTIA";
 
     private Permiso() {}
 
@@ -16,6 +18,7 @@ public final class Permiso {
         return GESTIONAR_USUARIOS.equals(permiso) || CAMBIAR_CONFIGURACION.equals(permiso)
                 || CONSULTAR_AUDITORIA.equals(permiso) || OPERAR_ALQUILERES.equals(permiso)
                 || CONSULTAR_REPORTES.equals(permiso) || AUTORIZAR_TASA.equals(permiso)
-                || ANULAR_PAGOS.equals(permiso);
+                || ANULAR_PAGOS.equals(permiso) || ANULAR_CARGOS.equals(permiso)
+                || LIQUIDAR_GARANTIA.equals(permiso);
     }
 }

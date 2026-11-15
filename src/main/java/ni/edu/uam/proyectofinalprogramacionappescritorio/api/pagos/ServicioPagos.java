@@ -3,8 +3,11 @@ package ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ExcepcionApi;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.Json;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.AplicacionResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PaginaResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.CargoListaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.EstadoCuentaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoDetalleResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoListaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoRegistroResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.ReciboResponse;
@@ -18,10 +21,13 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Pago;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Recibo;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.SolicitudIdempotente;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ConflictoDatosException;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.CargoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PagoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.Permiso;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PermisoService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ParserMonto;
 import org.hibernate.Session;
 
 import java.math.BigDecimal;
@@ -29,6 +35,8 @@ import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -44,23 +52,87 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 /**
  * API 4: cobranza y pagos. Las escrituras usan una Idempotency-Key persistente
  * y comparten transacción con el pago para que no existan cobros duplicados.
  */
 public final class ServicioPagos {
+    public static final int TAMANO_PAGINA_MAXIMO = 50;
+    public static final int TAMANO_PAGINA_PREDETERMINADO = 50;
+    public static final int PAGINA_MAXIMA = 100_000;
     private static final String RECURSO = "PAGOS";
     private static final Set<String> MONEDAS = Set.of("USD", "NIO");
     private static final int MAXIMO_DISTRIBUCIONES = 100;
+    private static final Duration RETENCION_IDEMPOTENCIA = Duration.ofDays(30);
 
     private final HibernateTransactions tx;
     private final PagoService pagos;
+    private final CargoService cargos;
     private final PermisoService permisos = new PermisoService();
+    private final Clock reloj;
 
     public ServicioPagos(HibernateTransactions tx) {
+        this(tx, Clock.systemUTC());
+    }
+
+    public ServicioPagos(HibernateTransactions tx, Clock reloj) {
+        this(tx, new PagoService(tx), new CargoService(tx), reloj);
+    }
+
+    public ServicioPagos(HibernateTransactions tx, PagoService pagos, CargoService cargos) {
+        this(tx, pagos, cargos, Clock.systemUTC());
+    }
+
+    public ServicioPagos(HibernateTransactions tx, PagoService pagos, CargoService cargos,
+                         Clock reloj) {
         this.tx = Objects.requireNonNull(tx, "Faltan las transacciones de la API.");
-        this.pagos = new PagoService(tx);
+        this.pagos = Objects.requireNonNull(pagos, "Falta el servicio de pagos.");
+        this.cargos = Objects.requireNonNull(cargos, "Falta el servicio de cargos.");
+        this.reloj = Objects.requireNonNull(reloj, "Falta el reloj de la API.");
+    }
+
+    public <T> T enTransaccion(Supplier<T> operacion) {
+        Objects.requireNonNull(operacion, "Falta la operación de la API.");
+        return tx.ejecutar(session -> operacion.get());
+    }
+
+    public PagoService pagoService() { return pagos; }
+    public CargoService cargoService() { return cargos; }
+
+    public PaginaResponse<PagoListaResponse> listarPagos(int pagina, int tamano, String texto) {
+        validarPaginacion(pagina, tamano);
+        PaginaResponse<Pago> resultados = pagos.listarTodos(pagina, tamano, texto);
+        return new PaginaResponse<>(pagina, tamano, resultados.total(), resultados.elementos().stream()
+                .map(pago -> new PagoListaResponse(pago.getId().toString(),
+                        pago.getContratoId().toString(), pago.getContratoInfo(), pago.getFechaPago().toString(),
+                        pago.getMontoOriginal().toPlainString(), pago.getMonedaOriginal(), pago.getMontoFormateado(),
+                        pago.getMetodo(), pago.getReferencia(), pago.getEstado()))
+                .toList());
+    }
+
+    public PaginaResponse<CargoListaResponse> listarCargos(int pagina, int tamano, String texto) {
+        validarPaginacion(pagina, tamano);
+        PaginaResponse<Cargo> resultados = cargos.listarTodos(pagina, tamano, texto);
+        return new PaginaResponse<>(pagina, tamano, resultados.total(), resultados.elementos().stream()
+                .map(cargo -> new CargoListaResponse(cargo.getId().toString(),
+                        cargo.getContratoId().toString(), cargo.getContratoInfo(), cargo.getTipo(),
+                        cargo.getConcepto(), cargo.getPeriodo().toString(), cargo.getFechaEmision().toString(),
+                        cargo.getVenceEl().toString(), cargo.getImporte().toPlainString(), cargo.getImporteFormateado(),
+                        cargo.getEstado()))
+                .toList());
+    }
+
+    private static void validarPaginacion(int pagina, int tamano) {
+        if (pagina < 1 || pagina > PAGINA_MAXIMA) {
+            throw ExcepcionApi.solicitudInvalida("La página debe ser un entero entre 1 y "
+                    + PAGINA_MAXIMA + ".");
+        }
+        if (tamano < 1 || tamano > TAMANO_PAGINA_MAXIMO) {
+            throw ExcepcionApi.solicitudInvalida("El tamaño debe ser un entero entre 1 y "
+                    + TAMANO_PAGINA_MAXIMO + ".");
+        }
     }
 
     public PagoRegistroResponse registrar(String clave, PagoRequest solicitud) {
@@ -68,8 +140,10 @@ public final class ServicioPagos {
         DatosPago datos = validar(solicitud);
         String huella = huella(datos);
         try {
-            return tx.ejecutar(session ->
-                    registrarEnSesion(session, idempotencyKey, huella, datos));
+            return tx.ejecutar(session -> {
+                limpiarSolicitudesExpiradas(session);
+                return registrarEnSesion(session, idempotencyKey, huella, datos);
+            });
         } catch (ConflictoDatosException e) {
             // Otra petición pudo insertar la misma clave en paralelo. Si ya
             // terminó, se repite su respuesta; si no coincide, se conserva 409.
@@ -77,6 +151,26 @@ public final class ServicioPagos {
             if (repetida != null) return repetida;
             throw e;
         }
+    }
+
+    /**
+     * Conserva las respuestas de idempotencia durante 30 días desde su
+     * finalización. Solo elimina solicitudes completadas; EN_PROCESO se
+     * conserva para no invalidar una operación que pudiera seguir activa.
+     */
+    public int limpiarSolicitudesExpiradas() {
+        return tx.ejecutar(this::limpiarSolicitudesExpiradas);
+    }
+
+    private int limpiarSolicitudesExpiradas(Session session) {
+        Instant limite = reloj.instant().minus(RETENCION_IDEMPOTENCIA);
+        return session.createNativeMutationQuery("""
+                        delete from solicitud_idempotente
+                        where estado = :estado and completado_en < :limite
+                        """)
+                .setParameter("estado", SolicitudIdempotente.COMPLETADA)
+                .setParameter("limite", limite)
+                .executeUpdate();
     }
 
     public PagoDetalleResponse obtenerPago(UUID id) {
@@ -121,9 +215,11 @@ public final class ServicioPagos {
 
     public EstadoCuentaResponse estadoCuenta(UUID contratoId, LocalDate corte) {
         Objects.requireNonNull(contratoId, "Falta el contrato.");
-        LocalDate fechaCorte = corte == null ? LocalDate.now() : corte;
+        LocalDate fechaSolicitada = corte;
         EstadoCuentaResponse respuesta = tx.ejecutar(session -> {
             permisos.exigir(session, SesionUsuario.getActual(), Permiso.OPERAR_ALQUILERES);
+            LocalDate fechaCorte = fechaSolicitada == null
+                    ? new RelojService().leer(session).fecha() : fechaSolicitada;
             Contrato contrato = session.createQuery("""
                             from Contrato c
                             join fetch c.unidad
@@ -157,7 +253,10 @@ public final class ServicioPagos {
 
             Set<UUID> cargosVigentes = new HashSet<>();
             for (Cargo cargo : cargos) {
-                if (!"Cancelado".equals(cargo.getEstado())) cargosVigentes.add(cargo.getId());
+                if (!"Cancelado".equals(cargo.getEstadoPersistido())
+                        && !"Anulado".equals(cargo.getEstadoPersistido())) {
+                    cargosVigentes.add(cargo.getId());
+                }
             }
 
             Map<UUID, BigDecimal> aplicadoPorCargo = new HashMap<>();
@@ -198,12 +297,10 @@ public final class ServicioPagos {
             for (Cargo cargo : cargos) {
                 BigDecimal importe = nz(cargo.getImporte());
                 BigDecimal aplicado = nz(aplicadoPorCargo.get(cargo.getId()));
-                BigDecimal saldo = importe.subtract(aplicado);
-                boolean cancelado = "Cancelado".equals(cargo.getEstado());
-                String estado = cancelado ? "Cancelado"
-                        : aplicado.compareTo(importe) >= 0 ? "Pagado"
-                        : aplicado.signum() > 0 ? "Parcial" : cargo.getEstado();
-                if (!cancelado) {
+                cargo.establecerEstadoDerivado(aplicado, fechaCorte);
+                String estado = cargo.getEstado();
+                BigDecimal saldo = cargo.saldoPendiente(aplicado);
+                if (!"Anulado".equals(estado)) {
                     totalCargos = totalCargos.add(importe);
                     totalPagado = totalPagado.add(aplicado);
                 }
@@ -277,8 +374,10 @@ public final class ServicioPagos {
             return repetir(existente, huella, sesion);
         }
 
+        RelojService.TiempoOperativo tiempo = pagos.comprobarReloj(session);
+
         SolicitudIdempotente registro = new SolicitudIdempotente(clave,
-                sesion.getUsuarioId(), RECURSO, huella, Instant.now());
+                sesion.getUsuarioId(), RECURSO, huella, tiempo.instante());
         session.persist(registro);
         session.flush();
 
@@ -296,14 +395,14 @@ public final class ServicioPagos {
                 .map(d -> new AplicacionPago(null, d.cargoId(), d.monto()))
                 .toList();
         PagoService.RegistroPago resultado = pagos.registrarPagoEnSesion(
-                session, pago, aplicaciones);
+                session, pago, aplicaciones, tiempo);
 
         PagoRegistroResponse respuesta = new PagoRegistroResponse(
                 resultado.pago().getId().toString(),
                 resultado.recibo().getNumero(),
                 decimal(resultado.pago().getMontoContrato()),
                 decimal(resultado.credito()));
-        registro.completar(201, Json.escribir(respuesta), Instant.now());
+        registro.completar(201, Json.escribir(respuesta), tiempo.instante());
         return respuesta;
     }
 
@@ -364,7 +463,7 @@ public final class ServicioPagos {
                 decimal(credito),
                 aplicacionesDto,
                 pago.getMotivoAnulacion(),
-                pago.getAnuladoEn() == null ? null : pago.getAnuladoEn().toString(),
+                RelojService.presentar(pago.getAnuladoEn()),
                 pago.getAnuladoPor());
     }
 
@@ -466,20 +565,18 @@ public final class ServicioPagos {
         String limpio = textoRequerido(valor, campo, 40);
         BigDecimal numero;
         try {
-            numero = new BigDecimal(limpio);
+            numero = ParserMonto.parsear(limpio, campo);
         } catch (NumberFormatException e) {
             throw ExcepcionApi.solicitudInvalida(
                     "El campo " + campo + " debe ser un número decimal.");
+        } catch (IllegalArgumentException e) {
+            throw ExcepcionApi.entidadNoProcesable(e.getMessage());
         }
         if (numero.signum() <= 0) {
             throw ExcepcionApi.entidadNoProcesable(
                     "El campo " + campo + " debe ser mayor que cero.");
         }
-        if (numero.stripTrailingZeros().scale() > 2) {
-            throw ExcepcionApi.entidadNoProcesable(
-                    "El campo " + campo + " admite como máximo 2 decimales.");
-        }
-        return numero.setScale(2, RoundingMode.HALF_EVEN);
+        return numero;
     }
 
     private static String textoRequerido(String valor, String campo, int maximo) {

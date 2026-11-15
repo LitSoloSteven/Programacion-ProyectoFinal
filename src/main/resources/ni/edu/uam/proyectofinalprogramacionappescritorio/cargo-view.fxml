@@ -104,6 +104,14 @@
                 <Label text="No hay cargos registrados en PostgreSQL." />
             </placeholder>
         </TableView>
+        <HBox alignment="CENTER_RIGHT" spacing="8.0">
+            <Label fx:id="lblPaginacion" text="Página 1 de 1 · 0 cargos" />
+            <Region HBox.hgrow="ALWAYS" />
+            <Button fx:id="btnPaginaAnterior" disable="true" onAction="#paginaAnterior"
+                    styleClass="btn-secondary" text="‹ Anterior" />
+            <Button fx:id="btnPaginaSiguiente" disable="true" onAction="#paginaSiguiente"
+                    styleClass="btn-secondary" text="Siguiente ›" />
+        </HBox>
     </VBox>
 
 </VBox>

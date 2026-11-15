@@ -48,6 +48,16 @@ public class Garantia {
     public BigDecimal getSaldoActual() { return saldoActual; }
     public long getVersion() { return version; }
 
+    public void actualizarMontoInicial(BigDecimal nuevoMontoInicial) {
+        BigDecimal monto = validarNoNegativo(nuevoMontoInicial,
+                "El monto inicial no puede ser negativo.");
+        if (saldoActual.compareTo(monto) > 0) {
+            throw new IllegalArgumentException(
+                    "El monto inicial de la garantía no puede ser menor que el saldo actual.");
+        }
+        montoInicial = monto;
+    }
+
     public void ajustarSaldo(BigDecimal nuevoSaldo) {
         BigDecimal saldo = validarNoNegativo(nuevoSaldo, "El saldo actual no puede ser negativo.");
         if (saldo.compareTo(montoInicial) > 0) {

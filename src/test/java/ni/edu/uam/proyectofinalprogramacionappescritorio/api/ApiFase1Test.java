@@ -199,8 +199,14 @@ class ApiFase1Test {
 
     @Test
     void rutaInexistenteDevuelve404Json() throws Exception {
+        HttpResponse<String> sinAutenticar = get("/api/v1/no-existe", null);
+        assertEquals(401, sinAutenticar.statusCode());
+        assertEquals("NO_AUTENTICADO", error(sinAutenticar).error().codigo());
+
+        String token = login(crearUsuario(Rol.ASISTENTE)).token();
         HttpRequest peticion = HttpRequest.newBuilder(URI.create(base + "/api/v1/no-existe"))
                 .timeout(Duration.ofSeconds(10))
+                .header("Authorization", "Bearer " + token)
                 .GET()
                 .build();
         HttpResponse<String> respuesta = cliente.send(peticion,
@@ -212,8 +218,14 @@ class ApiFase1Test {
 
     @Test
     void metodoNoPermitidoDevuelve405() throws Exception {
+        HttpResponse<String> sinAutenticar = get("/api/v1/auth/login", null);
+        assertEquals(401, sinAutenticar.statusCode());
+        assertEquals("NO_AUTENTICADO", error(sinAutenticar).error().codigo());
+
+        String token = login(crearUsuario(Rol.ASISTENTE)).token();
         HttpRequest peticion = HttpRequest.newBuilder(URI.create(base + "/api/v1/auth/login"))
                 .timeout(Duration.ofSeconds(10))
+                .header("Authorization", "Bearer " + token)
                 .GET()
                 .build();
         HttpResponse<String> respuesta = cliente.send(peticion,
@@ -241,6 +253,15 @@ class ApiFase1Test {
     private static HttpResponse<String> postJson(String ruta, String cuerpo, String token)
             throws Exception {
         return post(ruta, cuerpo, token, "application/json");
+    }
+
+    private static HttpResponse<String> get(String ruta, String token) throws Exception {
+        HttpRequest.Builder constructor = HttpRequest.newBuilder(URI.create(base + ruta))
+                .timeout(Duration.ofSeconds(10))
+                .GET();
+        if (token != null) constructor.header("Authorization", "Bearer " + token);
+        return cliente.send(constructor.build(),
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
     }
 
     private static HttpResponse<String> post(String ruta, String cuerpo, String token,

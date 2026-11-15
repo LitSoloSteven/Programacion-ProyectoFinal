@@ -3,20 +3,25 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import javafx.collections.transformation.FilteredList;
+import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PaginaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Cargo;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.CargoService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ContratoService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
 
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Controlador de la vista de Cargos.
@@ -52,6 +57,15 @@ public class CargoController {
     private Button btnEliminar;
 
     @FXML
+    private Button btnPaginaAnterior;
+
+    @FXML
+    private Button btnPaginaSiguiente;
+
+    @FXML
+    private Label lblPaginacion;
+
+    @FXML
     private TextField txtBuscar;
 
     @FXML
@@ -79,12 +93,16 @@ public class CargoController {
     private final ContratoService contratoService;
 
     private final ObservableList<Cargo> listaCargos = FXCollections.observableArrayList();
-    private FilteredList<Cargo> listaFiltrada;
     private Cargo cargoSeleccionado = null;
+    private int paginaActual = 1;
+    private long versionConsulta;
+
+    private record DatosTabla(List<Contrato> contratos, PaginaResponse<Cargo> cargos) {
+    }
 
     public CargoController() {
-        this.cargoService = new CargoService();
-        this.contratoService = new ContratoService();
+        this(HelloApplication.instancia().getComposicion().cargos(),
+                HelloApplication.instancia().getComposicion().contratos());
     }
 
     public CargoController(CargoService cargoService, ContratoService contratoService) {
@@ -116,9 +134,9 @@ public class CargoController {
         cmbEstado.setItems(FXCollections.observableArrayList("Pendiente", "Pagado", "Cancelado"));
         cmbEstado.getSelectionModel().selectFirst();
 
-        dpPeriodo.setValue(LocalDate.now().withDayOfMonth(1));
-        dpFechaEmision.setValue(LocalDate.now());
-        dpVenceEl.setValue(LocalDate.now().plusDays(5));
+        dpPeriodo.setValue(LocalDate.now(RelojService.ZONA_OPERATIVA).withDayOfMonth(1));
+        dpFechaEmision.setValue(LocalDate.now(RelojService.ZONA_OPERATIVA));
+        dpVenceEl.setValue(LocalDate.now(RelojService.ZONA_OPERATIVA).plusDays(5));
     }
 
     private void configurarTabla() {
@@ -129,20 +147,13 @@ public class CargoController {
         colVence.setCellValueFactory(new PropertyValueFactory<>("venceEl"));
         colEstado.setCellValueFactory(new PropertyValueFactory<>("estado"));
 
-        listaFiltrada = new FilteredList<>(listaCargos, c -> true);
-        tblCargos.setItems(listaFiltrada);
+        tblCargos.setItems(listaCargos);
     }
 
     private void configurarFiltro() {
         txtBuscar.textProperty().addListener((obs, oldVal, newVal) -> {
-            listaFiltrada.setPredicate(c -> {
-                if (newVal == null || newVal.isBlank()) return true;
-                String filtro = newVal.toLowerCase().trim();
-                boolean matchCon = c.getContratoInfo() != null && c.getContratoInfo().toLowerCase().contains(filtro);
-                boolean matchConcep = c.getConcepto() != null && c.getConcepto().toLowerCase().contains(filtro);
-                boolean matchTip = c.getTipo() != null && c.getTipo().toLowerCase().contains(filtro);
-                return matchCon || matchConcep || matchTip;
-            });
+            paginaActual = 1;
+            cargarDatos();
         });
     }
 
@@ -153,32 +164,58 @@ public class CargoController {
     }
 
     public void cargarContratosReales() {
-        try {
-            List<Contrato> contratos = contratoService.listarVigentes();
-            cmbContrato.setItems(FXCollections.observableArrayList(contratos));
-            if (!contratos.isEmpty()) {
-                cmbContrato.getSelectionModel().selectFirst();
+        Task<List<Contrato>> tarea = new Task<>() {
+            @Override
+            protected List<Contrato> call() throws SQLException {
+                return contratoService.listarVigentes();
             }
-        } catch (SQLException e) {
-            AlertaUtil.mostrarError("Error", "No fue posible cargar los contratos vigentes de PostgreSQL.");
-        }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, this::mostrarContratos,
+                error -> AlertaUtil.mostrarError("Error",
+                        "No fue posible cargar los contratos vigentes de PostgreSQL."));
     }
 
     public void cargarDatos() {
-        try {
-            List<Cargo> datos = cargoService.listarTodos();
-            listaCargos.setAll(datos);
-        } catch (SQLException e) {
-            AlertaUtil.mostrarError("Error al cargar cargos", "No fue posible consultar las obligaciones desde PostgreSQL.");
-        }
+        int pagina = paginaActual;
+        String texto = txtBuscar.getText();
+        long version = ++versionConsulta;
+        Task<PaginaResponse<Cargo>> tarea = new Task<>() {
+            @Override
+            protected PaginaResponse<Cargo> call() {
+                return cargoService.listarTodos(pagina, CargoService.TAMANO_PAGINA_MAXIMO, texto);
+            }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, resultado -> {
+            if (version == versionConsulta) mostrarPagina(resultado);
+        }, error -> {
+            if (version == versionConsulta) AlertaUtil.mostrarError("Error al cargar cargos",
+                    "No fue posible consultar las obligaciones desde PostgreSQL.");
+        });
     }
 
     @FXML
     public void refrescarTabla() {
-        cargarContratosReales();
-        cargarDatos();
-        limpiarFormulario();
-        AlertaUtil.mostrarExito("Tabla actualizada", "El registro de cargos ha sido sincronizado con PostgreSQL.");
+        int pagina = paginaActual;
+        String texto = txtBuscar.getText();
+        long version = ++versionConsulta;
+        Task<DatosTabla> tarea = new Task<>() {
+            @Override
+            protected DatosTabla call() throws SQLException {
+                return new DatosTabla(contratoService.listarVigentes(),
+                        cargoService.listarTodos(pagina, CargoService.TAMANO_PAGINA_MAXIMO, texto));
+            }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
+            if (version != versionConsulta) return;
+            mostrarContratos(datos.contratos());
+            mostrarPagina(datos.cargos());
+            limpiarFormulario();
+            AlertaUtil.mostrarExito("Tabla actualizada",
+                    "El registro de cargos ha sido sincronizado con PostgreSQL.");
+        }, error -> {
+            if (version == versionConsulta) AlertaUtil.mostrarError("Error al cargar cargos",
+                    "No fue posible sincronizar el registro de cargos desde PostgreSQL.");
+        });
     }
 
     @FXML
@@ -229,47 +266,30 @@ public class CargoController {
             return;
         }
 
-        try {
-            if (cargoSeleccionado == null) {
-                // Nuevo cargo
-                Cargo nuevo = new Cargo();
-                nuevo.setContratoId(contrato.getId());
-                nuevo.setTipo(tipo);
-                nuevo.setImporte(importe);
-                nuevo.setEstado(estado);
-                nuevo.setConcepto(concepto.trim());
-                nuevo.setPeriodo(periodo.withDayOfMonth(1));
-                nuevo.setFechaEmision(emision);
-                nuevo.setVenceEl(vence);
-
-                cargoService.guardar(nuevo);
+        boolean nuevo = cargoSeleccionado == null;
+        CargoService.Solicitud solicitud = new CargoService.Solicitud(
+                nuevo ? null : cargoSeleccionado.getId(),
+                nuevo ? 0 : cargoSeleccionado.getVersion(),
+                contrato.getId(), tipo, periodo.withDayOfMonth(1), emision,
+                vence, importe, concepto.trim(), estado);
+        Task<Void> tarea = new Task<>() {
+            @Override
+            protected Void call() throws SQLException {
+                cargoService.guardar(solicitud);
+                return null;
+            }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+            if (nuevo) {
                 AlertaUtil.mostrarExito("Registro exitoso", "El cargo financiero fue registrado correctamente en PostgreSQL.");
             } else {
-                // Edición
-                cargoSeleccionado.setContratoId(contrato.getId());
-                cargoSeleccionado.setTipo(tipo);
-                cargoSeleccionado.setImporte(importe);
-                cargoSeleccionado.setEstado(estado);
-                cargoSeleccionado.setConcepto(concepto.trim());
-                cargoSeleccionado.setPeriodo(periodo.withDayOfMonth(1));
-                cargoSeleccionado.setFechaEmision(emision);
-                cargoSeleccionado.setVenceEl(vence);
-
-                cargoService.guardar(cargoSeleccionado);
                 AlertaUtil.mostrarExito("Actualización exitosa", "El cargo financiero fue actualizado.");
             }
 
+            paginaActual = 1;
             cargarDatos();
             limpiarFormulario();
-        } catch (IllegalArgumentException e) {
-            AlertaUtil.mostrarAdvertencia("Datos inválidos", e.getMessage());
-        } catch (SecurityException e) {
-            AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
-        } catch (IllegalStateException e) {
-            AlertaUtil.mostrarError("Error de persistencia", e.getMessage());
-        } catch (SQLException e) {
-            AlertaUtil.mostrarError("Error de persistencia", "No fue posible guardar el cargo en PostgreSQL.");
-        }
+        }, this::mostrarErrorCargo);
     }
 
     @FXML
@@ -280,23 +300,68 @@ public class CargoController {
         }
 
         boolean confirma = AlertaUtil.mostrarConfirmacion(
-                "Confirmar eliminación",
-                "¿Está seguro de que desea eliminar este cargo de " + cargoSeleccionado.getImporteFormateado() + "?"
+                "Confirmar anulación",
+                "¿Está seguro de que desea anular este cargo de " + cargoSeleccionado.getImporteFormateado() + "?"
         );
 
         if (confirma) {
-            try {
-                cargoService.eliminar(cargoSeleccionado.getId());
-                AlertaUtil.mostrarExito("Registro eliminado", "El cargo fue eliminado de PostgreSQL.");
+            UUID cargoId = cargoSeleccionado.getId();
+            Task<Void> tarea = new Task<>() {
+                @Override
+                protected Void call() throws SQLException {
+                    cargoService.anular(cargoId);
+                    return null;
+                }
+            };
+            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+                AlertaUtil.mostrarExito("Cargo anulado", "El cargo fue anulado y auditado.");
                 cargarDatos();
                 limpiarFormulario();
-            } catch (SecurityException e) {
-                AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
-            } catch (IllegalStateException e) {
-                AlertaUtil.mostrarError("Error de persistencia", e.getMessage());
-            } catch (SQLException e) {
-                AlertaUtil.mostrarError("Error", "No fue posible eliminar el cargo.");
-            }
+            }, this::mostrarErrorCargo);
+        }
+    }
+
+    private void mostrarContratos(List<Contrato> contratos) {
+        cmbContrato.setItems(FXCollections.observableArrayList(contratos));
+        if (!contratos.isEmpty()) cmbContrato.getSelectionModel().selectFirst();
+    }
+
+    private void mostrarPagina(PaginaResponse<Cargo> pagina) {
+        int paginas = (int) Math.max(1, (pagina.total() + pagina.tamano() - 1) / pagina.tamano());
+        if (paginaActual > paginas) {
+            paginaActual = paginas;
+            cargarDatos();
+            return;
+        }
+        listaCargos.setAll(pagina.elementos());
+        lblPaginacion.setText("Página " + paginaActual + " de " + paginas
+                + " · " + pagina.total() + " cargos");
+        btnPaginaAnterior.setDisable(paginaActual <= 1);
+        btnPaginaSiguiente.setDisable(paginaActual >= paginas);
+    }
+
+    @FXML
+    public void paginaAnterior() {
+        if (paginaActual <= 1) return;
+        paginaActual--;
+        cargarDatos();
+    }
+
+    @FXML
+    public void paginaSiguiente() {
+        paginaActual++;
+        cargarDatos();
+    }
+
+    private void mostrarErrorCargo(Throwable error) {
+        if (error instanceof IllegalArgumentException argumento) {
+            AlertaUtil.mostrarAdvertencia("Datos inválidos", argumento.getMessage());
+        } else if (error instanceof SecurityException permiso) {
+            AlertaUtil.mostrarAdvertencia("Permiso denegado", permiso.getMessage());
+        } else if (error instanceof IllegalStateException persistencia) {
+            AlertaUtil.mostrarError("Error de persistencia", persistencia.getMessage());
+        } else {
+            AlertaUtil.mostrarError("Error de persistencia", "No fue posible guardar o anular el cargo en PostgreSQL.");
         }
     }
 
@@ -312,16 +377,16 @@ public class CargoController {
         if (!cmbEstado.getItems().isEmpty()) cmbEstado.getSelectionModel().selectFirst();
         txtImporte.clear();
         txtConcepto.clear();
-        dpPeriodo.setValue(LocalDate.now().withDayOfMonth(1));
-        dpFechaEmision.setValue(LocalDate.now());
-        dpVenceEl.setValue(LocalDate.now().plusDays(5));
+        dpPeriodo.setValue(LocalDate.now(RelojService.ZONA_OPERATIVA).withDayOfMonth(1));
+        dpFechaEmision.setValue(LocalDate.now(RelojService.ZONA_OPERATIVA));
+        dpVenceEl.setValue(LocalDate.now(RelojService.ZONA_OPERATIVA).plusDays(5));
         tblCargos.getSelectionModel().clearSelection();
     }
 
     private void seleccionarCargo(Cargo c) {
         this.cargoSeleccionado = c;
         cmbTipo.setValue(c.getTipo());
-        cmbEstado.setValue(c.getEstado());
+        cmbEstado.setValue(c.getEstadoPersistido());
         txtImporte.setText(c.getImporte() != null ? c.getImporte().toPlainString() : "");
         txtConcepto.setText(c.getConcepto());
         dpPeriodo.setValue(c.getPeriodo());

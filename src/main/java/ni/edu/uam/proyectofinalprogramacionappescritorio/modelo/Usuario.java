@@ -44,4 +44,8 @@ public class Usuario {
     public boolean isActivo() { return activo; }
     public long getVersion() { return version; }
     public void desactivar() { activo = false; }
+    public void cambiarRol(String rol) {
+        if (!Rol.esValido(rol)) throw new IllegalArgumentException("Rol inválido.");
+        this.rol = rol;
+    }
 }

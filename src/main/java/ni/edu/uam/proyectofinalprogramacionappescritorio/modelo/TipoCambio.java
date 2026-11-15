@@ -20,6 +20,10 @@ import java.util.UUID;
 @Table(name = "tipo_cambio", indexes = @Index(columnList = "fecha, registrado_en"))
 @Immutable
 public class TipoCambio {
+    /** Banda comercial informativa; no se aplica como CHECK en la base de datos. */
+    public static final BigDecimal BANDA_MINIMA = new BigDecimal("1");
+    public static final BigDecimal BANDA_MAXIMA = new BigDecimal("100");
+
     @Id
     private UUID id;
     @Column(nullable = false)
@@ -111,4 +115,10 @@ public class TipoCambio {
     }
     public String getMotivo() { return motivo; }
     public boolean isAutorizada() { return autorizadoPor != null; }
+
+    /** Banda inclusiva 1–100 NIO/USD; fuera de ella se exige confirmación expresa. */
+    public boolean estaFueraDeBanda() {
+        return nioPorUsd.compareTo(BANDA_MINIMA) < 0
+                || nioPorUsd.compareTo(BANDA_MAXIMA) > 0;
+    }
 }

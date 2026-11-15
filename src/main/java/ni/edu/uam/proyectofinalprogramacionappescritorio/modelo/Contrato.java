@@ -4,6 +4,9 @@ import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
+import java.util.Map;
+import java.util.Set;
+import java.util.Objects;
 
 /**
  * Entidad de dominio que representa un Contrato de arrendamiento en Latch.
@@ -11,6 +14,18 @@ import java.util.UUID;
 @Entity
 @Table(name = "contrato")
 public class Contrato {
+
+    private static final Set<String> ESTADOS = Set.of(
+            "Borrador", "Vigente", "Por vencer", "Vencido", "Terminado", "Cancelado");
+    private static final Set<String> ESTADOS_QUE_RESERVAN_UNIDAD = Set.of(
+            "Vigente", "Por vencer", "Vencido");
+    private static final Map<String, Set<String>> TRANSICIONES = Map.of(
+            "Borrador", Set.of("Vigente", "Cancelado"),
+            "Vigente", Set.of("Por vencer", "Vencido", "Terminado"),
+            "Por vencer", Set.of("Vigente", "Vencido", "Terminado"),
+            "Vencido", Set.of("Vigente", "Por vencer", "Terminado"),
+            "Terminado", Set.of(),
+            "Cancelado", Set.of());
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -58,7 +73,7 @@ public class Contrato {
         this.moneda = "USD";
         this.diaPago = 5;
         this.canon = BigDecimal.ZERO;
-        this.estado = "Vigente";
+        this.estado = "Borrador";
         this.version = 0;
     }
 
@@ -96,6 +111,11 @@ public class Contrato {
         this.unidadId = unidadId;
     }
 
+    public void setUnidad(Unidad unidad) {
+        this.unidad = unidad;
+        this.unidadId = unidad == null ? null : unidad.getId();
+    }
+
     public String getUnidadInfo() {
         return unidad == null ? unidadInfo : unidad.toString();
     }
@@ -110,6 +130,11 @@ public class Contrato {
 
     public void setInquilinoId(UUID inquilinoId) {
         this.inquilinoId = inquilinoId;
+    }
+
+    public void setInquilino(Inquilino inquilino) {
+        this.inquilino = inquilino;
+        this.inquilinoId = inquilino == null ? null : inquilino.getId();
     }
 
     public String getInquilinoNombre() {
@@ -165,7 +190,11 @@ public class Contrato {
     }
 
     public void setDepositoPactado(BigDecimal depositoPactado) {
-        this.deposito = new DepositoPactado(depositoPactado);
+        DepositoPactado nuevoDeposito = new DepositoPactado(depositoPactado);
+        if (garantiaSeguimiento != null) {
+            garantiaSeguimiento.actualizarMontoInicial(nuevoDeposito.getMontoPactado());
+        }
+        this.deposito = nuevoDeposito;
     }
 
     public Garantia getGarantiaSeguimiento() { return garantiaSeguimiento; }
@@ -187,7 +216,39 @@ public class Contrato {
     }
 
     public void setEstado(String estado) {
-        this.estado = estado;
+        transicionarA(estado, LocalDate.now());
+    }
+
+    public static boolean esEstadoValido(String estado) {
+        return ESTADOS.contains(estado);
+    }
+
+    public static boolean reservaUnidad(String estado) {
+        return ESTADOS_QUE_RESERVAN_UNIDAD.contains(estado);
+    }
+
+    public void validarTransicionA(String nuevoEstado) {
+        if (!esEstadoValido(nuevoEstado)) {
+            throw new IllegalArgumentException("El estado del contrato no es válido.");
+        }
+        if (!Objects.equals(estado, nuevoEstado)
+                && !TRANSICIONES.getOrDefault(estado, Set.of()).contains(nuevoEstado)) {
+            throw new IllegalArgumentException("La transición de estado del contrato no está permitida.");
+        }
+    }
+
+    public void transicionarA(String nuevoEstado, LocalDate fechaTerminacion) {
+        validarTransicionA(nuevoEstado);
+        if (Objects.equals(estado, nuevoEstado)) return;
+        if ("Terminado".equals(nuevoEstado)) {
+            if (fechaTerminacion == null) {
+                throw new IllegalArgumentException("La fecha de terminación del contrato es obligatoria.");
+            }
+            terminadoEl = fechaTerminacion;
+        } else {
+            terminadoEl = null;
+        }
+        estado = nuevoEstado;
     }
 
     public long getVersion() {
@@ -214,7 +275,6 @@ public class Contrato {
     }
 
     public void terminar(LocalDate fecha) {
-        estado = "Terminado";
-        terminadoEl = fecha;
+        transicionarA("Terminado", fecha);
     }
 }

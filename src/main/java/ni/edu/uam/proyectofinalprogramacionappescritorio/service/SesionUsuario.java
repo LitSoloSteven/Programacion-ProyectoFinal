@@ -9,6 +9,7 @@ public final class SesionUsuario implements AutoCloseable {
     private final Long usuarioId;
     private final String nombre;
     private final String rol;
+    private final long version;
     private static volatile SesionUsuario actual;
     private static final ThreadLocal<SesionUsuario> contextoHilo = new ThreadLocal<>();
     // Marca los hilos que ya están atendiendo una petición aislada (API). En
@@ -19,13 +20,19 @@ public final class SesionUsuario implements AutoCloseable {
     private final AtomicBoolean vigente = new AtomicBoolean(true);
 
     SesionUsuario(Long usuarioId, String nombre, String rol) {
+        this(usuarioId, nombre, rol, 0L);
+    }
+
+    SesionUsuario(Long usuarioId, String nombre, String rol, long version) {
         this.usuarioId = usuarioId;
         this.nombre = nombre;
         this.rol = rol;
+        this.version = version;
     }
     public Long getUsuarioId() { return usuarioId; }
     public String getNombre() { return nombre; }
     public String getRol() { return rol; }
+    public long getVersion() { return version; }
     public boolean isVigente() { return vigente.get(); }
 
     /**
@@ -75,10 +82,16 @@ public final class SesionUsuario implements AutoCloseable {
      * credenciales: solo debe usarse después de un login correcto.
      */
     public static SesionUsuario paraSesionAutenticada(Long usuarioId, String nombre, String rol) {
+        return paraSesionAutenticada(usuarioId, nombre, rol, 0L);
+    }
+
+    public static SesionUsuario paraSesionAutenticada(Long usuarioId, String nombre,
+                                                      String rol, long version) {
         if (usuarioId == null || nombre == null || nombre.isBlank() || !Rol.esValido(rol)) {
             throw new IllegalArgumentException("Identidad de sesión inválida.");
         }
-        return new SesionUsuario(usuarioId, nombre, rol);
+        if (version < 0) throw new IllegalArgumentException("Versión de sesión inválida.");
+        return new SesionUsuario(usuarioId, nombre, rol, version);
     }
 
     public static void establecer(SesionUsuario sesion) { cerrarSesion(); actual = sesion; }

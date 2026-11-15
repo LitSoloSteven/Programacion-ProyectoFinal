@@ -23,6 +23,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.DashboardService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoMoneda;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
 
 import java.io.IOException;
 
@@ -98,7 +99,7 @@ public class DashboardController {
     private final DashboardService dashboardService;
 
     public DashboardController() {
-        this.dashboardService = new DashboardService();
+        this(HelloApplication.instancia().getComposicion().dashboard());
     }
 
     public DashboardController(DashboardService dashboardService) {
@@ -121,8 +122,13 @@ public class DashboardController {
 
     @FXML
     public void actualizarMetricas() {
-        try {
-            MetricasDashboardDTO metricas = dashboardService.obtenerMetricas();
+        Task<MetricasDashboardDTO> tarea = new Task<>() {
+            @Override
+            protected MetricasDashboardDTO call() {
+                return dashboardService.obtenerMetricas();
+            }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, metricas -> {
             lblTotalPropiedades.setText(String.valueOf(metricas.propiedades()));
             lblTotalUnidades.setText(String.valueOf(metricas.unidades()));
             lblTotalInquilinos.setText(String.valueOf(metricas.inquilinos()));
@@ -135,11 +141,14 @@ public class DashboardController {
             lblPagosRegistrados.setText(String.valueOf(metricas.cantidadPagosRegistrados()));
             lblPagosMonto.setText(String.join("\n", metricas.pagosRegistrados().stream()
                     .map(total -> FormatoMoneda.formatear(total.moneda(), total.total())).toList()));
-        } catch (SecurityException e) {
-            AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
-        } catch (RuntimeException e) {
-            AlertaUtil.mostrarError("Error de Base de Datos", "No fue posible actualizar las métricas desde PostgreSQL.");
-        }
+        }, error -> {
+            if (error instanceof SecurityException permiso) {
+                AlertaUtil.mostrarAdvertencia("Permiso denegado", permiso.getMessage());
+            } else {
+                AlertaUtil.mostrarError("Error de Base de Datos",
+                        "No fue posible actualizar las métricas desde PostgreSQL.");
+            }
+        });
     }
 
     @FXML

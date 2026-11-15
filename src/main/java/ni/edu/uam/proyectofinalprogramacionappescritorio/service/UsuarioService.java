@@ -36,4 +36,22 @@ public final class UsuarioService {
             return null;
         });
     }
+
+    public void cambiarRol(SesionUsuario identidad, Long id, String rol) {
+        transactions.ejecutar(session -> {
+            Usuario actor = permisos.exigir(session, identidad, Permiso.GESTIONAR_USUARIOS);
+            if (actor.getId().equals(id)) {
+                throw new IllegalArgumentException("No puedes cambiar tu propio rol.");
+            }
+            Usuario usuario = session.find(Usuario.class, id);
+            if (usuario == null) throw new IllegalArgumentException("El usuario no existe.");
+            String rolAnterior = usuario.getRol();
+            usuario.cambiarRol(rol);
+            if (!rolAnterior.equals(usuario.getRol())) {
+                auditoria.registrar(session, actor, UUID.randomUUID(), "CAMBIAR_ROL_USUARIO",
+                        "usuario:" + id + ";rol:" + rolAnterior + "->" + usuario.getRol());
+            }
+            return null;
+        });
+    }
 }

@@ -24,8 +24,7 @@ class InfraestructuraTest {
     @BeforeAll static void iniciar() {
         Properties p;
         if (Boolean.getBoolean("latch.test.postgres")) {
-            // Usar exclusivamente una base desechable: las tablas se crean y eliminan en esta suite.
-            p = DatabaseConfig.desdeEntorno(System.getenv());
+            p = PostgresTestSupport.propiedadesHibernate();
         } else {
             p = new Properties();
             p.setProperty("hibernate.connection.driver_class", "org.h2.Driver");
@@ -36,11 +35,19 @@ class InfraestructuraTest {
         p.setProperty("hibernate.hbm2ddl.auto", "create-drop");
         p.setProperty("hibernate.jdbc.time_zone", "UTC");
         factory = HibernateUtil.construir(p);
+        if (Boolean.getBoolean("latch.test.postgres")) {
+            PostgresTestSupport.aplicarMigraciones(p);
+        }
         tx = new HibernateTransactions(factory);
         hash = new PasswordHasher().crear(PASSWORD);
     }
 
-    @AfterAll static void cerrar() { if (factory != null) factory.close(); }
+    @AfterAll static void cerrar() {
+        if (factory != null) factory.close();
+        if (Boolean.getBoolean("latch.test.postgres")) {
+            PostgresTestSupport.eliminarFuncionRecibo();
+        }
+    }
 
     private Usuario crearUsuario(String rol) {
         return tx.ejecutar(session -> {
@@ -218,8 +225,31 @@ class InfraestructuraTest {
             service.guardar(propietario, clave, "original", -1);
             long version = service.consultar(propietario, clave).getVersion();
             service.guardar(propietario, clave, "nuevo", version);
-            assertThrows(IllegalArgumentException.class, () -> service.guardar(propietario, clave, "obsoleto", version));
+            ConflictoDatosException conflicto = assertThrows(ConflictoDatosException.class,
+                    () -> service.guardar(propietario, clave, "obsoleto", version));
+            assertEquals("La configuración cambió. Actualiza los datos antes de guardar.",
+                    conflicto.getMessage());
             assertEquals("nuevo", service.consultar(propietario, clave).getValor());
+        }
+    }
+
+    @Test void eliminarConfiguracionProduceConflictoAlGuardarConVersionAnterior() {
+        try (SesionUsuario propietario = login(crearUsuario(Rol.PROPIETARIO))) {
+            ConfiguracionService service = new ConfiguracionService(tx);
+            String clave = UUID.randomUUID().toString();
+            service.guardar(propietario, clave, "original", -1);
+            long version = service.consultar(propietario, clave).getVersion();
+
+            tx.ejecutar(session -> {
+                session.remove(session.find(Configuracion.class, clave));
+                return null;
+            });
+
+            ConflictoDatosException conflicto = assertThrows(ConflictoDatosException.class,
+                    () -> service.guardar(propietario, clave, "obsoleto", version));
+            assertEquals("La configuración cambió o ya no existe. Actualiza los datos antes de guardar.",
+                    conflicto.getMessage());
+            assertNull(service.consultar(propietario, clave));
         }
     }
 

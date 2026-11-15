@@ -38,6 +38,9 @@ en errores o logs, duplicación de cobros y manipulación de importes.
   persiste ni se escribe en disco.
 - Vigencia de 15 minutos verificada en cada petición.
 - `logout` revoca el token de inmediato.
+- Cada token conserva la versión de la cuenta al iniciar sesión. Un cambio de
+  rol, desactivación u otra modificación versionada invalida todas las sesiones
+  anteriores; restaurar el rol o reactivar la cuenta no rehabilita esos tokens.
 - Se rechazan tokens vacíos o de longitud anómala.
 - Los tokens se pierden al reiniciar el servidor (comportamiento intencional).
 
@@ -83,6 +86,11 @@ en errores o logs, duplicación de cobros y manipulación de importes.
 - Distribución de pagos validada contra cargos del mismo contrato, sin
   duplicados, sin cargos cancelados y sin superar saldos.
 - Anulación exclusiva del propietario, con motivo obligatorio y auditoría.
+- Instante y fecha operativa desde PostgreSQL; la fecha efectiva del pago queda
+  separada. Un desfase absoluto mayor de cinco minutos bloquea las nuevas
+  escrituras con `ERR-057` antes de persistir.
+- Los instantes de operación se presentan en `America/Managua`; la base conserva
+  el instante UTC. `pago.creado_en` requiere aplicar V10.
 
 ### Auditoría
 
@@ -93,7 +101,7 @@ en errores o logs, duplicación de cobros y manipulación de importes.
 
 ## Verificación automatizada
 
-`ApiSeguridadTest` (12 pruebas) comprueba:
+`ApiSeguridadTest` comprueba:
 
 1. `logout` revoca el token.
 2. Token ausente, inventado, alterado o demasiado largo devuelve `401` con
@@ -102,19 +110,31 @@ en errores o logs, duplicación de cobros y manipulación de importes.
 4. `Content-Type` obligatorio y límite de 256 KiB.
 5. Rutas inexistentes (`404`) y métodos no permitidos (`405`).
 6. Los errores no contienen SQLSTATE, excepciones, Hibernate ni rutas internas.
-7. El rol se revalida en cada petición (degradar a asistente bloquea la
-   autorización de tasas; restaurar el rol la habilita).
-8. Un usuario desactivado pierde el acceso aunque su token siga vigente.
+7. Cambiar el rol invalida el token anterior (degradarlo bloquea la autorización
+   de tasas y restaurarlo no rehabilita ese token).
+8. Desactivar y luego reactivar al usuario tampoco rehabilita el token anterior.
 9. El login HTTP no modifica la sesión global de JavaFX.
 10. La respuesta de login no contiene contraseña, hash ni PBKDF2.
 11. Credenciales inválidas no revelan si el usuario existe.
-12. Cinco fallos bloquean el login con `429`.
+12. Cinco fallos para una cuenta y 25 desde un origen bloquean el login con `429`.
+13. Cada credencial inválida genera auditoría con identificador hash y origen,
+    sin asociar el evento a una cuenta que podría no existir.
+14. `Host` distinto de `127.0.0.1:<puerto>` se rechaza antes de resolver rutas.
+15. Las rutas protegidas devuelven `401` antes de distinguir una ruta o método
+    inexistente; el servidor limita a 30 segundos la recepción completa.
+16. El reloj desfasado se devuelve como `503 ERR-057` sin detalles técnicos y
+    los instantes de tasas se presentan con el desplazamiento de Managua.
 
 Además, `ApiPagosTest` verifica que una `Idempotency-Key` de otro usuario
 devuelve `409` y no duplica el pago, y `SesionUsuarioTest` cubre el aislamiento
 y el fallo cerrado del contexto.
 
-Resultado de la suite completa: **108 pruebas, 0 fallos, 0 errores, 0 omitidas**.
+`RelojServiceTest` comprueba la lectura de hora de BD, la conversión de zona,
+ambos lados del umbral de cinco minutos y el bloqueo. `ApiValidacionesTest`
+comprueba el rechazo de `valor` por encima de 255 caracteres y el manejo de un
+`mesesMinimos` extremo sin propagar `DateTimeException`.
+
+Resultado de la suite completa: **163 pruebas, 0 fallos, 0 errores, 0 omitidas**.
 
 ## Riesgos residuales aceptados
 
@@ -131,7 +151,6 @@ Resultado de la suite completa: **108 pruebas, 0 fallos, 0 errores, 0 omitidas**
 ## Recomendaciones futuras
 
 - Emitir tokens con un identificador de sesión revocable desde el servidor.
-- Añadir un límite de intentos también por IP además de por usuario.
 - Firmar los recibos o exportarlos a PDF con verificación.
 - Rotar credenciales de base de datos y usar un usuario con permisos mínimos.
 - Sustituir el pool básico de Hibernate por uno configurado para producción.

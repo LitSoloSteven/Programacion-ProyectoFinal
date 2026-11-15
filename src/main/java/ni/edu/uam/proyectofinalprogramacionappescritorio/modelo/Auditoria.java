@@ -11,8 +11,8 @@ import java.util.UUID;
 public class Auditoria {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "usuario_id", nullable = false, updatable = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "usuario_id", nullable = true, updatable = false)
     private Usuario actor;
     @Column(nullable = false, updatable = false)
     private Instant instante;
@@ -26,11 +26,30 @@ public class Auditoria {
     protected Auditoria() {}
 
     public Auditoria(Usuario actor, UUID correlacion, String accion, String referencia) {
-        this.actor = Objects.requireNonNull(actor);
-        this.instante = Instant.now();
+        this(actor, Instant.now(), correlacion, accion, referencia);
+    }
+
+    public Auditoria(Usuario actor, Instant instante, UUID correlacion,
+                     String accion, String referencia) {
+        this(actor, instante, correlacion, accion, referencia, false);
+    }
+
+    private Auditoria(Usuario actor, Instant instante, UUID correlacion,
+                      String accion, String referencia, boolean permitirActorNulo) {
+        this.actor = permitirActorNulo ? actor : Objects.requireNonNull(actor);
+        this.instante = Objects.requireNonNull(instante);
         this.correlacion = Objects.requireNonNull(correlacion);
         this.accion = texto(accion, 80);
         this.referencia = texto(referencia, 160);
+    }
+
+    public static Auditoria intentoLoginFallido(UUID correlacion, String referencia) {
+        return new Auditoria(null, Instant.now(), correlacion, "LOGIN_FALLIDO", referencia, true);
+    }
+
+    public static Auditoria intentoLoginFallido(Instant instante, UUID correlacion,
+                                                String referencia) {
+        return new Auditoria(null, instante, correlacion, "LOGIN_FALLIDO", referencia, true);
     }
 
     private static String texto(String valor, int maximo) {

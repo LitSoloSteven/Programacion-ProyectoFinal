@@ -17,6 +17,8 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Rol;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.AutenticacionService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.DashboardService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojDesfasadoException;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.TipoCambioService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PasswordHasher;
@@ -27,6 +29,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
+import java.net.Socket;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -93,6 +96,8 @@ class ApiSeguridadTest {
         Router router = new Router();
         new RutasTasas(new TipoCambioService(tx)).registrar(router);
         new RutasIndicadores(new DashboardService(tx)).registrar(router);
+        router.registrar("GET", "/api/v1/pruebas/reloj-desfasado", false,
+                contexto -> { throw new RelojDesfasadoException(); });
         servidor = new ServidorApi(ApiConfig.paraPruebas(0),
                 new AutenticacionService(tx), new TokenService(), router);
         servidor.iniciar();
@@ -123,6 +128,24 @@ class ApiSeguridadTest {
         assertEquals(204, salida.statusCode());
 
         assertEquals(401, get("/api/v1/dashboard/metricas", token).statusCode());
+    }
+
+    @Test
+    void traduceElDesfaseDelRelojAlCodigoErr057() throws Exception {
+        HttpResponse<String> respuesta = get(
+                "/api/v1/pruebas/reloj-desfasado", login(nombrePropietario));
+
+        assertEquals(503, respuesta.statusCode());
+        assertEquals("ERR-057", error(respuesta).error().codigo());
+        assertEquals(RelojDesfasadoException.MENSAJE, error(respuesta).error().mensaje());
+    }
+
+    @Test
+    void presentaElInstanteDeTasaEnZonaManagua() throws Exception {
+        TasaResponse tasa = registrarTasa(login(nombrePropietario),
+                LocalDate.now(RelojService.ZONA_OPERATIVA).toString());
+
+        assertTrue(tasa.registradoEn().endsWith("-06:00"));
     }
 
     @Test
@@ -183,16 +206,49 @@ class ApiSeguridadTest {
     @Test
     void rutasYMetodosInvalidosUsanElCuerpoUniforme() throws Exception {
         HttpResponse<String> inexistente = get("/api/v1/no-existe", null);
+        assertEquals(401, inexistente.statusCode());
+        assertEquals("NO_AUTENTICADO", error(inexistente).error().codigo());
+
+        String token = login(nombrePropietario);
+        inexistente = get("/api/v1/no-existe", token);
         assertEquals(404, inexistente.statusCode());
         assertEquals("NO_ENCONTRADO", error(inexistente).error().codigo());
 
-        HttpResponse<String> metodo = cliente.send(HttpRequest.newBuilder(
+        HttpResponse<String> sinAutenticar = cliente.send(HttpRequest.newBuilder(
                         URI.create(base + "/api/v1/tasas"))
                 .timeout(Duration.ofSeconds(10))
                 .DELETE()
                 .build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        assertEquals(401, sinAutenticar.statusCode());
+
+        HttpResponse<String> metodo = cliente.send(HttpRequest.newBuilder(
+                        URI.create(base + "/api/v1/tasas"))
+                .timeout(Duration.ofSeconds(10))
+                .header("Authorization", "Bearer " + token)
+                .DELETE()
+                .build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         assertEquals(405, metodo.statusCode());
         assertEquals("METODO_NO_PERMITIDO", error(metodo).error().codigo());
+    }
+
+    @Test
+    void rechazaHostAjenoAntesDeResolverLaRuta() throws Exception {
+        String respuesta;
+        try (Socket socket = new Socket("127.0.0.1", servidor.puerto())) {
+            socket.setSoTimeout(5000);
+            String peticion = "GET /api/v1/no-existe HTTP/1.1\r\n"
+                    + "Host: atacante.example:" + servidor.puerto() + "\r\n"
+                    + "Connection: close\r\n\r\n";
+            socket.getOutputStream().write(peticion.getBytes(StandardCharsets.US_ASCII));
+            respuesta = new String(socket.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        }
+        assertTrue(respuesta.startsWith("HTTP/1.1 400") || respuesta.startsWith("HTTP/1.1 421"), respuesta);
+        assertFalse(respuesta.startsWith("HTTP/1.1 404"), respuesta);
+    }
+
+    @Test
+    void configuraUnLimiteDeTreintaSegundosParaLeerLaPeticion() {
+        assertEquals("30", System.getProperty("sun.net.httpserver.maxReqTime"));
     }
 
     @Test
@@ -218,40 +274,34 @@ class ApiSeguridadTest {
     }
 
     @Test
-    void elRolSeRevalidaEnCadaPeticion() throws Exception {
+    void cambiarElRolRevocaElTokenHastaElSiguienteLogin() throws Exception {
         String token = login(nombrePropietario);
-        TasaResponse tasa = registrarTasa(token, LocalDate.now().minusDays(1).toString());
+        assertEquals(200, get("/api/v1/dashboard/metricas", token).statusCode());
 
         cambiarRol(idPropietario, Rol.ASISTENTE);
-        HttpResponse<String> denegada = postJson(
-                "/api/v1/tasas/" + tasa.id() + "/autorizar",
-                "{\"motivo\":\"Intento tras cambio de rol\"}", token, null);
-        assertEquals(403, denegada.statusCode());
-        assertEquals("SIN_PERMISO", error(denegada).error().codigo());
-
-        // El asistente conserva las operaciones que sí le corresponden.
-        assertEquals(201, postJson("/api/v1/tasas",
-                "{\"fecha\":\"" + LocalDate.now().minusDays(2)
-                        + "\",\"tasa\":\"36.70000000\",\"fuente\":\"BCN\"}",
-                token, null).statusCode());
+        HttpResponse<String> invalidada = get("/api/v1/dashboard/metricas", token);
+        assertEquals(401, invalidada.statusCode());
+        assertEquals("NO_AUTENTICADO", error(invalidada).error().codigo());
 
         cambiarRol(idPropietario, Rol.PROPIETARIO);
-        HttpResponse<String> autorizada = postJson(
-                "/api/v1/tasas/" + tasa.id() + "/autorizar",
-                "{\"motivo\":\"Restablecido el rol\"}", token, null);
-        assertEquals(200, autorizada.statusCode());
-        assertTrue(GSON.fromJson(autorizada.body(), TasaResponse.class).autorizada());
+        assertEquals(401, get("/api/v1/dashboard/metricas", token).statusCode());
+        String tokenNuevo = login(nombrePropietario);
+        assertEquals(200, get("/api/v1/dashboard/metricas", tokenNuevo).statusCode());
     }
 
     @Test
-    void unUsuarioDesactivadoPierdeElAccesoAunqueSuTokenSigaVigente() throws Exception {
+    void desactivarUnUsuarioRevocaSuTokenHastaElSiguienteLogin() throws Exception {
         String token = login(nombreAsistente);
         assertEquals(200, get("/api/v1/dashboard/metricas", token).statusCode());
 
         cambiarActivo(idAsistente, false);
         HttpResponse<String> respuesta = get("/api/v1/dashboard/metricas", token);
-        assertEquals(403, respuesta.statusCode());
-        assertEquals("SIN_PERMISO", error(respuesta).error().codigo());
+        assertEquals(401, respuesta.statusCode());
+        assertEquals("NO_AUTENTICADO", error(respuesta).error().codigo());
+
+        cambiarActivo(idAsistente, true);
+        assertEquals(401, get("/api/v1/dashboard/metricas", token).statusCode());
+        assertEquals(200, get("/api/v1/dashboard/metricas", login(nombreAsistente)).statusCode());
     }
 
     @Test
@@ -289,6 +339,7 @@ class ApiSeguridadTest {
 
     @Test
     void lasCredencialesInvalidasNoRevelanSiElUsuarioExiste() throws Exception {
+        long auditoriasAntes = contarIntentosLoginFallidos();
         HttpResponse<String> existente = postJson("/api/v1/auth/login",
                 GSON.toJson(new LoginRequest(nombrePropietario, "ClaveEquivocada-2026")),
                 null, null);
@@ -300,6 +351,17 @@ class ApiSeguridadTest {
         assertEquals(401, inexistente.statusCode());
         assertEquals(error(existente).error().mensaje(), error(inexistente).error().mensaje());
         assertEquals("CREDENCIALES_INVALIDAS", error(existente).error().codigo());
+        assertEquals(auditoriasAntes + 2, contarIntentosLoginFallidos());
+
+        List<String> referencias = tx.ejecutar(session -> session.createQuery(
+                        "select a.referencia from Auditoria a where a.accion = 'LOGIN_FALLIDO' order by a.id desc",
+                        String.class)
+                .setMaxResults(2).getResultList());
+        assertEquals(2, referencias.size());
+        assertTrue(referencias.stream().allMatch(ref -> ref.startsWith("usuario_sha256:")
+                && ref.endsWith(";origen:127.0.0.1")));
+        assertFalse(referencias.stream().anyMatch(ref -> ref.contains(nombrePropietario)
+                || ref.contains("no.existe.") || ref.contains("ClaveEquivocada")));
     }
 
     @Test
@@ -325,9 +387,15 @@ class ApiSeguridadTest {
         return GSON.fromJson(respuesta.body(), TasaResponse.class);
     }
 
+    private static long contarIntentosLoginFallidos() {
+        return tx.ejecutar(session -> session.createQuery(
+                "select count(a) from Auditoria a where a.accion = 'LOGIN_FALLIDO' and a.actor is null",
+                Long.class).getSingleResult());
+    }
+
     private static void cambiarRol(Long id, String rol) {
         tx.ejecutar(session -> {
-            session.createNativeMutationQuery("update usuario set rol = :rol where id = :id")
+            session.createNativeMutationQuery("update usuario set rol = :rol, version = version + 1 where id = :id")
                     .setParameter("rol", rol)
                     .setParameter("id", id)
                     .executeUpdate();
@@ -337,7 +405,7 @@ class ApiSeguridadTest {
 
     private static void cambiarActivo(Long id, boolean activo) {
         tx.ejecutar(session -> {
-            session.createNativeMutationQuery("update usuario set activo = :activo where id = :id")
+            session.createNativeMutationQuery("update usuario set activo = :activo, version = version + 1 where id = :id")
                     .setParameter("activo", activo)
                     .setParameter("id", id)
                     .executeUpdate();
@@ -348,7 +416,7 @@ class ApiSeguridadTest {
     private static void restaurarUsuario(Long id, String rol, boolean activo) {
         tx.ejecutar(session -> {
             session.createNativeMutationQuery(
-                            "update usuario set rol = :rol, activo = :activo where id = :id")
+                            "update usuario set rol = :rol, activo = :activo, version = version + 1 where id = :id")
                     .setParameter("rol", rol)
                     .setParameter("activo", activo)
                     .setParameter("id", id)
