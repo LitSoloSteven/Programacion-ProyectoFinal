@@ -136,9 +136,9 @@ métricas y seguridad HTTP.
 
 La suite normal permanece en H2. Para ejecutar la verificación adicional en PostgreSQL,
 configurar una base **desechable y exclusiva** con permisos para crear y eliminar tablas.
-El perfil genera el esquema con Hibernate, aplica las migraciones V4, V6, V7, V8 y V10,
-y al terminar elimina las tablas creadas y la función de recibos. No usar la base configurada
-para la aplicación:
+El perfil genera el esquema con Hibernate y aplica las migraciones V1 a V10,
+y al terminar elimina las tablas creadas, la función de recibos y su contador auxiliar.
+No usar la base configurada para la aplicación:
 
 ```powershell
 $env:LATCH_TEST_DB_URL = 'jdbc:postgresql://localhost:5432/latch_test'
