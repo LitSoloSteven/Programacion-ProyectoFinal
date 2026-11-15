@@ -16,14 +16,15 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.TasaRespo
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteTasas;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.TipoCambio;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoTasa;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
+import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
@@ -38,7 +39,7 @@ public class TasaController {
             DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter INSTANTE_VISIBLE =
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
-                    .withZone(ZoneId.systemDefault());
+                    .withZone(RelojService.ZONA_OPERATIVA);
 
     @FXML private DatePicker dpFecha;
     @FXML private TextField txtTasa;
@@ -65,7 +66,7 @@ public class TasaController {
     @FXML
     public void initialize() {
         configurarTabla();
-        dpFecha.setValue(LocalDate.now());
+        dpFecha.setValue(LocalDate.now(RelojService.ZONA_OPERATIVA));
         boolean propietario = SesionUsuario.esPropietario();
         btnAutorizar.setVisible(propietario);
         btnAutorizar.setManaged(propietario);
@@ -118,7 +119,7 @@ public class TasaController {
 
     @FXML
     public void limpiarFormulario() {
-        dpFecha.setValue(LocalDate.now());
+        dpFecha.setValue(LocalDate.now(RelojService.ZONA_OPERATIVA));
         txtTasa.clear();
         txtFuente.clear();
         txtMotivo.clear();
@@ -135,7 +136,7 @@ public class TasaController {
             dpFecha.requestFocus();
             return;
         }
-        if (fecha.isAfter(LocalDate.now())) {
+        if (fecha.isAfter(LocalDate.now(RelojService.ZONA_OPERATIVA))) {
             AlertaUtil.mostrarAdvertencia("Fecha inválida",
                     "La tasa no puede corresponder a una fecha futura.");
             return;
@@ -197,15 +198,27 @@ public class TasaController {
             txtMotivo.requestFocus();
             return;
         }
-        boolean confirmar = AlertaUtil.mostrarConfirmacion("Autorizar tasa",
-                "La tasa del " + fechaVisible(seleccionada.fecha())
-                        + " quedará disponible para convertir pagos. ¿Desea continuar?");
+        boolean fueraDeBanda = new BigDecimal(seleccionada.nioPorUsd())
+                .compareTo(TipoCambio.BANDA_MINIMA) < 0
+                || new BigDecimal(seleccionada.nioPorUsd())
+                .compareTo(TipoCambio.BANDA_MAXIMA) > 0;
+        boolean confirmar;
+        if (fueraDeBanda) {
+            confirmar = AlertaUtil.mostrarConfirmacion("Tasa fuera de banda",
+                    "La tasa del " + fechaVisible(seleccionada.fecha())
+                            + " está fuera de la banda comercial 1–100 NIO/USD. "
+                            + "Revise la fuente antes de confirmar. ¿Desea autorizarla?");
+        } else {
+            confirmar = AlertaUtil.mostrarConfirmacion("Autorizar tasa",
+                    "La tasa del " + fechaVisible(seleccionada.fecha())
+                            + " quedará disponible para convertir pagos. ¿Desea continuar?");
+        }
         if (!confirmar) return;
 
         Task<TasaResponse> tarea = new Task<>() {
             @Override
             protected TasaResponse call() {
-                return cliente.autorizar(seleccionada.id(), motivo.strip());
+                return cliente.autorizar(seleccionada.id(), motivo.strip(), fueraDeBanda);
             }
         };
         ejecutar(tarea, autorizada -> {
@@ -301,7 +314,7 @@ public class TasaController {
 
     private static String instanteVisible(String valor) {
         try {
-            return INSTANTE_VISIBLE.format(Instant.parse(valor));
+            return INSTANTE_VISIBLE.format(OffsetDateTime.parse(valor).toInstant());
         } catch (DateTimeParseException e) {
             return valor;
         }

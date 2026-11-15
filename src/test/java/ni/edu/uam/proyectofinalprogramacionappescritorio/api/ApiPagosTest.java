@@ -21,12 +21,15 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoReque
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.ReciboResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.config.PostgresTestSupport;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Cargo;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Inquilino;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propiedad;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propietario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Pago;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Rol;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.SolicitudIdempotente;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.TipoCambio;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Unidad;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
@@ -47,8 +50,10 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -62,6 +67,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ApiPagosTest {
@@ -87,16 +93,23 @@ class ApiPagosTest {
     @BeforeAll
     static void iniciar() throws Exception {
         Properties p = new Properties();
-        p.setProperty("hibernate.connection.driver_class", "org.h2.Driver");
-        p.setProperty("hibernate.connection.url",
-                "jdbc:h2:mem:latch_api_pagos_" + UUID.randomUUID() + ";MODE=PostgreSQL");
-        p.setProperty("hibernate.connection.username", "sa");
-        p.setProperty("hibernate.connection.password", "");
+        if (Boolean.getBoolean("latch.test.postgres")) {
+            p = PostgresTestSupport.propiedadesHibernate();
+        } else {
+            p.setProperty("hibernate.connection.driver_class", "org.h2.Driver");
+            p.setProperty("hibernate.connection.url",
+                    "jdbc:h2:mem:latch_api_pagos_" + UUID.randomUUID() + ";MODE=PostgreSQL");
+            p.setProperty("hibernate.connection.username", "sa");
+            p.setProperty("hibernate.connection.password", "");
+        }
         p.setProperty("hibernate.hbm2ddl.auto", "create-drop");
         p.setProperty("hibernate.jdbc.time_zone", "UTC");
         p.setProperty("hibernate.show_sql", "false");
 
         factory = HibernateUtil.construir(p);
+        if (Boolean.getBoolean("latch.test.postgres")) {
+            PostgresTestSupport.aplicarMigraciones(p);
+        }
         tx = new HibernateTransactions(factory);
         String hash = new PasswordHasher().crear(PASSWORD);
         nombrePropietario = "prop-" + UUID.randomUUID().toString().substring(0, 8);
@@ -128,6 +141,9 @@ class ApiPagosTest {
     static void cerrar() {
         if (servidor != null) servidor.detener();
         if (factory != null) factory.close();
+        if (Boolean.getBoolean("latch.test.postgres")) {
+            PostgresTestSupport.eliminarFuncionRecibo();
+        }
         SesionUsuario.cerrarSesion();
     }
 
@@ -248,6 +264,108 @@ class ApiPagosTest {
     }
 
     @Test
+    void paginaPagosYCargosConLimiteDeCincuentaYConsultasAcotadas() throws Exception {
+        tx.ejecutar(session -> {
+            for (int indice = 0; indice < 51; indice++) {
+                BigDecimal importe = new BigDecimal("10.00");
+                Pago pago = new Pago(null, contratoId, null, FECHA_PAGO.minusDays(indice),
+                        "USD", importe, importe, "Transferencia", "REF-PAG-" + indice,
+                        null, "Registrado");
+                pago.aplicarConversion("USD", importe, null);
+                session.persist(pago);
+            }
+            for (int indice = 0; indice < 49; indice++) {
+                Cargo cargo = new Cargo();
+                cargo.setContratoId(contratoId);
+                cargo.setTipo("Servicio");
+                cargo.setPeriodo(LocalDate.of(2026, 10, 1).minusMonths(indice));
+                cargo.setFechaEmision(LocalDate.of(2026, 10, 1).minusMonths(indice));
+                cargo.setVenceEl(LocalDate.of(2026, 10, 5).minusMonths(indice));
+                cargo.setImporte(new BigDecimal("25.00"));
+                cargo.setConcepto("Cargo de paginación " + indice);
+                cargo.setEstado("Pendiente");
+                session.persist(cargo);
+            }
+            return null;
+        });
+
+        String token = login(nombrePropietario);
+        factory.getStatistics().setStatisticsEnabled(true);
+        factory.getStatistics().clear();
+        HttpResponse<String> pagosPrimera = get("/api/v1/pagos?tamano=50", token);
+        assertEquals(200, pagosPrimera.statusCode(), pagosPrimera.body());
+        var pagosPagina = GSON.fromJson(pagosPrimera.body(), com.google.gson.JsonObject.class);
+        assertEquals(50, pagosPagina.get("tamano").getAsInt());
+        assertEquals(51, pagosPagina.get("total").getAsInt());
+        assertEquals(50, pagosPagina.getAsJsonArray("elementos").size());
+        long consultasPagos = factory.getStatistics().getPrepareStatementCount();
+        assertTrue(consultasPagos < 25,
+                "la consulta de pagos no debe crecer con el número de filas de la página: " + consultasPagos);
+
+        HttpResponse<String> pagosSegunda = get("/api/v1/pagos?pagina=2&tamano=50", token);
+        assertEquals(200, pagosSegunda.statusCode(), pagosSegunda.body());
+        var pagosPaginaDos = GSON.fromJson(pagosSegunda.body(), com.google.gson.JsonObject.class);
+        assertEquals(1, pagosPaginaDos.getAsJsonArray("elementos").size());
+
+        factory.getStatistics().clear();
+        HttpResponse<String> cargosPrimera = get("/api/v1/cargos?tamano=50", token);
+        assertEquals(200, cargosPrimera.statusCode(), cargosPrimera.body());
+        var cargosPagina = GSON.fromJson(cargosPrimera.body(), com.google.gson.JsonObject.class);
+        assertEquals(50, cargosPagina.get("tamano").getAsInt());
+        assertEquals(51, cargosPagina.get("total").getAsInt());
+        assertEquals(50, cargosPagina.getAsJsonArray("elementos").size());
+        long consultasCargos = factory.getStatistics().getPrepareStatementCount();
+        assertTrue(consultasCargos < 25,
+                "la consulta de cargos no debe crecer con el número de filas de la página: " + consultasCargos);
+
+        HttpResponse<String> cargosSegunda = get("/api/v1/cargos?pagina=2&tamano=50", token);
+        assertEquals(200, cargosSegunda.statusCode(), cargosSegunda.body());
+        var cargosPaginaDos = GSON.fromJson(cargosSegunda.body(), com.google.gson.JsonObject.class);
+        assertEquals(1, cargosPaginaDos.getAsJsonArray("elementos").size());
+
+        assertEquals(400, get("/api/v1/pagos?tamano=51", token).statusCode());
+        assertEquals(400, get("/api/v1/cargos?tamano=51", token).statusCode());
+    }
+
+    @Test
+    void busquedasDePagosYCargosTratanComodinesComoTextoLiteral() throws Exception {
+        tx.ejecutar(session -> {
+            Cargo cargo = session.find(Cargo.class, cargoRentaId);
+            cargo.setConcepto("Cargo %_! literal");
+            BigDecimal monto = new BigDecimal("10.00");
+            Pago pago = new Pago(null, contratoId, null, FECHA_PAGO, "USD", monto, monto,
+                    "Transferencia", "Referencia %_! literal", null, "Registrado");
+            pago.aplicarConversion("USD", monto, null);
+            session.persist(pago);
+            return null;
+        });
+
+        String token = login(nombrePropietario);
+        for (String consulta : new String[]{"%25", "%5F", "%21"}) {
+            HttpResponse<String> pagos = get("/api/v1/pagos?texto=" + consulta, token);
+            HttpResponse<String> cargos = get("/api/v1/cargos?texto=" + consulta, token);
+            assertEquals(200, pagos.statusCode(), pagos.body());
+            assertEquals(200, cargos.statusCode(), cargos.body());
+            assertEquals(1, GSON.fromJson(pagos.body(), com.google.gson.JsonObject.class)
+                    .get("total").getAsInt(), consulta);
+            assertEquals(1, GSON.fromJson(cargos.body(), com.google.gson.JsonObject.class)
+                    .get("total").getAsInt(), consulta);
+        }
+    }
+
+    @Test
+    void rechazaExponenteExtremoSinGuardarPago() throws Exception {
+        String token = login(nombrePropietario);
+        long pagosAntes = contar("select count(p) from Pago p");
+
+        HttpResponse<String> respuesta = postJson("/api/v1/pagos",
+                GSON.toJson(pago("1E+999999999", null)), token, UUID.randomUUID().toString());
+
+        assertEquals(422, respuesta.statusCode(), respuesta.body());
+        assertEquals(pagosAntes, contar("select count(p) from Pago p"));
+    }
+
+    @Test
     void registraUnaSolaVezYConsultaPagoYRecibo() throws Exception {
         String token = login(nombrePropietario);
         String clave = UUID.randomUUID().toString();
@@ -255,14 +373,21 @@ class ApiPagosTest {
                 new DistribucionRequest(cargoRentaId.toString(), "400.00"),
                 new DistribucionRequest(cargoServicioId.toString(), "600.00")));
 
+        Instant inicioSolicitud = Instant.now();
         HttpResponse<String> primera = postJson("/api/v1/pagos",
                 GSON.toJson(solicitud), token, clave);
+        Instant finSolicitud = Instant.now();
         assertEquals(201, primera.statusCode(), primera.body());
         PagoRegistroResponse registro = GSON.fromJson(primera.body(), PagoRegistroResponse.class);
         assertNotNull(registro.pagoId());
         assertTrue(registro.numeroRecibo() > 0);
         assertEquals("1000.00", registro.montoContrato());
         assertEquals("0.00", registro.credito());
+        Pago pagoGuardado = tx.ejecutar(session ->
+                session.find(Pago.class, UUID.fromString(registro.pagoId())));
+        assertNotNull(pagoGuardado.getCreadoEn());
+        assertTrue(!pagoGuardado.getCreadoEn().isBefore(inicioSolicitud));
+        assertTrue(!pagoGuardado.getCreadoEn().isAfter(finSolicitud));
 
         HttpResponse<String> repetida = postJson("/api/v1/pagos",
                 GSON.toJson(solicitud), token, clave);
@@ -270,6 +395,7 @@ class ApiPagosTest {
         PagoRegistroResponse otra = GSON.fromJson(repetida.body(), PagoRegistroResponse.class);
         assertEquals(registro.pagoId(), otra.pagoId());
         assertEquals(registro.numeroRecibo(), otra.numeroRecibo());
+        assertEquals(primera.body(), repetida.body());
         assertEquals(1, contar("select count(p) from Pago p"));
 
         HttpResponse<String> distinta = postJson("/api/v1/pagos",
@@ -294,6 +420,105 @@ class ApiPagosTest {
 
         assertEquals(404, get("/api/v1/pagos/" + UUID.randomUUID(), token).statusCode());
         assertEquals(404, get("/api/v1/recibos/999999", token).statusCode());
+    }
+
+    @Test
+    void claveDistintaRegistraUnPagoNuevo() throws Exception {
+        String token = login(nombrePropietario);
+        PagoRequest solicitud = pago("1000.00", null);
+
+        HttpResponse<String> primera = postJson("/api/v1/pagos", GSON.toJson(solicitud),
+                token, UUID.randomUUID().toString());
+        HttpResponse<String> segunda = postJson("/api/v1/pagos", GSON.toJson(solicitud),
+                token, UUID.randomUUID().toString());
+
+        assertEquals(201, primera.statusCode(), primera.body());
+        assertEquals(201, segunda.statusCode(), segunda.body());
+        PagoRegistroResponse pagoUno = GSON.fromJson(primera.body(), PagoRegistroResponse.class);
+        PagoRegistroResponse pagoDos = GSON.fromJson(segunda.body(), PagoRegistroResponse.class);
+        assertNotEquals(pagoUno.pagoId(), pagoDos.pagoId());
+        assertEquals(pagoUno.numeroRecibo() + 1, pagoDos.numeroRecibo());
+        assertEquals(2, contar("select count(p) from Pago p"));
+    }
+
+    @Test
+    void rollbackNoConsumeNumeroDeRecibo() throws Exception {
+        long numeroEsperado = Boolean.getBoolean("latch.test.postgres")
+                ? siguienteNumeroRecibo() : 1L;
+        String token = login(nombrePropietario);
+        PagoRequest solicitudInvalida = pago("1000.00", List.of(
+                new DistribucionRequest(UUID.randomUUID().toString(), "100.00")));
+        HttpResponse<String> rechazada = postJson("/api/v1/pagos", GSON.toJson(solicitudInvalida),
+                token, UUID.randomUUID().toString());
+        assertEquals(422, rechazada.statusCode(), rechazada.body());
+        assertEquals(0, contar("select count(p) from Pago p"));
+        assertEquals(0, contar("select count(r) from Recibo r"));
+
+        HttpResponse<String> confirmada = postJson("/api/v1/pagos",
+                GSON.toJson(pago("1000.00", null)), token, UUID.randomUUID().toString());
+        assertEquals(201, confirmada.statusCode(), confirmada.body());
+        PagoRegistroResponse resultado = GSON.fromJson(confirmada.body(),
+                PagoRegistroResponse.class);
+        assertEquals(numeroEsperado, resultado.numeroRecibo());
+    }
+
+    @Test
+    void reciboConservaUnResumenDeContratoMayorA300Caracteres() throws Exception {
+        tx.ejecutar(session -> {
+            Contrato contrato = session.find(Contrato.class, contratoId);
+            Inquilino inquilino = session.find(Inquilino.class, contrato.getInquilinoId());
+            Unidad unidad = session.find(Unidad.class, contrato.getUnidadId());
+            Propiedad propiedad = session.find(Propiedad.class, unidad.getPropiedadId());
+            inquilino.setNombre("I".repeat(160));
+            propiedad.setNombre("P".repeat(120));
+            unidad.setCodigo("U".repeat(30));
+            unidad.setTipo("T".repeat(24));
+            return null;
+        });
+
+        String token = login(nombrePropietario);
+        HttpResponse<String> respuesta = postJson("/api/v1/pagos",
+                GSON.toJson(pago("1000.00", null)), token, UUID.randomUUID().toString());
+        assertEquals(201, respuesta.statusCode(), respuesta.body());
+        PagoRegistroResponse pago = GSON.fromJson(respuesta.body(), PagoRegistroResponse.class);
+        HttpResponse<String> respuestaRecibo = get(
+                "/api/v1/recibos/" + pago.numeroRecibo(), token);
+        assertEquals(200, respuestaRecibo.statusCode(), respuestaRecibo.body());
+        ReciboResponse recibo = GSON.fromJson(respuestaRecibo.body(), ReciboResponse.class);
+        assertEquals(343, recibo.contratoInfo().length());
+    }
+
+    @Test
+    void limpiezaRespetaRetencionYSoloEliminaSolicitudesCompletadas() {
+        Instant ahora = Instant.parse("2026-11-14T12:00:00Z");
+        String claveExpirada = UUID.randomUUID().toString();
+        String claveReciente = UUID.randomUUID().toString();
+        String claveEnProceso = UUID.randomUUID().toString();
+
+        tx.ejecutar(session -> {
+            SolicitudIdempotente expirada = new SolicitudIdempotente(claveExpirada,
+                    idPropietario, "PAGOS", "a".repeat(64), ahora.minus(Duration.ofDays(45)));
+            expirada.completar(201, "{}", ahora.minus(Duration.ofDays(31)));
+            session.persist(expirada);
+
+            SolicitudIdempotente reciente = new SolicitudIdempotente(claveReciente,
+                    idPropietario, "PAGOS", "b".repeat(64), ahora.minus(Duration.ofDays(40)));
+            reciente.completar(201, "{}", ahora.minus(Duration.ofDays(29)));
+            session.persist(reciente);
+
+            session.persist(new SolicitudIdempotente(claveEnProceso, idPropietario,
+                    "PAGOS", "c".repeat(64), ahora.minus(Duration.ofDays(100))));
+            return null;
+        });
+
+        ServicioPagos servicio = new ServicioPagos(tx, Clock.fixed(ahora, ZoneOffset.UTC));
+        assertEquals(1, servicio.limpiarSolicitudesExpiradas());
+        assertEquals(0, contar("select count(s) from SolicitudIdempotente s where s.clave = '"
+                + claveExpirada + "'"));
+        assertEquals(1, contar("select count(s) from SolicitudIdempotente s where s.clave = '"
+                + claveReciente + "'"));
+        assertEquals(1, contar("select count(s) from SolicitudIdempotente s where s.clave = '"
+                + claveEnProceso + "'"));
     }
 
     @Test
@@ -373,6 +598,7 @@ class ApiPagosTest {
         assertEquals("Pago duplicado", detalle.motivoAnulacion());
         assertEquals(idPropietario, detalle.anuladoPor());
         assertNotNull(detalle.anuladoEn());
+        assertTrue(detalle.anuladoEn().endsWith("-06:00"));
 
         assertEquals(409, postJson("/api/v1/pagos/" + pago.pagoId() + "/anulacion",
                 "{\"motivo\":\"Otra vez\"}", tokenPropietario, null).statusCode());
@@ -407,7 +633,7 @@ class ApiPagosTest {
         assertEquals("600.00", estado.totales().saldo());
         assertEquals("600.00", estado.totales().credito());
         assertEquals("Pagado", estado.cargos().get(0).estado());
-        assertEquals("Pendiente", estado.cargos().get(1).estado());
+        assertEquals("Vencido", estado.cargos().get(1).estado());
         assertEquals("400.00", estado.pagos().get(0).aplicado());
         assertEquals("600.00", estado.pagos().get(0).credito());
 
@@ -415,6 +641,27 @@ class ApiPagosTest {
                 + "/estado-cuenta?corte=" + CORTE, token).statusCode());
         assertEquals(400, get("/api/v1/contratos/" + contratoId
                 + "/estado-cuenta?corte=no-es-fecha", token).statusCode());
+    }
+
+    @Test
+    void estadoCuentaDerivaVencimientoYAnulacionAlCorte() throws Exception {
+        String token = login(nombrePropietario);
+        tx.ejecutar(session -> {
+            session.find(Cargo.class, cargoServicioId).setEstado("Cancelado");
+            return null;
+        });
+
+        HttpResponse<String> respuesta = get("/api/v1/contratos/" + contratoId
+                + "/estado-cuenta?corte=" + CORTE, token);
+
+        assertEquals(200, respuesta.statusCode(), respuesta.body());
+        EstadoCuentaResponse estado = GSON.fromJson(respuesta.body(),
+                EstadoCuentaResponse.class);
+        assertEquals(2, estado.cargos().size());
+        assertTrue(estado.cargos().stream().anyMatch(c -> "Vencido".equals(c.estado())));
+        assertTrue(estado.cargos().stream().anyMatch(c -> "Anulado".equals(c.estado())));
+        assertEquals("400.00", estado.totales().cargos());
+        assertEquals("400.00", estado.totales().saldo());
     }
 
     @Test
@@ -475,6 +722,38 @@ class ApiPagosTest {
     }
 
     @Test
+    void dosPagosConcurrentesNoSobreaplicanElMismoCargo() throws Exception {
+        String token = login(nombrePropietario);
+        String cuerpo = GSON.toJson(pago("300.00", List.of(
+                new DistribucionRequest(cargoRentaId.toString(), "300.00"))));
+        CountDownLatch salida = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<Integer> primero = pool.submit(() -> {
+                salida.await();
+                return postJson("/api/v1/pagos", cuerpo, token,
+                        UUID.randomUUID().toString()).statusCode();
+            });
+            Future<Integer> segundo = pool.submit(() -> {
+                salida.await();
+                return postJson("/api/v1/pagos", cuerpo, token,
+                        UUID.randomUUID().toString()).statusCode();
+            });
+            salida.countDown();
+
+            List<Integer> estados = List.of(primero.get(15, TimeUnit.SECONDS),
+                    segundo.get(15, TimeUnit.SECONDS));
+
+            assertEquals(1, estados.stream().filter(e -> e == 201).count(), estados.toString());
+            assertEquals(1, estados.stream().filter(e -> e == 422).count(), estados.toString());
+            assertEquals(1, contar("select count(p) from Pago p"));
+            assertEquals(1, contar("select count(a) from AplicacionPago a"));
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
     void unaClaveDeOtroUsuarioNoRevelaNiDuplicaElPago() throws Exception {
         String tokenPropietario = login(nombrePropietario);
         String tokenAsistente = login(nombreAsistente);
@@ -502,6 +781,12 @@ class ApiPagosTest {
 
     private static long contar(String hql) {
         return tx.ejecutar(session -> session.createQuery(hql, Long.class).getSingleResult());
+    }
+
+    private static long siguienteNumeroRecibo() {
+        return tx.ejecutar(session -> session.createNativeQuery(
+                "select siguiente_numero from consecutivo_recibo where id = 1", Long.class)
+                .getSingleResult());
     }
 
     private static String login(String nombre) throws Exception {

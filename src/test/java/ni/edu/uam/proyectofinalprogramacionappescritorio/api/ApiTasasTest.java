@@ -187,7 +187,42 @@ class ApiTasasTest {
                 "{\"motivo\":\"Segunda\"}", token);
 
         assertEquals(409, respuesta.statusCode());
-        assertEquals("CONFLICTO", error(respuesta).error().codigo());
+        assertEquals("ERR-060", error(respuesta).error().codigo());
+        assertEquals(TipoCambioService.MENSAJE_TASA_DUPLICADA,
+                error(respuesta).error().mensaje());
+    }
+
+    @Test
+    void laBandaEsInclusivaYExigeConfirmacionFueraDeRango() throws Exception {
+        String token = login(nombrePropietario);
+        TasaResponse minimo = registrar(token, FECHA.minusDays(10), "1", "BCN");
+        TasaResponse maximo = registrar(token, FECHA.minusDays(11), "100", "BCN");
+        TasaResponse bajo = registrar(token, FECHA.minusDays(12), "0.99", "BCN");
+        TasaResponse alto = registrar(token, FECHA.minusDays(13), "100.01", "BCN");
+
+        assertEquals(200, postJson("/api/v1/tasas/" + minimo.id() + "/autorizar",
+                "{\"motivo\":\"Límite inferior\"}", token).statusCode());
+        assertEquals(200, postJson("/api/v1/tasas/" + maximo.id() + "/autorizar",
+                "{\"motivo\":\"Límite superior\"}", token).statusCode());
+
+        HttpResponse<String> rechazoBajo = postJson(
+                "/api/v1/tasas/" + bajo.id() + "/autorizar",
+                "{\"motivo\":\"Sin confirmar\"}", token);
+        assertEquals(422, rechazoBajo.statusCode(), rechazoBajo.body());
+        assertEquals("ENTIDAD_NO_PROCESABLE", error(rechazoBajo).error().codigo());
+        assertEquals(TipoCambioService.MENSAJE_FUERA_DE_BANDA,
+                error(rechazoBajo).error().mensaje());
+
+        assertEquals(422, postJson("/api/v1/tasas/" + alto.id() + "/autorizar",
+                "{\"motivo\":\"Sin confirmar\",\"confirmarFueraDeBanda\":false}",
+                token).statusCode());
+
+        HttpResponse<String> confirmada = postJson(
+                "/api/v1/tasas/" + bajo.id() + "/autorizar",
+                "{\"motivo\":\"Revisión confirmada\",\"confirmarFueraDeBanda\":true}",
+                token);
+        assertEquals(200, confirmada.statusCode(), confirmada.body());
+        assertTrue(GSON.fromJson(confirmada.body(), TasaResponse.class).autorizada());
     }
 
     @Test

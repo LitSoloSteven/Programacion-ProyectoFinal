@@ -25,6 +25,8 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PermisoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PropiedadService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.UnidadService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ParserMonto;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PatronLike;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ValidadorEntrada;
 import org.hibernate.Session;
 import org.hibernate.query.Query;
@@ -43,6 +45,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Orquesta las lecturas y escrituras de la API 3. Las lecturas usan
@@ -71,12 +74,29 @@ public final class ServicioCatalogos {
     private final ContratoService contratos;
 
     public ServicioCatalogos(HibernateTransactions tx) {
-        this.tx = Objects.requireNonNull(tx, "Faltan las transacciones de la API.");
-        this.propiedades = new PropiedadService(tx);
-        this.unidades = new UnidadService(tx);
-        this.inquilinos = new InquilinoService(tx);
-        this.contratos = new ContratoService(tx);
+        this(tx, new PropiedadService(tx), new UnidadService(tx),
+                new InquilinoService(tx), new ContratoService(tx));
     }
+
+    public ServicioCatalogos(HibernateTransactions tx, PropiedadService propiedades,
+                             UnidadService unidades, InquilinoService inquilinos,
+                             ContratoService contratos) {
+        this.tx = Objects.requireNonNull(tx, "Faltan las transacciones de la API.");
+        this.propiedades = Objects.requireNonNull(propiedades, "Falta el servicio de propiedades.");
+        this.unidades = Objects.requireNonNull(unidades, "Falta el servicio de unidades.");
+        this.inquilinos = Objects.requireNonNull(inquilinos, "Falta el servicio de inquilinos.");
+        this.contratos = Objects.requireNonNull(contratos, "Falta el servicio de contratos.");
+    }
+
+    public <T> T enTransaccion(Supplier<T> operacion) {
+        Objects.requireNonNull(operacion, "Falta la operación de la API.");
+        return tx.ejecutar(session -> operacion.get());
+    }
+
+    public PropiedadService propiedadService() { return propiedades; }
+    public UnidadService unidadService() { return unidades; }
+    public InquilinoService inquilinoService() { return inquilinos; }
+    public ContratoService contratoService() { return contratos; }
 
     // ------------------------------------------------------------------
     // Propiedades
@@ -87,8 +107,9 @@ public final class ServicioCatalogos {
         StringBuilder where = new StringBuilder();
         Map<String, Object> parametros = new LinkedHashMap<>();
         if (texto != null && !texto.isBlank()) {
-            where.append("(lower(p.nombre) like :texto or lower(p.direccion) like :texto)");
-            parametros.put("texto", "%" + texto.strip().toLowerCase(Locale.ROOT) + "%");
+            where.append("(lower(p.nombre) like :texto escape '!' or lower(p.direccion) like :texto escape '!')");
+            parametros.put("texto", PatronLike.contieneLiteral(
+                    texto.strip().toLowerCase(Locale.ROOT)));
         }
         if (activa != null) {
             if (!where.isEmpty()) where.append(" and ");
@@ -150,7 +171,10 @@ public final class ServicioCatalogos {
 
     public PropiedadResponse cambiarEstadoPropiedad(UUID id, Boolean activa) {
         obtenerPropiedad(id);
-        boolean nuevo = activa != null && activa;
+        if (activa == null) {
+            throw ExcepcionApi.entidadNoProcesable("El campo activa es obligatorio.");
+        }
+        boolean nuevo = activa;
         ejecutar(() -> propiedades.cambiarEstado(id, nuevo));
         return obtenerPropiedad(id);
     }
@@ -179,8 +203,9 @@ public final class ServicioCatalogos {
         }
         if (texto != null && !texto.isBlank()) {
             separar(where);
-            where.append("(lower(u.codigo) like :texto or lower(u.descripcion) like :texto)");
-            parametros.put("texto", "%" + texto.strip().toLowerCase(Locale.ROOT) + "%");
+            where.append("(lower(u.codigo) like :texto escape '!' or lower(u.descripcion) like :texto escape '!')");
+            parametros.put("texto", PatronLike.contieneLiteral(
+                    texto.strip().toLowerCase(Locale.ROOT)));
         }
         return paginar(Unidad.class, "u",
                 "Unidad u join fetch u.propiedad", "Unidad u",
@@ -206,7 +231,14 @@ public final class ServicioCatalogos {
         DatosUnidad datos = validarUnidad(solicitud);
         Unidad unidad = new Unidad();
         aplicar(unidad, datos);
-        ejecutar(() -> unidades.guardar(unidad));
+        tx.ejecutar(session -> {
+            permisos.exigir(session, SesionUsuario.getActual(), Permiso.OPERAR_ALQUILERES);
+            Propiedad propiedad = session.find(Propiedad.class, datos.propiedadId());
+            if (propiedad == null) throw ExcepcionApi.noEncontrado();
+            unidad.setPropiedad(propiedad);
+            ejecutar(() -> unidades.guardar(unidad));
+            return null;
+        });
         if (unidad.getId() == null) throw ExcepcionApi.interno();
         return obtenerUnidad(unidad.getId());
     }
@@ -214,15 +246,19 @@ public final class ServicioCatalogos {
     public UnidadResponse actualizarUnidad(UUID id, long version, UnidadRequest solicitud) {
         obtenerUnidad(id);
         DatosUnidad datos = validarUnidad(solicitud);
-        ejecutar(() -> unidades.actualizar(id, version, datos.propiedadId(), datos.codigo(),
-                datos.descripcion(), datos.tipo(), datos.estado(), datos.canon(), datos.moneda()));
+        tx.ejecutar(session -> {
+            ejecutar(() -> unidades.actualizar(id, version, datos.propiedadId(), datos.codigo(),
+                    datos.descripcion(), datos.tipo(), datos.estado(), datos.canon(), datos.moneda()));
+            Unidad unidad = session.find(Unidad.class, id);
+            unidad.setPropiedad(session.getReference(Propiedad.class, datos.propiedadId()));
+            return null;
+        });
         return obtenerUnidad(id);
     }
 
     public UnidadResponse cambiarEstadoUnidad(UUID id, String estado) {
         obtenerUnidad(id);
-        String nuevo = textoOpcional(estado, "estado", 24);
-        if (nuevo == null) nuevo = "Inactiva";
+        String nuevo = textoRequerido(estado, "estado", 24);
         exigirEstadoUnidad(nuevo);
         String definitivo = nuevo;
         ejecutar(() -> unidades.cambiarEstado(id, definitivo));
@@ -243,9 +279,10 @@ public final class ServicioCatalogos {
         }
         if (texto != null && !texto.isBlank()) {
             separar(where);
-            where.append("(lower(i.nombre) like :texto or lower(i.identificacion) like :texto")
-                    .append(" or lower(i.correo) like :texto)");
-            parametros.put("texto", "%" + texto.strip().toLowerCase(Locale.ROOT) + "%");
+            where.append("(lower(i.nombre) like :texto escape '!' or lower(i.identificacion) like :texto escape '!'")
+                    .append(" or lower(i.correo) like :texto escape '!')");
+            parametros.put("texto", PatronLike.contieneLiteral(
+                    texto.strip().toLowerCase(Locale.ROOT)));
         }
         return paginar(Inquilino.class, "i",
                 "Inquilino i", "Inquilino i",
@@ -283,7 +320,10 @@ public final class ServicioCatalogos {
 
     public InquilinoResponse cambiarEstadoInquilino(UUID id, Boolean activo) {
         obtenerInquilino(id);
-        boolean nuevo = activo != null && activo;
+        if (activo == null) {
+            throw ExcepcionApi.entidadNoProcesable("El campo activo es obligatorio.");
+        }
+        boolean nuevo = activo;
         ejecutar(() -> inquilinos.cambiarEstado(id, nuevo));
         return obtenerInquilino(id);
     }
@@ -337,7 +377,12 @@ public final class ServicioCatalogos {
         DatosContrato datos = validarContrato(solicitud);
         Contrato contrato = new Contrato();
         aplicar(contrato, datos);
-        ejecutar(() -> contratos.guardar(contrato));
+        tx.ejecutar(session -> {
+            contrato.setUnidad(session.getReference(Unidad.class, datos.unidadId()));
+            contrato.setInquilino(session.getReference(Inquilino.class, datos.inquilinoId()));
+            ejecutar(() -> contratos.guardar(contrato));
+            return null;
+        });
         if (contrato.getId() == null) throw ExcepcionApi.interno();
         return obtenerContrato(contrato.getId());
     }
@@ -345,16 +390,21 @@ public final class ServicioCatalogos {
     public ContratoResponse actualizarContrato(UUID id, long version, ContratoRequest solicitud) {
         obtenerContrato(id);
         DatosContrato datos = validarContrato(solicitud);
-        ejecutar(() -> contratos.actualizar(id, version, datos.unidadId(), datos.inquilinoId(),
-                datos.inicio(), datos.fin(), datos.canon(), datos.moneda(), datos.diaPago(),
-                datos.depositoPactado(), datos.estado()));
+        tx.ejecutar(session -> {
+            ejecutar(() -> contratos.actualizar(id, version, datos.unidadId(), datos.inquilinoId(),
+                    datos.inicio(), datos.fin(), datos.canon(), datos.moneda(), datos.diaPago(),
+                    datos.depositoPactado(), datos.estado()));
+            Contrato contrato = session.find(Contrato.class, id);
+            contrato.setUnidad(session.getReference(Unidad.class, datos.unidadId()));
+            contrato.setInquilino(session.getReference(Inquilino.class, datos.inquilinoId()));
+            return null;
+        });
         return obtenerContrato(id);
     }
 
     public ContratoResponse cambiarEstadoContrato(UUID id, String estado) {
         obtenerContrato(id);
-        String nuevo = textoOpcional(estado, "estado", 24);
-        if (nuevo == null) nuevo = "Cancelado";
+        String nuevo = textoRequerido(estado, "estado", 24);
         exigirEstadoContrato(nuevo);
         String definitivo = nuevo;
         ejecutar(() -> contratos.cambiarEstado(id, definitivo));
@@ -658,13 +708,11 @@ public final class ServicioCatalogos {
         }
         BigDecimal numero;
         try {
-            numero = new BigDecimal(valor.strip());
+            numero = ParserMonto.parsear(valor, campo);
         } catch (NumberFormatException e) {
             throw ExcepcionApi.solicitudInvalida("El campo " + campo + " debe ser un número decimal.");
-        }
-        if (numero.stripTrailingZeros().scale() > 2) {
-            throw ExcepcionApi.entidadNoProcesable(
-                    "El campo " + campo + " admite como máximo 2 decimales.");
+        } catch (IllegalArgumentException e) {
+            throw ExcepcionApi.entidadNoProcesable(e.getMessage());
         }
         if (positivo && numero.compareTo(BigDecimal.ZERO) <= 0) {
             throw ExcepcionApi.entidadNoProcesable(
@@ -674,7 +722,7 @@ public final class ServicioCatalogos {
             throw ExcepcionApi.entidadNoProcesable(
                     "El campo " + campo + " no puede ser negativo.");
         }
-        return numero.setScale(2, RoundingMode.HALF_EVEN);
+        return numero;
     }
 
     private static UUID uuid(String valor, String campo) {

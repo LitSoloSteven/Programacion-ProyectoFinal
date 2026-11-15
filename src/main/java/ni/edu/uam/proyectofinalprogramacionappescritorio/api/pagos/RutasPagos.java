@@ -31,11 +31,29 @@ public final class RutasPagos {
 
     public void registrar(Router router) {
         router.registrar("POST", "/api/v1/pagos", false, this::registrarPago);
+        router.registrar("GET", "/api/v1/pagos", false, this::listarPagos);
+        router.registrar("GET", "/api/v1/cargos", false, this::listarCargos);
         router.registrar("GET", "/api/v1/pagos/{id}", false, this::obtenerPago);
         router.registrar("GET", "/api/v1/recibos/{numero}", false, this::obtenerRecibo);
         router.registrar("POST", "/api/v1/pagos/{id}/anulacion", false, this::anularPago);
         router.registrar("GET", "/api/v1/contratos/{id}/estado-cuenta", false,
                 this::estadoCuenta);
+    }
+
+    private RespuestaJson listarPagos(ContextoPeticion contexto) {
+        int pagina = pagina(contexto.consulta("pagina"));
+        int tamano = tamano(contexto.consulta("tamano"));
+        String texto = contexto.consulta("texto");
+        return RespuestaJson.ok(enSesion(contexto,
+                () -> servicio.listarPagos(pagina, tamano, texto)));
+    }
+
+    private RespuestaJson listarCargos(ContextoPeticion contexto) {
+        int pagina = pagina(contexto.consulta("pagina"));
+        int tamano = tamano(contexto.consulta("tamano"));
+        String texto = contexto.consulta("texto");
+        return RespuestaJson.ok(enSesion(contexto,
+                () -> servicio.listarCargos(pagina, tamano, texto)));
     }
 
     private RespuestaJson registrarPago(ContextoPeticion contexto) throws Exception {
@@ -46,8 +64,8 @@ public final class RutasPagos {
         }
         PagoRequest solicitud = leer(contexto, PagoRequest.class);
         try {
-            return RespuestaJson.creado(enSesion(contexto,
-                    () -> servicio.registrar(clave, solicitud)));
+            return RespuestaJson.creado(SesionUsuario.ejecutarComo(
+                    contexto.sesion().comoUsuario(), () -> servicio.registrar(clave, solicitud)));
         } catch (ConflictoDatosException e) {
             throw ExcepcionApi.conflicto(e.getMessage());
         } catch (IllegalArgumentException e) {
@@ -89,8 +107,9 @@ public final class RutasPagos {
         return Json.leer(LectorCuerpo.leerJson(contexto.intercambio()), tipo);
     }
 
-    private static <T> T enSesion(ContextoPeticion contexto, Supplier<T> operacion) {
-        return SesionUsuario.ejecutarComo(contexto.sesion().comoUsuario(), operacion);
+    private <T> T enSesion(ContextoPeticion contexto, Supplier<T> operacion) {
+        return SesionUsuario.ejecutarComo(contexto.sesion().comoUsuario(),
+                () -> servicio.enTransaccion(operacion));
     }
 
     private static UUID identificador(String valor) {
@@ -98,6 +117,32 @@ public final class RutasPagos {
             return UUID.fromString(valor);
         } catch (NullPointerException | IllegalArgumentException e) {
             throw ExcepcionApi.solicitudInvalida("El identificador no es válido.");
+        }
+    }
+
+    private static int pagina(String valor) {
+        if (valor == null || valor.isBlank()) return 1;
+        try {
+            int numero = Integer.parseInt(valor.strip());
+            if (numero < 1 || numero > ServicioPagos.PAGINA_MAXIMA) throw new NumberFormatException();
+            return numero;
+        } catch (NumberFormatException e) {
+            throw ExcepcionApi.solicitudInvalida("La página debe ser un entero entre 1 y "
+                    + ServicioPagos.PAGINA_MAXIMA + ".");
+        }
+    }
+
+    private static int tamano(String valor) {
+        if (valor == null || valor.isBlank()) return ServicioPagos.TAMANO_PAGINA_PREDETERMINADO;
+        try {
+            int numero = Integer.parseInt(valor.strip());
+            if (numero < 1 || numero > ServicioPagos.TAMANO_PAGINA_MAXIMO) {
+                throw new NumberFormatException();
+            }
+            return numero;
+        } catch (NumberFormatException e) {
+            throw ExcepcionApi.solicitudInvalida("El tamaño debe ser un entero entre 1 y "
+                    + ServicioPagos.TAMANO_PAGINA_MAXIMO + ".");
         }
     }
 

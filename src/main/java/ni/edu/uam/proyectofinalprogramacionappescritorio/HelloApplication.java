@@ -6,22 +6,9 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ApiConfig;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.Router;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ServidorApi;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.RutasCatalogos;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.ServicioCatalogos;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.TokenService;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.indicadores.RutasIndicadores;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.RutasPagos;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.ServicioPagos;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.RutasTasas;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.validaciones.RutasValidaciones;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.AutenticacionService;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.DashboardService;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.TipoCambioService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasSegundoPlano;
 
@@ -33,6 +20,7 @@ import java.time.Duration;
 public class HelloApplication extends Application {
     private final TareasSegundoPlano tareas = new TareasSegundoPlano();
     private static volatile HelloApplication instancia;
+    private ComposicionAplicacion composicion;
     private ServidorApi servidor;
 
     public TareasSegundoPlano getTareas() { return tareas; }
@@ -45,6 +33,13 @@ public class HelloApplication extends Application {
         return actual;
     }
 
+    public ComposicionAplicacion getComposicion() {
+        if (composicion == null) {
+            throw new IllegalStateException("Los servicios de Latch todavía no están preparados.");
+        }
+        return composicion;
+    }
+
     @Override
     public void stop() {
         ClienteLatch.cerrar();
@@ -52,6 +47,7 @@ public class HelloApplication extends Application {
             servidor.detener();
             servidor = null;
         }
+        composicion = null;
         instancia = null;
         tareas.cerrar();
         Thread cierre = new Thread(() -> {
@@ -94,17 +90,8 @@ public class HelloApplication extends Application {
     private String iniciarServicioLocal() {
         try {
             ApiConfig config = ApiConfig.desdeArchivo(Path.of(".env"), System.getenv());
-            HibernateTransactions transacciones = new HibernateTransactions(
-                    HibernateUtil.getSessionFactory());
-            Router router = new Router();
-            new RutasTasas(new TipoCambioService(transacciones)).registrar(router);
-            new RutasCatalogos(new ServicioCatalogos(transacciones)).registrar(router);
-            new RutasValidaciones(transacciones).registrar(router);
-            new RutasPagos(new ServicioPagos(transacciones)).registrar(router);
-            new RutasIndicadores(new DashboardService(transacciones)).registrar(router);
-
-            servidor = new ServidorApi(config,
-                    new AutenticacionService(transacciones), new TokenService(), router);
+            composicion = new ComposicionAplicacion(HibernateUtil.getSessionFactory());
+            servidor = composicion.crearServidorApi(config);
             servidor.iniciar();
             ClienteLatch.iniciar(servidor.puerto());
             return null;
@@ -127,5 +114,6 @@ public class HelloApplication extends Application {
             servidor.detener();
             servidor = null;
         }
+        composicion = null;
     }
 }

@@ -1,4 +1,5 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 
 import javafx.collections.FXCollections;
@@ -79,8 +80,8 @@ public class UnidadController {
     private Unidad unidadSeleccionada = null;
 
     public UnidadController() {
-        this.unidadService = new UnidadService();
-        this.propiedadService = new PropiedadService();
+        this(HelloApplication.instancia().getComposicion().unidades(),
+                HelloApplication.instancia().getComposicion().propiedades());
     }
 
     public UnidadController(UnidadService unidadService, PropiedadService propiedadService) {
@@ -228,16 +229,10 @@ public class UnidadController {
                 unidadService.guardar(nueva);
                 AlertaUtil.mostrarExito("Registro exitoso", "La unidad ha sido guardada satisfactoriamente en PostgreSQL.");
             } else {
-                // Actualización
-                unidadSeleccionada.setPropiedadId(prop.getId());
-                unidadSeleccionada.setCodigo(codigo.trim());
-                unidadSeleccionada.setDescripcion(normalizarDescripcion(txtDescripcion.getText()));
-                unidadSeleccionada.setTipo(tipo);
-                unidadSeleccionada.setEstado(estado);
-                unidadSeleccionada.setCanonReferencia(canon);
-                unidadSeleccionada.setMoneda(moneda);
-
-                unidadService.guardar(unidadSeleccionada);
+                unidadService.actualizar(unidadSeleccionada.getId(),
+                        unidadSeleccionada.getVersion(), prop.getId(), codigo.trim(),
+                        normalizarDescripcion(txtDescripcion.getText()), tipo, estado,
+                        canon, moneda);
                 AlertaUtil.mostrarExito("Actualización exitosa", "Los datos de la unidad fueron actualizados.");
             }
 

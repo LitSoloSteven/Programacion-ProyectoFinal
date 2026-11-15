@@ -1,5 +1,6 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.service;
 
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PaginaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.AplicacionPago;
@@ -10,14 +11,18 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Pago;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Recibo;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.TipoCambio;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PatronLike;
 import org.hibernate.Session;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.SQLException;
-import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -29,12 +34,15 @@ import java.util.UUID;
  * el recibo y las aplicaciones a cargos dentro de la misma transacción.
  */
 public class PagoService {
+    public static final int TAMANO_PAGINA_MAXIMO = 50;
+    private static final int PAGINA_MAXIMA = 100_000;
     private static final Set<String> MONEDAS = Set.of("USD", "NIO");
 
     private final HibernateCrudService db;
     private final HibernateTransactions tx;
     private final PermisoService permisos = new PermisoService();
     private final AuditoriaService auditoria = new AuditoriaService();
+    private final RelojService reloj = new RelojService();
 
     public PagoService() {
         this(new HibernateTransactions(HibernateUtil.getSessionFactory()));
@@ -45,8 +53,58 @@ public class PagoService {
         this.db = new HibernateCrudService(tx);
     }
 
-    public List<Pago> listarTodos() throws SQLException {
-        return db.listar(Pago.class, "from Pago order by fechaPago desc");
+    public List<Pago> listarTodos() {
+        return listarTodos(1, TAMANO_PAGINA_MAXIMO, null).elementos();
+    }
+
+    public PaginaResponse<Pago> listarTodos(int pagina, int tamano, String texto) {
+        validarPaginacion(pagina, tamano);
+        String criterio = texto == null || texto.isBlank()
+                ? null : PatronLike.contieneLiteral(texto.strip().toLowerCase(Locale.ROOT));
+        return tx.ejecutar(session -> {
+            permisos.exigir(session, SesionUsuario.getActual(), Permiso.OPERAR_ALQUILERES);
+            String filtro = criterio == null ? "" : """
+                     where lower(p.referencia) like :texto escape '!'
+                        or lower(p.metodo) like :texto escape '!'
+                        or lower(i.nombre) like :texto escape '!'
+                        or lower(prop.nombre) like :texto escape '!'
+                        or lower(u.codigo) like :texto escape '!'
+                        or lower(u.tipo) like :texto escape '!'
+                    """;
+            var conteo = session.createQuery("""
+                    select count(p) from Pago p
+                    join p.contrato c join c.inquilino i
+                    join c.unidad u join u.propiedad prop
+                    """ + filtro, Long.class);
+            if (criterio != null) conteo.setParameter("texto", criterio);
+            long total = conteo.getSingleResult();
+
+            var consulta = session.createQuery("""
+                    select p from Pago p
+                    join fetch p.contrato c
+                    left join fetch c.garantiaSeguimiento
+                    join fetch c.inquilino i
+                    join fetch c.unidad u
+                    join fetch u.propiedad prop
+                    left join fetch p.tipoCambio
+                    """ + filtro + " order by p.fechaPago desc, p.id", Pago.class);
+            if (criterio != null) consulta.setParameter("texto", criterio);
+            List<Pago> pagos = consulta
+                    .setFirstResult((pagina - 1) * tamano)
+                    .setMaxResults(tamano)
+                    .getResultList();
+            return new PaginaResponse<>(pagina, tamano, total, pagos);
+        });
+    }
+
+    private static void validarPaginacion(int pagina, int tamano) {
+        if (pagina < 1 || pagina > PAGINA_MAXIMA) {
+            throw new IllegalArgumentException("La página debe estar entre 1 y " + PAGINA_MAXIMA + ".");
+        }
+        if (tamano < 1 || tamano > TAMANO_PAGINA_MAXIMO) {
+            throw new IllegalArgumentException("El tamaño de página debe estar entre 1 y "
+                    + TAMANO_PAGINA_MAXIMO + ".");
+        }
     }
 
     public void registrarPago(Pago pago) throws SQLException {
@@ -70,11 +128,19 @@ public class PagoService {
     public RegistroPago registrarPagoEnSesion(Session session, Pago pago,
                                               List<AplicacionPago> aplicaciones) {
         Objects.requireNonNull(session, "Falta la sesión.");
+        return registrarPagoEnSesion(session, pago, aplicaciones, reloj.comprobar(session));
+    }
+
+    public RegistroPago registrarPagoEnSesion(Session session, Pago pago,
+                                              List<AplicacionPago> aplicaciones,
+                                              RelojService.TiempoOperativo tiempo) {
+        Objects.requireNonNull(session, "Falta la sesión.");
+        Objects.requireNonNull(tiempo, "Falta la hora operativa.");
         validarPago(pago);
         Usuario actor = permisos.exigir(session, SesionUsuario.getActual(),
                 Permiso.OPERAR_ALQUILERES);
 
-        Contrato contrato = session.find(Contrato.class, pago.getContratoId());
+        Contrato contrato = bloquearContrato(session, pago.getContratoId());
         if (contrato == null) {
             throw new IllegalArgumentException("El contrato ya no existe.");
         }
@@ -104,12 +170,18 @@ public class PagoService {
         session.persist(pago);
         session.flush();
 
-        Recibo recibo = new Recibo(pago, contrato.toString());
+        long numeroRecibo = reservarNumeroRecibo(session);
+        Recibo recibo = new Recibo(numeroRecibo, pago, contrato.toString());
         session.persist(recibo);
         BigDecimal credito = aplicarDistribucion(session, pago, aplicaciones);
         auditoria.registrar(session, actor, UUID.randomUUID(), "PAGO_REGISTRADO",
                 "pago:" + pago.getId());
         return new RegistroPago(pago, recibo, credito);
+    }
+
+    /** Comprueba el reloj antes de crear una idempotencia para un pago nuevo. */
+    public RelojService.TiempoOperativo comprobarReloj(Session session) {
+        return reloj.comprobar(session);
     }
 
     public Optional<Pago> obtener(UUID id) {
@@ -189,12 +261,13 @@ public class PagoService {
         return tx.ejecutar(session -> {
             Usuario actor = permisos.exigir(session, SesionUsuario.getActual(),
                     Permiso.ANULAR_PAGOS);
+            RelojService.TiempoOperativo tiempo = reloj.comprobar(session);
             Pago pago = session.find(Pago.class, id);
             if (pago == null) return Optional.<Pago>empty();
             if ("Anulado".equals(pago.getEstado())) {
                 throw new ConflictoDatosException("El pago ya está anulado.");
             }
-            pago.anular(limpio, actor.getId(), Instant.now());
+            pago.anular(limpio, actor.getId(), tiempo.instante());
             auditoria.registrar(session, actor, UUID.randomUUID(), "PAGO_ANULADO",
                     "pago:" + pago.getId());
             return Optional.of(pago);
@@ -215,6 +288,7 @@ public class PagoService {
 
         BigDecimal total = BigDecimal.ZERO;
         Set<UUID> cargosVistos = new HashSet<>();
+        List<UUID> cargosSolicitados = new ArrayList<>();
         for (AplicacionPago aplicacion : aplicaciones) {
             if (aplicacion == null) {
                 throw new IllegalArgumentException("La distribución contiene una fila vacía.");
@@ -224,10 +298,34 @@ public class PagoService {
                 throw new IllegalArgumentException(
                         "La distribución repite el mismo cargo.");
             }
-            Cargo cargo = session.find(Cargo.class, cargoId);
+            cargosSolicitados.add(cargoId);
+        }
+
+        List<UUID> cargosOrdenados = session.createQuery("""
+                        select c.id from Cargo c
+                        where c.id in :ids and c.contratoId = :contratoId
+                        order by c.venceEl, c.id
+                        """, UUID.class)
+                .setParameter("ids", cargosSolicitados)
+                .setParameter("contratoId", pago.getContratoId())
+                .getResultList();
+        if (cargosOrdenados.size() != cargosSolicitados.size()) {
+            throw new IllegalArgumentException(
+                    "Uno de los cargos no existe o no pertenece al contrato del pago.");
+        }
+
+        Map<UUID, Cargo> cargosBloqueados = new HashMap<>();
+        for (UUID cargoId : cargosOrdenados) {
+            Cargo cargo = bloquearCargo(session, cargoId);
             if (cargo == null) {
                 throw new IllegalArgumentException("Uno de los cargos ya no existe.");
             }
+            cargosBloqueados.put(cargoId, cargo);
+        }
+
+        for (AplicacionPago aplicacion : aplicaciones) {
+            UUID cargoId = aplicacion.getCargoId();
+            Cargo cargo = cargosBloqueados.get(cargoId);
             if (!pago.getContratoId().equals(cargo.getContratoId())) {
                 throw new IllegalArgumentException(
                         "Todos los cargos deben pertenecer al contrato del pago.");
@@ -262,6 +360,37 @@ public class PagoService {
                     "La distribución supera el monto del pago en la moneda del contrato.");
         }
         return montoContrato.subtract(total).setScale(2, RoundingMode.HALF_EVEN);
+    }
+
+    private Contrato bloquearContrato(Session session, UUID contratoId) {
+        Object filaBloqueada = session.createNativeQuery(
+                        "select id from contrato where id = :id for update")
+                .setParameter("id", contratoId)
+                .uniqueResult();
+        return filaBloqueada == null ? null : session.find(Contrato.class, contratoId);
+    }
+
+    private long reservarNumeroRecibo(Session session) {
+        String producto = session.doReturningWork(
+                conexion -> conexion.getMetaData().getDatabaseProductName());
+        String consulta;
+        if ("H2".equalsIgnoreCase(producto)) {
+            // H2 se usa para pruebas rápidas; producción reserva con la función transaccional de PostgreSQL.
+            consulta = "select coalesce(max(numero), 0) + 1 from recibo";
+        } else if ("PostgreSQL".equalsIgnoreCase(producto)) {
+            consulta = "select public.fn_reservar_numero()";
+        } else {
+            throw new IllegalStateException("La numeración de recibos requiere PostgreSQL.");
+        }
+        return session.createNativeQuery(consulta, Long.class).getSingleResult();
+    }
+
+    private Cargo bloquearCargo(Session session, UUID cargoId) {
+        Object filaBloqueada = session.createNativeQuery(
+                        "select id from cargo where id = :id for update")
+                .setParameter("id", cargoId)
+                .uniqueResult();
+        return filaBloqueada == null ? null : session.find(Cargo.class, cargoId);
     }
 
     private static void validarPago(Pago pago) {

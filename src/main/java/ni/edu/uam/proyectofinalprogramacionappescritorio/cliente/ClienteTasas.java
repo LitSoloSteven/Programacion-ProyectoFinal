@@ -32,8 +32,12 @@ public final class ClienteTasas {
     }
 
     public TasaResponse autorizar(String id, String motivo) {
+        return autorizar(id, motivo, false);
+    }
+
+    public TasaResponse autorizar(String id, String motivo, boolean confirmarFueraDeBanda) {
         return api.post("/api/v1/tasas/" + id + "/autorizar",
-                new AutorizarTasaRequest(motivo), TasaResponse.class);
+                new AutorizarTasaRequest(motivo, confirmarFueraDeBanda), TasaResponse.class);
     }
 
     public Optional<TasaResponse> vigente(LocalDate fecha) {

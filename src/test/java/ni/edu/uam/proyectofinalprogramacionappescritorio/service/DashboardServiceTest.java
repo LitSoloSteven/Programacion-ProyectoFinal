@@ -4,6 +4,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransac
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.MetricasDashboardDTO;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.TotalMonedaDTO;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.AplicacionPago;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Cargo;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Inquilino;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Pago;
@@ -96,7 +97,7 @@ class DashboardServiceTest {
         assertEquals(List.of("USD", "NIO"), metricas.cargosPendientes().stream().map(TotalMonedaDTO::moneda).toList());
         assertEquals(List.of("USD", "NIO"), metricas.pagosRegistrados().stream().map(TotalMonedaDTO::moneda).toList());
         assertEquals(1L, total(metricas.cargosPendientes(), "USD").cantidad());
-        assertEquals(new BigDecimal("450.25"), total(metricas.cargosPendientes(), "USD").total());
+        assertEquals(new BigDecimal("400.25"), total(metricas.cargosPendientes(), "USD").total());
         assertEquals(1L, total(metricas.cargosPendientes(), "NIO").cantidad());
         assertEquals(new BigDecimal("35000.50"), total(metricas.cargosPendientes(), "NIO").total());
         assertEquals(1L, total(metricas.pagosRegistrados(), "USD").cantidad());
@@ -105,8 +106,10 @@ class DashboardServiceTest {
         assertEquals(new BigDecimal("20000.75"), total(metricas.pagosRegistrados(), "NIO").total());
 
         String importeFormateado = transactions.ejecutar(session -> session.createQuery(
-                        "select c from Cargo c join fetch c.contrato ct where ct.moneda = 'USD' and c.estado = 'Pendiente'",
-                        Cargo.class).getSingleResult().getImporteFormateado());
+                        "select c from Cargo c join fetch c.contrato ct where ct.moneda = 'USD' and c.importe = :importe",
+                        Cargo.class)
+                .setParameter("importe", new BigDecimal("450.25"))
+                .getSingleResult().getImporteFormateado());
         assertEquals("450.25 USD", importeFormateado);
     }
 
@@ -165,15 +168,27 @@ class DashboardServiceTest {
             UUID contratoNio = insertarContrato(session, unidad.getId(), inquilino.getId(), "NIO");
 
             if (incluirMovimientos) {
-                insertarCargo(session, contratoUsd, new BigDecimal("450.25"), "Pendiente");
-                insertarCargo(session, contratoUsd, new BigDecimal("999.99"), "Pagado");
+                UUID cargoUsdAbierto = insertarCargo(session, contratoUsd,
+                        new BigDecimal("450.25"), "Pendiente");
+                UUID cargoUsdPagado = insertarCargo(session, contratoUsd,
+                        new BigDecimal("200.00"), "Pendiente");
                 insertarCargo(session, contratoNio, new BigDecimal("35000.50"), "Pendiente");
-                insertarCargo(session, contratoNio, new BigDecimal("9000.00"), "Pagado");
+                UUID cargoNioPagado = insertarCargo(session, contratoNio,
+                        new BigDecimal("9000.00"), "Pendiente");
+                insertarCargo(session, contratoUsd, new BigDecimal("88.00"), "Cancelado");
 
-                insertarPago(session, contratoUsd, "USD", new BigDecimal("300.10"), "Registrado");
+                UUID pagoUsd = insertarPago(session, contratoUsd, "USD",
+                        new BigDecimal("300.10"), "Registrado");
                 insertarPago(session, contratoUsd, "USD", new BigDecimal("2000.00"), "Anulado");
-                insertarPago(session, contratoNio, "NIO", new BigDecimal("20000.75"), "Registrado");
+                UUID pagoNio = insertarPago(session, contratoNio, "NIO",
+                        new BigDecimal("20000.75"), "Registrado");
                 insertarPago(session, contratoNio, "NIO", new BigDecimal("50000.00"), "Anulado");
+                session.persist(new AplicacionPago(pagoUsd, cargoUsdAbierto,
+                        new BigDecimal("50.00")));
+                session.persist(new AplicacionPago(pagoUsd, cargoUsdPagado,
+                        new BigDecimal("200.00")));
+                session.persist(new AplicacionPago(pagoNio, cargoNioPagado,
+                        new BigDecimal("9000.00")));
             }
             return null;
         });
@@ -203,7 +218,7 @@ class DashboardServiceTest {
         return contratoId;
     }
 
-    private void insertarCargo(Session session, UUID contratoId, BigDecimal importe, String estado) {
+    private UUID insertarCargo(Session session, UUID contratoId, BigDecimal importe, String estado) {
         Cargo cargo = new Cargo();
         cargo.setContratoId(contratoId);
         cargo.setTipo("Renta");
@@ -214,9 +229,11 @@ class DashboardServiceTest {
         cargo.setConcepto("Cargo de prueba");
         cargo.setEstado(estado);
         session.persist(cargo);
+        session.flush();
+        return cargo.getId();
     }
 
-    private void insertarPago(Session session, UUID contratoId, String moneda,
+    private UUID insertarPago(Session session, UUID contratoId, String moneda,
                               BigDecimal monto, String estado) {
         Pago pago = new Pago();
         pago.setContratoId(contratoId);
@@ -229,6 +246,8 @@ class DashboardServiceTest {
         pago.setEstado(estado);
         pago.aplicarConversion(moneda, monto, null);
         session.persist(pago);
+        session.flush();
+        return pago.getId();
     }
 
     private TotalMonedaDTO total(List<TotalMonedaDTO> totales, String moneda) {

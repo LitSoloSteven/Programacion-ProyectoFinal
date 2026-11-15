@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoMoneda;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.NumberFormat;
 import java.time.LocalDate;
 import java.util.Locale;
@@ -39,6 +40,8 @@ public class Cargo {
     private String estado;
     @Version
     private long version;
+    @Transient
+    private String estadoDerivado;
 
 
     @ManyToOne(optional = false)
@@ -144,11 +147,46 @@ public class Cargo {
     }
 
     public String getEstado() {
+        return estadoDerivado == null ? estado : estadoDerivado;
+    }
+
+    public String getEstadoPersistido() {
         return estado;
     }
 
     public void setEstado(String estado) {
         this.estado = estado;
+        this.estadoDerivado = null;
+    }
+
+    public void establecerEstadoDerivado(BigDecimal montoAplicado, LocalDate fechaCorte) {
+        if ("Cancelado".equals(estado) || "Anulado".equals(estado)) {
+            estadoDerivado = "Anulado";
+            return;
+        }
+        BigDecimal aplicado = montoAplicado == null ? BigDecimal.ZERO : montoAplicado;
+        BigDecimal saldo = saldoPendiente(aplicado);
+        if (saldo.signum() <= 0) {
+            estadoDerivado = "Pagado";
+        } else if (venceEl != null && fechaCorte != null && venceEl.isBefore(fechaCorte)) {
+            estadoDerivado = "Vencido";
+        } else if (aplicado.signum() > 0) {
+            estadoDerivado = "Parcial";
+        } else {
+            estadoDerivado = "Pendiente";
+        }
+    }
+
+    public BigDecimal saldoPendiente(BigDecimal montoAplicado) {
+        if ("Cancelado".equals(estado) || "Anulado".equals(estado)) {
+            return BigDecimal.ZERO.setScale(2);
+        }
+        BigDecimal monto = importe == null ? BigDecimal.ZERO : importe;
+        BigDecimal aplicado = montoAplicado == null ? BigDecimal.ZERO : montoAplicado;
+        BigDecimal saldo = monto.subtract(aplicado);
+        return saldo.signum() <= 0
+                ? BigDecimal.ZERO.setScale(2)
+                : saldo.setScale(2, RoundingMode.HALF_EVEN);
     }
 
     public long getVersion() {

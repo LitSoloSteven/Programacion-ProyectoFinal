@@ -34,7 +34,13 @@ Content-Type: application/json
 - Cada petición protegida envía `Authorization: Bearer <token>`.
 - El rol y el estado `activo` del usuario se **revalidan contra la base de datos en cada operación**.
 - `POST /api/v1/auth/logout` revoca el token de inmediato (`204`).
-- Tras 5 intentos fallidos, el usuario queda bloqueado 15 minutos (`429`).
+- Tras 5 intentos fallidos para el usuario o 25 desde el mismo origen, el login
+  queda bloqueado durante 15 minutos (`429`). Un login correcto restablece ambos
+  contadores. Los fallos se auditan sin guardar usuario ni contraseña en claro.
+- La cabecera `Host` debe coincidir con `127.0.0.1:<puerto>` y el servidor cierra
+  solicitudes que tarden más de 30 segundos en recibirse por completo.
+- Las rutas protegidas validan el token antes de devolver `404` o `405`; sin
+  sesión válida, esos casos responden `401`.
 - El mensaje de credenciales inválidas es idéntico exista o no el usuario.
 
 ## Convenciones de la petición
@@ -47,7 +53,7 @@ Content-Type: application/json
 | Importes | Texto decimal con 2 decimales (`"1000.00"`); nunca números flotantes |
 | Tasas | Texto decimal con 8 decimales (`"36.62430000"`) |
 | Fechas | `AAAA-MM-DD` |
-| Instantes | ISO-8601 UTC (`2026-11-13T19:30:00Z`) |
+| Instantes de operación | ISO-8601 con zona `America/Managua` (`2026-11-13T13:30-06:00`); `expiraEn` de login sigue en UTC |
 | Identificadores | UUID como texto |
 
 ### Idempotencia
@@ -58,6 +64,8 @@ Content-Type: application/json
 - Misma clave con contenido, usuario o recurso distinto → `409 CONFLICTO`.
 - La clave se persiste en `solicitud_idempotente` dentro de la misma transacción del pago.
 - Si la solicitud falla, no queda registro de idempotencia ni pago.
+- La interfaz JavaFX genera un UUID por solicitud sin cambios y lo conserva para reintentos; al completar el pago, una nueva operación recibe una clave nueva.
+- Las respuestas completadas se conservan 30 días desde `completado_en`. Antes de cada registro se eliminan las completadas anteriores al límite; `EN_PROCESO` no se elimina. Tras la limpieza, una clave vencida puede registrar una nueva operación.
 
 ## Errores
 
@@ -79,6 +87,7 @@ Cuerpo uniforme:
 | 415 | `CONTENIDO_NO_SOPORTADO` | `Content-Type` distinto de JSON |
 | 422 | `ENTIDAD_NO_PROCESABLE` | Regla de negocio incumplida |
 | 429 | `DEMASIADOS_INTENTOS` | Bloqueo temporal de login |
+| 503 | `ERR-057` | La fecha del equipo difiere más de cinco minutos de PostgreSQL |
 | 500 | `ERROR_INTERNO` | Fallo técnico; nunca incluye SQLSTATE ni stack trace |
 
 ## Resumen de endpoints
@@ -111,6 +120,8 @@ Cuerpo uniforme:
 | PATCH | `/api/v1/contratos/{id}` | `OPERAR_ALQUILERES` |
 | POST | `/api/v1/validaciones` | `OPERAR_ALQUILERES` |
 | POST | `/api/v1/pagos` | `OPERAR_ALQUILERES` + `Idempotency-Key` |
+| GET | `/api/v1/pagos?pagina=1&tamano=50&texto=...` | `OPERAR_ALQUILERES` |
+| GET | `/api/v1/cargos?pagina=1&tamano=50&texto=...` | `OPERAR_ALQUILERES` |
 | GET | `/api/v1/pagos/{id}` | `OPERAR_ALQUILERES` |
 | GET | `/api/v1/recibos/{numero}` | `OPERAR_ALQUILERES` |
 | POST | `/api/v1/pagos/{id}/anulacion` | `ANULAR_PAGOS` (solo propietario) |
@@ -143,8 +154,9 @@ Respuesta:
 }
 ```
 
-`PATCH` hace baja lógica o cambio de estado, según el recurso, y también
-requiere `version`.
+`PATCH` hace baja lógica o cambio de estado, según el recurso. El cuerpo debe
+incluir el campo correspondiente (`activa`, `activo` o `estado`); si falta o
+su valor no es válido, la API responde `422` y conserva el estado actual.
 
 ## Tasas de cambio
 
@@ -158,11 +170,14 @@ POST /api/v1/tasas
 { "fecha": "2026-11-13", "tasa": "36.62430000", "fuente": "BCN" }
 
 POST /api/v1/tasas/{id}/autorizar
-{ "motivo": "Tasa oficial del día" }
+{ "motivo": "Tasa oficial del día", "confirmarFueraDeBanda": false }
 ```
 
 No se admiten fechas futuras (`422`). Autorizar dos veces la misma fecha
-devuelve `409`.
+devuelve `409` con código `ERR-060` y el mensaje `MSG-083`, sin insertar otro
+registro. La banda 1–100 NIO/USD es inclusiva y solo es una advertencia: fuera
+de ella el propietario debe enviar `"confirmarFueraDeBanda": true`; la base de
+datos no impone un `CHECK` de banda, solo de tasa positiva.
 
 ## Cobranza y pagos
 
@@ -203,6 +218,12 @@ Content-Type: application/json
 `GET /api/v1/pagos/{id}` devuelve el detalle con `aplicaciones`, `numeroRecibo`,
 `credito` y, si fue anulado, `motivoAnulacion`, `anuladoPor` y `anuladoEn`.
 
+`GET /api/v1/pagos` y `GET /api/v1/cargos` devuelven páginas de hasta 50 filas.
+`pagina` empieza en 1, `tamano` usa 50 por defecto y rechaza valores mayores
+que 50; `texto` filtra por contrato, referencia/método en pagos y por contrato,
+concepto/tipo en cargos. La respuesta tiene `pagina`, `tamano`, `total` y
+`elementos`; fechas e importes son cadenas para conservar su formato.
+
 `GET /api/v1/recibos/{numero}` devuelve el recibo con importes como texto.
 
 `POST /api/v1/pagos/{id}/anulacion` exige `{ "motivo": "…" }`, solo lo puede
@@ -240,7 +261,9 @@ suman USD con NIO.
 ```
 
 Tipos: `correo`, `telefono`, `cedula`, `monto`, `rangoFechas`. Para
-`rangoFechas` se envían `valor` y `valorSecundario` con las dos fechas.
+`rangoFechas` se envían `inicio`, `fin` y `mesesMinimos` opcional. `valor`
+admite hasta 255 caracteres; una solicitud más larga devuelve
+`400 SOLICITUD_INVALIDA`.
 
 ```json
 { "valido": true, "mensaje": null }

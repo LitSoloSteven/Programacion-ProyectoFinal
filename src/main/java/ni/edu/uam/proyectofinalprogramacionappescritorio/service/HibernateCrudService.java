@@ -30,10 +30,13 @@ final class HibernateCrudService {
 
     <T> void guardar(T item, Function<T, UUID> id, Consumer<T> validar) {
         validar.accept(item);
+        if (id.apply(item) != null) {
+            throw new IllegalArgumentException(
+                    "No se guardan entidades desconectadas; actualice la entidad administrada.");
+        }
         tx.ejecutar(s -> {
             permisos.exigir(s, SesionUsuario.getActual(), Permiso.OPERAR_ALQUILERES);
-            if (id.apply(item) == null) s.persist(item);
-            else s.merge(item);
+            s.persist(item);
             return null;
         });
     }

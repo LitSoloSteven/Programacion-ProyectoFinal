@@ -66,6 +66,12 @@ public final class TokenService {
         entradas.remove(huella(token));
     }
 
+    public void revocarUsuario(Long usuarioId) {
+        if (usuarioId == null) return;
+        entradas.entrySet().removeIf(entrada ->
+                entrada.getValue().sesion().usuarioId().equals(usuarioId));
+    }
+
     public void limpiarExpirados() {
         Instant ahora = Instant.now();
         entradas.entrySet().removeIf(entrada -> !entrada.getValue().expiraEn().isAfter(ahora));

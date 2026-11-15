@@ -12,6 +12,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.TasaReque
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.TasaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.TipoCambio;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ConflictoDatosException;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.TipoCambioService;
 
@@ -59,7 +60,8 @@ public final class RutasTasas {
 
     private RespuestaJson vigente(ContextoPeticion contexto) {
         String valor = contexto.consulta("fecha");
-        LocalDate fecha = valor == null || valor.isBlank() ? LocalDate.now() : fecha(valor);
+        LocalDate fecha = valor == null || valor.isBlank()
+                ? servicio.fechaOperativa() : fecha(valor);
         Optional<TipoCambio> tasa = enSesion(contexto, () -> servicio.vigente(fecha));
         return RespuestaJson.ok(respuesta(tasa.orElseThrow(() -> new ExcepcionApi(404,
                 "TASA_NO_DISPONIBLE",
@@ -100,11 +102,13 @@ public final class RutasTasas {
                     "El motivo de autorización es obligatorio.");
         }
         try {
+            boolean confirmarFueraDeBanda = Boolean.TRUE.equals(
+                    solicitud.confirmarFueraDeBanda());
             Optional<TipoCambio> autorizada = enSesion(contexto,
-                    () -> servicio.autorizar(id, solicitud.motivo()));
+                    () -> servicio.autorizar(id, solicitud.motivo(), confirmarFueraDeBanda));
             return RespuestaJson.ok(respuesta(autorizada.orElseThrow(ExcepcionApi::noEncontrado)));
         } catch (ConflictoDatosException e) {
-            throw ExcepcionApi.conflicto(e.getMessage());
+            throw new ExcepcionApi(409, "ERR-060", TipoCambioService.MENSAJE_TASA_DUPLICADA);
         } catch (IllegalArgumentException e) {
             throw ExcepcionApi.entidadNoProcesable(e.getMessage());
         }
@@ -121,7 +125,7 @@ public final class RutasTasas {
                 tasa.getFecha().toString(),
                 tasa.getNioPorUsd().toPlainString(),
                 tasa.getFuente(),
-                tasa.getRegistradoEn().toString(),
+                RelojService.presentar(tasa.getRegistradoEn()),
                 tasa.isAutorizada(),
                 tasa.getAutorizadoPor() == null ? null : tasa.getAutorizadoPor().toString(),
                 tasa.getAutorizadoPorNombre(),

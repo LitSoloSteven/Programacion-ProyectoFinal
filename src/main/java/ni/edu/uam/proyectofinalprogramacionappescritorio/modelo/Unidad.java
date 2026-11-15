@@ -74,6 +74,11 @@ public class Unidad {
         this.propiedadId = propiedadId;
     }
 
+    public void setPropiedad(Propiedad propiedad) {
+        this.propiedad = propiedad;
+        this.propiedadId = propiedad == null ? null : propiedad.getId();
+    }
+
     public String getPropiedadNombre() {
         return propiedad == null ? propiedadNombre : propiedad.getNombre();
     }

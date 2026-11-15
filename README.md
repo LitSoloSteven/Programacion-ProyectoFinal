@@ -8,7 +8,7 @@ con `com.sun.net.httpserver.HttpServer`; no se usan servicios externos.
 - JavaFX 21 + Hibernate 7.4.6.Final + PostgreSQL 18.
 - JSON con Gson 2.13.2.
 - Paquete raíz: `ni.edu.uam.proyectofinalprogramacionappescritorio`.
-- **108 pruebas automatizadas**, todas en verde.
+- **163 pruebas automatizadas**, todas en verde.
 
 ## Requisitos
 
@@ -36,6 +36,16 @@ LATCH_API_PORT=8090
 - Las variables de entorno tienen prioridad sobre el archivo.
 - `.env` está ignorado por Git. No introducir credenciales en la URL JDBC ni en
   el código.
+- Para `localhost`, la URL actual sin parámetros sigue siendo válida. Para una
+  base remota, usar `sslmode=verify-full` (recomendado) o `sslmode=verify-ca`
+  y añadir `sslrootcert` con la ruta absoluta a un certificado raíz existente y
+  legible. Codificar los caracteres reservados de la ruta como `%XX` dentro de
+  la URL; por ejemplo, `C:\certs\ca.crt` se escribe como
+  `C%3A%5Ccerts%5Cca.crt`.
+- La URL solo admite los parámetros `sslmode` y `sslrootcert`. Un host remoto
+  rechaza `disable`, `allow`, `prefer` y `require`; `require` cifra la conexión,
+  pero pgJDBC no valida el certificado del servidor en ese modo. Los modos
+  `verify-ca` y `verify-full` requieren `sslrootcert`.
 - `validate` (predeterminado) verifica el esquema sin modificarlo. `update` solo
   debe usarse en una base de desarrollo durante la inicialización.
 
@@ -51,6 +61,11 @@ aplicar **en orden** las migraciones de `docs/migrations`:
 | `V3__descripcion_unidad.sql` | Descripción de unidades |
 | `V4__tasas_autorizadas.sql` | Una tasa autorizada por fecha y tasa positiva |
 | `V5__pagos_idempotencia_aplicaciones.sql` | Idempotencia, aplicaciones de pago y datos de anulación |
+| `V6__contratos_activos_por_unidad.sql` | Una ocupación activa por unidad |
+| `V7__retencion_idempotencia_pagos.sql` | Índice para limpiar idempotencias vencidas |
+| `V8__consecutivo_recibos_transaccional.sql` | Consecutivo de recibos sin huecos por rollback |
+| `V9__auditoria_login_fallido.sql` | Auditoría de login fallido sin requerir una cuenta existente |
+| `V10__instante_operativo_pago.sql` | Instante UTC de registro del pago, separado de su fecha efectiva |
 
 Ejemplo con `psql`:
 
@@ -60,6 +75,11 @@ psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V2__seguimiento_g
 psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V3__descripcion_unidad.sql
 psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V4__tasas_autorizadas.sql
 psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V5__pagos_idempotencia_aplicaciones.sql
+psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V6__contratos_activos_por_unidad.sql
+psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V7__retencion_idempotencia_pagos.sql
+psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V8__consecutivo_recibos_transaccional.sql
+psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V9__auditoria_login_fallido.sql
+psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V10__instante_operativo_pago.sql
 ```
 
 Comprobar la conexión:
@@ -114,10 +134,32 @@ rollback, restricciones, versiones concurrentes, tasas, catálogos,
 validaciones, pagos, idempotencia, recibos, anulación, estado de cuenta,
 métricas y seguridad HTTP.
 
-Para repetir la suite contra PostgreSQL, usar **una base desechable exclusiva**:
+La suite normal permanece en H2. Para ejecutar la verificación adicional en PostgreSQL,
+configurar una base **desechable y exclusiva** con permisos para crear y eliminar tablas.
+El perfil genera el esquema con Hibernate y aplica las migraciones V1 a V10,
+y al terminar elimina las tablas creadas, la función de recibos y su contador auxiliar.
+No usar la base configurada para la aplicación:
 
 ```powershell
-./mvnw.cmd test '-Dlatch.test.postgres=true'
+$env:LATCH_TEST_DB_URL = 'jdbc:postgresql://localhost:5432/latch_test'
+$env:LATCH_TEST_DB_USER = 'latch_test'
+$env:LATCH_TEST_DB_PASSWORD = 'contraseña_de_prueba'
+./mvnw.cmd verify -Ppostgres
+Remove-Item Env:LATCH_TEST_DB_URL
+Remove-Item Env:LATCH_TEST_DB_USER
+Remove-Item Env:LATCH_TEST_DB_PASSWORD
+```
+
+El perfil vuelve a ejecutar `InfraestructuraTest` y `ApiPagosTest` sobre PostgreSQL para
+cubrir persistencia y concurrencia, y ejecuta `PostgresMigrationIT` para comprobar los
+índices parciales, el consecutivo transaccional y la columna `pago.creado_en`. La suite
+H2 se ejecuta primero. El perfil requiere que PostgreSQL esté disponible; si faltan las
+variables de `LATCH_TEST_DB_*` o no se puede conectar, la verificación falla.
+
+Para ejecutar solo las pruebas H2:
+
+```powershell
+./mvnw.cmd test
 ```
 
 ## Arquitectura
@@ -194,6 +236,11 @@ La referencia completa está en [docs/API_Latch.md](docs/API_Latch.md).
 - Contraseñas con PBKDF2-HMAC-SHA256 (600 000 iteraciones, sal aleatoria y
   comparación en tiempo constante).
 - El rol y el estado del usuario se revalidan contra la base en cada operación.
+- Al cambiar el rol o desactivar un usuario, la versión de su cuenta invalida
+  todas las sesiones anteriores; reactivarlo no restaura los tokens revocados.
+- Las escrituras financieras toman su instante y fecha operativa de PostgreSQL.
+  Si el reloj local difiere más de cinco minutos, devuelven `ERR-057` y no
+  escriben la operación; las fechas efectivas de pago se conservan aparte.
 - Una petición HTTP nunca hereda la sesión global de JavaFX: si su identidad
   aislada no es válida, la operación falla cerrada.
 - Sin cabeceras CORS, con `Cache-Control: no-store` y
@@ -213,7 +260,10 @@ El detalle de controles, verificación y riesgos aceptados está en
 - `409` al repetir un pago: la `Idempotency-Key` se usó con otro contenido u
   otro usuario. Usar una clave nueva para un pago distinto.
 - `401` tras 15 minutos: la sesión expiró; cerrar sesión y volver a iniciar.
-- `429` al iniciar sesión: demasiados intentos fallidos; esperar 15 minutos.
+- `401` después de cambiar el rol o el estado de la cuenta: iniciar sesión otra
+  vez para obtener un token vigente.
+- `429` al iniciar sesión: cinco fallos para la cuenta o 25 desde el mismo
+  origen; esperar 15 minutos.
 - Error de conexión: comprobar el servicio PostgreSQL, puerto, base, usuario y
   contraseña.
 

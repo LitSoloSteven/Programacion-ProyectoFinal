@@ -93,7 +93,8 @@ public final class RutasCatalogos {
         UUID id = identificador(contexto.parametro("id"));
         PropiedadEstadoRequest solicitud = leer(contexto, PropiedadEstadoRequest.class);
         return RespuestaJson.ok(enSesion(contexto,
-                () -> servicio.cambiarEstadoPropiedad(id, solicitud.activa())));
+                () -> servicio.cambiarEstadoPropiedad(id,
+                        booleanoRequerido(solicitud.activa(), "activa"))));
     }
 
     // ------------------------------------------------------------------
@@ -171,7 +172,8 @@ public final class RutasCatalogos {
         UUID id = identificador(contexto.parametro("id"));
         InquilinoEstadoRequest solicitud = leer(contexto, InquilinoEstadoRequest.class);
         return RespuestaJson.ok(enSesion(contexto,
-                () -> servicio.cambiarEstadoInquilino(id, solicitud.activo())));
+                () -> servicio.cambiarEstadoInquilino(id,
+                        booleanoRequerido(solicitud.activo(), "activo"))));
     }
 
     // ------------------------------------------------------------------
@@ -221,8 +223,9 @@ public final class RutasCatalogos {
         return Json.leer(LectorCuerpo.leerJson(contexto.intercambio()), tipo);
     }
 
-    private static <T> T enSesion(ContextoPeticion contexto, Supplier<T> operacion) {
-        return SesionUsuario.ejecutarComo(contexto.sesion().comoUsuario(), operacion);
+    private <T> T enSesion(ContextoPeticion contexto, Supplier<T> operacion) {
+        return SesionUsuario.ejecutarComo(contexto.sesion().comoUsuario(),
+                () -> servicio.enTransaccion(operacion));
     }
 
     private static long version(Long valor) {
@@ -264,6 +267,17 @@ public final class RutasCatalogos {
         if ("false".equalsIgnoreCase(valor.strip())) return Boolean.FALSE;
         throw ExcepcionApi.solicitudInvalida(
                 "El parámetro " + nombre + " debe ser true o false.");
+    }
+
+    private static boolean booleanoRequerido(String valor, String nombre) {
+        if (valor == null || valor.isBlank()) {
+            throw ExcepcionApi.entidadNoProcesable(
+                    "El campo " + nombre + " es obligatorio.");
+        }
+        if ("true".equalsIgnoreCase(valor.strip())) return true;
+        if ("false".equalsIgnoreCase(valor.strip())) return false;
+        throw ExcepcionApi.entidadNoProcesable(
+                "El campo " + nombre + " debe ser true o false.");
     }
 
     private static UUID uuidOpcional(String valor, String nombre) {

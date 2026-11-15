@@ -3,10 +3,10 @@ package ni.edu.uam.proyectofinalprogramacionappescritorio.service;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.TipoCambio;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ParserMonto;
 import org.hibernate.Session;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
@@ -19,10 +19,15 @@ import java.util.UUID;
  */
 public final class TipoCambioService {
     public static final int LIMITE_MAXIMO = 200;
+    public static final String MENSAJE_TASA_DUPLICADA =
+            "Ya existe una tasa autorizada para esa fecha.";
+    public static final String MENSAJE_FUERA_DE_BANDA =
+            "La tasa está fuera de la banda 1–100 NIO/USD; el Propietario debe confirmar la revisión.";
 
     private final HibernateTransactions transactions;
     private final PermisoService permisos = new PermisoService();
     private final AuditoriaService auditoria = new AuditoriaService();
+    private final RelojService reloj = new RelojService();
 
     public TipoCambioService(HibernateTransactions transactions) {
         this.transactions = Objects.requireNonNull(transactions);
@@ -75,12 +80,17 @@ public final class TipoCambioService {
         });
     }
 
+    public LocalDate fechaOperativa() {
+        return transactions.ejecutar(session -> reloj.leer(session).fecha());
+    }
+
     public TipoCambio registrar(LocalDate fecha, BigDecimal tasa, String fuente) {
         if (fecha == null) throw new IllegalArgumentException("La fecha de la tasa es obligatoria.");
-        if (fecha.isAfter(LocalDate.now())) {
-            throw new IllegalArgumentException("La fecha de la tasa no puede ser futura.");
+        if (tasa == null) {
+            throw new IllegalArgumentException("La tasa es obligatoria.");
         }
-        if (tasa == null || tasa.signum() <= 0) {
+        ParserMonto.validarTasa(tasa, "tasa");
+        if (tasa.signum() <= 0) {
             throw new IllegalArgumentException("La tasa debe ser un número positivo.");
         }
         if (fuente == null || fuente.isBlank()) {
@@ -89,7 +99,11 @@ public final class TipoCambioService {
         return transactions.ejecutar(session -> {
             Usuario actor = permisos.exigir(session, SesionUsuario.getActual(),
                     Permiso.OPERAR_ALQUILERES);
-            TipoCambio registro = TipoCambio.informativa(fecha, tasa, fuente, Instant.now());
+            RelojService.TiempoOperativo tiempo = reloj.comprobar(session);
+            if (fecha.isAfter(tiempo.fecha())) {
+                throw new IllegalArgumentException("La fecha de la tasa no puede ser futura.");
+            }
+            TipoCambio registro = TipoCambio.informativa(fecha, tasa, fuente, tiempo.instante());
             session.persist(registro);
             auditoria.registrar(session, actor, UUID.randomUUID(), "TASA_REGISTRADA",
                     "tasa:" + registro.getId());
@@ -97,40 +111,54 @@ public final class TipoCambioService {
         });
     }
 
+    public Optional<TipoCambio> autorizar(UUID id, String motivo) {
+        return autorizar(id, motivo, false);
+    }
+
     /**
      * Autoriza una tasa informativa creando una nueva instantánea. Devuelve
      * vacío si el identificador no existe; lanza conflicto si la fecha ya
-     * tiene una tasa autorizada.
+     * tiene una tasa autorizada. Fuera de la banda 1–100 NIO/USD exige
+     * confirmación explícita del Propietario, sin restricción en la BD.
      */
-    public Optional<TipoCambio> autorizar(UUID id, String motivo) {
+    public Optional<TipoCambio> autorizar(UUID id, String motivo,
+                                          boolean confirmarFueraDeBanda) {
         Objects.requireNonNull(id, "Falta el identificador de la tasa.");
         if (motivo == null || motivo.isBlank()) {
             throw new IllegalArgumentException("El motivo de autorización es obligatorio.");
         }
-        return transactions.ejecutar((Session session) -> {
-            Usuario actor = permisos.exigir(session, SesionUsuario.getActual(),
-                    Permiso.AUTORIZAR_TASA);
-            TipoCambio origen = session.find(TipoCambio.class, id);
-            if (origen == null) return Optional.<TipoCambio>empty();
-            if (origen.isAutorizada()) {
-                throw new ConflictoDatosException("La tasa ya está autorizada.");
-            }
-            Long autorizadas = session.createQuery("""
-                            select count(t) from TipoCambio t
-                            where t.fecha = :fecha and t.autorizadoPor is not null
-                            """, Long.class)
-                    .setParameter("fecha", origen.getFecha())
-                    .getSingleResult();
-            if (autorizadas > 0) {
-                throw new ConflictoDatosException(
-                        "Ya existe una tasa autorizada para esa fecha.");
-            }
-            TipoCambio autorizada = TipoCambio.autorizada(origen.getFecha(),
-                    origen.getNioPorUsd(), origen.getFuente(), Instant.now(), actor, motivo);
-            session.persist(autorizada);
-            auditoria.registrar(session, actor, UUID.randomUUID(), "TASA_AUTORIZADA",
-                    "tasa:" + autorizada.getId());
-            return Optional.of(autorizada);
-        });
+        try {
+            return transactions.ejecutar((Session session) -> {
+                Usuario actor = permisos.exigir(session, SesionUsuario.getActual(),
+                        Permiso.AUTORIZAR_TASA);
+                RelojService.TiempoOperativo tiempo = reloj.comprobar(session);
+                TipoCambio origen = session.find(TipoCambio.class, id);
+                if (origen == null) return Optional.<TipoCambio>empty();
+                if (origen.isAutorizada()) {
+                    throw new ConflictoDatosException(MENSAJE_TASA_DUPLICADA);
+                }
+                if (origen.estaFueraDeBanda() && !confirmarFueraDeBanda) {
+                    throw new IllegalArgumentException(MENSAJE_FUERA_DE_BANDA);
+                }
+                Long autorizadas = session.createQuery("""
+                                select count(t) from TipoCambio t
+                                where t.fecha = :fecha and t.autorizadoPor is not null
+                                """, Long.class)
+                        .setParameter("fecha", origen.getFecha())
+                        .getSingleResult();
+                if (autorizadas > 0) {
+                    throw new ConflictoDatosException(MENSAJE_TASA_DUPLICADA);
+                }
+                TipoCambio autorizada = TipoCambio.autorizada(origen.getFecha(),
+                        origen.getNioPorUsd(), origen.getFuente(), tiempo.instante(), actor, motivo);
+                session.persist(autorizada);
+                auditoria.registrar(session, actor, UUID.randomUUID(), "TASA_AUTORIZADA",
+                        "tasa:" + autorizada.getId());
+                return Optional.of(autorizada);
+            });
+        } catch (ConflictoDatosException e) {
+            // También normaliza la violación del índice único ante concurrencia.
+            throw new ConflictoDatosException(MENSAJE_TASA_DUPLICADA);
+        }
     }
 }

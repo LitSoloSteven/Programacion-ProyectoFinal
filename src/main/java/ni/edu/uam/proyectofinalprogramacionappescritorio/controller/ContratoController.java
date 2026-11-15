@@ -3,9 +3,11 @@ package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
+import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Inquilino;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
@@ -15,11 +17,13 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.service.InquilinoServic
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.GarantiaService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.UnidadService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
 
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 /**
  - Controlador de la vista de Contratos de arrendamiento.
@@ -105,18 +109,29 @@ public class ContratoController {
     private FilteredList<Contrato> listaFiltrada;
     private Contrato contratoSeleccionado = null;
 
+    private record Catalogos(List<Unidad> unidades, List<Inquilino> inquilinos) {
+    }
+
+    private record DatosTabla(Catalogos catalogos, List<Contrato> contratos) {
+    }
+
     public ContratoController() {
-        this.contratoService = new ContratoService();
-        this.unidadService = new UnidadService();
-        this.inquilinoService = new InquilinoService();
-        this.garantiaService = new GarantiaService();
+        this(HelloApplication.instancia().getComposicion().contratos(),
+                HelloApplication.instancia().getComposicion().unidades(),
+                HelloApplication.instancia().getComposicion().inquilinos(),
+                HelloApplication.instancia().getComposicion().garantias());
     }
 
     public ContratoController(ContratoService contratoService, UnidadService unidadService, InquilinoService inquilinoService) {
+        this(contratoService, unidadService, inquilinoService, new GarantiaService());
+    }
+
+    public ContratoController(ContratoService contratoService, UnidadService unidadService,
+                             InquilinoService inquilinoService, GarantiaService garantiaService) {
         this.contratoService = contratoService;
         this.unidadService = unidadService;
         this.inquilinoService = inquilinoService;
-        this.garantiaService = new GarantiaService();
+        this.garantiaService = garantiaService;
     }
 
     @FXML
@@ -196,32 +211,46 @@ public class ContratoController {
     }
 
     public void cargarCatalogosReales() {
-        try {
-            List<Unidad> unidades = unidadService.listarTodas();
-            cmbUnidad.setItems(FXCollections.observableArrayList(unidades));
-
-            List<Inquilino> inquilinos = inquilinoService.listarActivos();
-            cmbInquilino.setItems(FXCollections.observableArrayList(inquilinos));
-        } catch (SQLException e) {
-            AlertaUtil.mostrarError("Error al cargar catálogos", "No fue posible consultar unidades e inquilinos desde PostgreSQL.");
-        }
+        Task<Catalogos> tarea = new Task<>() {
+            @Override
+            protected Catalogos call() throws SQLException {
+                return new Catalogos(unidadService.listarTodas(), inquilinoService.listarActivos());
+            }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, this::mostrarCatalogos,
+                error -> AlertaUtil.mostrarError("Error al cargar catálogos",
+                        "No fue posible consultar unidades e inquilinos desde PostgreSQL."));
     }
 
     public void cargarDatos() {
-        try {
-            List<Contrato> datos = contratoService.listarTodos();
-            listaContratos.setAll(datos);
-        } catch (SQLException e) {
-            AlertaUtil.mostrarError("Error al cargar contratos", "No fue posible consultar los contratos desde PostgreSQL.");
-        }
+        Task<List<Contrato>> tarea = new Task<>() {
+            @Override
+            protected List<Contrato> call() throws SQLException {
+                return contratoService.listarTodos();
+            }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, listaContratos::setAll,
+                error -> AlertaUtil.mostrarError("Error al cargar contratos",
+                        "No fue posible consultar los contratos desde PostgreSQL."));
     }
 
     @FXML
     public void refrescarTabla() {
-        cargarCatalogosReales();
-        cargarDatos();
-        limpiarFormulario();
-        AlertaUtil.mostrarExito("Tabla actualizada", "Los contratos han sido sincronizados con PostgreSQL.");
+        Task<DatosTabla> tarea = new Task<>() {
+            @Override
+            protected DatosTabla call() throws SQLException {
+                Catalogos catalogos = new Catalogos(unidadService.listarTodas(), inquilinoService.listarActivos());
+                return new DatosTabla(catalogos, contratoService.listarTodos());
+            }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
+            mostrarCatalogos(datos.catalogos());
+            listaContratos.setAll(datos.contratos());
+            limpiarFormulario();
+            AlertaUtil.mostrarExito("Tabla actualizada",
+                    "Los contratos han sido sincronizados con PostgreSQL.");
+        }, error -> AlertaUtil.mostrarError("Error al cargar contratos",
+                "No fue posible sincronizar contratos y catálogos desde PostgreSQL."));
     }
 
     @FXML
@@ -321,47 +350,47 @@ public class ContratoController {
             }
         }
 
-        try {
-            if (contratoSeleccionado == null) {
-                // Nuevo contrato
-                Contrato nuevo = new Contrato();
-                nuevo.setUnidadId(unidad.getId());
-                nuevo.setInquilinoId(inquilino.getId());
-                nuevo.setInicio(inicio);
-                nuevo.setFin(fin);
-                nuevo.setCanon(canon);
-                nuevo.setMoneda(moneda);
-                nuevo.setDiaPago(diaPago);
-                nuevo.setDepositoPactado(deposito);
-                nuevo.setEstado(estado);
-
-                contratoService.guardar(nuevo);
+        boolean nuevo = contratoSeleccionado == null;
+        UUID contratoId = nuevo ? null : contratoSeleccionado.getId();
+        long version = nuevo ? 0 : contratoSeleccionado.getVersion();
+        UUID unidadId = unidad.getId();
+        UUID inquilinoId = inquilino.getId();
+        BigDecimal canonGuardado = canon;
+        BigDecimal depositoGuardado = deposito;
+        Task<Void> tarea = new Task<>() {
+            @Override
+            protected Void call() throws SQLException {
+                if (nuevo) {
+                    // Nuevo contrato
+                    Contrato contrato = new Contrato();
+                    contrato.setUnidadId(unidadId);
+                    contrato.setInquilinoId(inquilinoId);
+                    contrato.setInicio(inicio);
+                    contrato.setFin(fin);
+                    contrato.setCanon(canonGuardado);
+                    contrato.setMoneda(moneda);
+                    contrato.setDiaPago(diaPago);
+                    contrato.setDepositoPactado(depositoGuardado);
+                    contrato.setEstado(estado);
+                    contratoService.guardar(contrato);
+                } else {
+                    contratoService.actualizar(contratoId, version, unidadId,
+                            inquilinoId, inicio, fin, canonGuardado, moneda, diaPago,
+                            depositoGuardado, estado);
+                }
+                return null;
+            }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+            if (nuevo) {
                 AlertaUtil.mostrarExito("Registro exitoso", "El contrato de arrendamiento ha sido registrado en PostgreSQL.");
             } else {
-                // Actualización
-                contratoSeleccionado.setUnidadId(unidad.getId());
-                contratoSeleccionado.setInquilinoId(inquilino.getId());
-                contratoSeleccionado.setInicio(inicio);
-                contratoSeleccionado.setFin(fin);
-                contratoSeleccionado.setCanon(canon);
-                contratoSeleccionado.setMoneda(moneda);
-                contratoSeleccionado.setDiaPago(diaPago);
-                contratoSeleccionado.setDepositoPactado(deposito);
-                contratoSeleccionado.setEstado(estado);
-
-                contratoService.guardar(contratoSeleccionado);
                 AlertaUtil.mostrarExito("Actualización exitosa", "Los términos del contrato fueron actualizados.");
             }
-
             cargarDatos();
             limpiarFormulario();
-
-        } catch (IllegalArgumentException e) {
-            AlertaUtil.mostrarAdvertencia("Validación de contrato", e.getMessage());
-        } catch (Exception e) {
-            AlertaUtil.mostrarError("Error de persistencia",
-                    "No se pudo guardar el contrato. Detalle: " + e.getMessage());
-        }
+        }, error -> mostrarErrorContrato(error,
+                "No se pudo guardar el contrato en PostgreSQL. Verifique los datos ingresados."));
     }
 
     @FXML
@@ -377,14 +406,20 @@ public class ContratoController {
         );
 
         if (confirma) {
-            try {
-                contratoService.terminarContrato(contratoSeleccionado.getId());
+            UUID contratoId = contratoSeleccionado.getId();
+            Task<Void> tarea = new Task<>() {
+                @Override
+                protected Void call() throws SQLException {
+                    contratoService.terminarContrato(contratoId);
+                    return null;
+                }
+            };
+            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
                 AlertaUtil.mostrarExito("Contrato finalizado", "El estado del contrato ha cambiado a 'Terminado'.");
                 cargarDatos();
                 limpiarFormulario();
-            } catch (SQLException e) {
-                AlertaUtil.mostrarError("Error", "No fue posible finalizar el contrato en la base de datos.");
-            }
+            }, error -> mostrarErrorContrato(error,
+                    "No fue posible finalizar el contrato en la base de datos."));
         }
     }
 
@@ -400,17 +435,25 @@ public class ContratoController {
         dialogo.setHeaderText("Contrato de " + contratoSeleccionado.getInquilinoNombre());
         dialogo.setContentText("Nuevo saldo retenido (0 a " + contratoSeleccionado.getGarantiaSeguimiento().getMontoInicial() + "): ");
         dialogo.showAndWait().ifPresent(valor -> {
+            UUID garantiaId = contratoSeleccionado.getGarantiaSeguimiento().getId();
+            BigDecimal nuevoSaldo;
             try {
-                garantiaService.ajustarSaldo(contratoSeleccionado.getGarantiaSeguimiento().getId(), new BigDecimal(valor.strip()));
+                nuevoSaldo = new BigDecimal(valor.strip());
+            } catch (NumberFormatException e) {
+                AlertaUtil.mostrarAdvertencia("Saldo inválido", "Ingrese un monto decimal válido.");
+                return;
+            }
+            Task<Void> tarea = new Task<>() {
+                @Override
+                protected Void call() throws SQLException {
+                    garantiaService.ajustarSaldo(garantiaId, nuevoSaldo);
+                    return null;
+                }
+            };
+            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
                 cargarDatos();
                 AlertaUtil.mostrarExito("Garantía actualizada", "El saldo retenido se actualizó correctamente.");
-            } catch (IllegalArgumentException e) {
-                AlertaUtil.mostrarAdvertencia("Saldo inválido", e.getMessage() == null ? "Ingrese un monto decimal válido." : e.getMessage());
-            } catch (SQLException e) {
-                AlertaUtil.mostrarError("No se pudo actualizar", "No fue posible guardar el saldo de la garantía.");
-            } catch (IllegalStateException e) {
-                AlertaUtil.mostrarError("No se pudo actualizar", e.getMessage());
-            }
+            }, error -> mostrarErrorGarantia(error));
         });
     }
 
@@ -427,16 +470,60 @@ public class ContratoController {
         );
 
         if (confirma) {
-            try {
-                contratoService.eliminar(contratoSeleccionado.getId());
+            UUID contratoId = contratoSeleccionado.getId();
+            Task<Void> tarea = new Task<>() {
+                @Override
+                protected Void call() throws SQLException {
+                    contratoService.eliminar(contratoId);
+                    return null;
+                }
+            };
+            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
                 AlertaUtil.mostrarExito("Registro eliminado", "El contrato fue eliminado de PostgreSQL.");
                 cargarDatos();
                 limpiarFormulario();
-            } catch (SecurityException e) {
-                AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
-            } catch (SQLException e) {
-                AlertaUtil.mostrarError("Restricción de integridad", "No es posible eliminar el contrato porque cuenta con cargos o pagos registrados.");
-            }
+            }, error -> {
+                if (error instanceof SecurityException permiso) {
+                    AlertaUtil.mostrarAdvertencia("Permiso denegado", permiso.getMessage());
+                } else {
+                    AlertaUtil.mostrarError("No se pudo eliminar",
+                            "Verifique que el contrato no tenga cargos o pagos asociados y que PostgreSQL esté disponible.");
+                }
+            });
+        }
+    }
+
+    private void mostrarCatalogos(Catalogos catalogos) {
+        cmbUnidad.setItems(FXCollections.observableArrayList(catalogos.unidades()));
+        cmbInquilino.setItems(FXCollections.observableArrayList(catalogos.inquilinos()));
+    }
+
+    private void mostrarErrorContrato(Throwable error, String errorPersistencia) {
+        if (error instanceof IllegalArgumentException argumento) {
+            AlertaUtil.mostrarAdvertencia("Validación de contrato", argumento.getMessage());
+        } else if (error instanceof SecurityException permiso) {
+            AlertaUtil.mostrarAdvertencia("Permiso denegado", permiso.getMessage());
+        } else if (error instanceof IllegalStateException persistencia) {
+            AlertaUtil.mostrarError("Error de persistencia", persistencia.getMessage());
+        } else {
+            String detalle = error.getMessage();
+            String mensaje = detalle == null || detalle.isBlank()
+                    ? errorPersistencia
+                    : errorPersistencia + " Detalle: " + detalle;
+            AlertaUtil.mostrarError("Error de persistencia", mensaje);
+        }
+    }
+
+    private void mostrarErrorGarantia(Throwable error) {
+        if (error instanceof IllegalArgumentException argumento) {
+            AlertaUtil.mostrarAdvertencia("Saldo inválido",
+                    argumento.getMessage() == null ? "Ingrese un monto decimal válido." : argumento.getMessage());
+        } else if (error instanceof SecurityException permiso) {
+            AlertaUtil.mostrarAdvertencia("Permiso denegado", permiso.getMessage());
+        } else if (error instanceof IllegalStateException persistencia) {
+            AlertaUtil.mostrarError("No se pudo actualizar", persistencia.getMessage());
+        } else {
+            AlertaUtil.mostrarError("No se pudo actualizar", "No fue posible guardar el saldo de la garantía.");
         }
     }
 
