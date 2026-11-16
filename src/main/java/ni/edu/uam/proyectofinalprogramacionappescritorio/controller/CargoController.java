@@ -112,7 +112,8 @@ public class CargoController {
         colVence.setCellFactory(FormatoTabla.fecha());
         colEstado.setCellValueFactory(cell -> new javafx.beans.property.ReadOnlyStringWrapper(cell.getValue().getEstado()));
         colEstado.setCellFactory(FormatoTabla.estado());
-        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>("Editar cargo", this::abrirEdicion)));
+        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>(
+                "Editar cargo", this::abrirEdicion, Iconos.Nombre.EDITAR)));
         tblCargos.getSelectionModel().selectedItemProperty().addListener((obs, anterior, nuevo) -> {
             cargoSeleccionado = nuevo;
             btnAnular.setDisable(nuevo == null || !permisoAnular);

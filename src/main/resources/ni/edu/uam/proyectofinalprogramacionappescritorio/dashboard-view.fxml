@@ -75,34 +75,40 @@
                         <ColumnConstraints percentWidth="33.334" hgrow="ALWAYS" />
                     </columnConstraints>
                     <VBox spacing="10.0" styleClass="kpi-card, kpi-neutral" GridPane.columnIndex="0" GridPane.rowIndex="0">
-                        <Label styleClass="kpi-title" text="Propiedades activas" />
+                        <Label fx:id="lblTituloKpiPropiedades" styleClass="kpi-title" text="Propiedades activas" />
                         <Label fx:id="lblTotalPropiedades" styleClass="kpi-value" text="—" />
                         <Label styleClass="kpi-desc" text="Inmuebles registrados" wrapText="true" />
                     </VBox>
                     <VBox spacing="10.0" styleClass="kpi-card, kpi-neutral" GridPane.columnIndex="1" GridPane.rowIndex="0">
-                        <Label styleClass="kpi-title" text="Unidades" />
+                        <Label fx:id="lblTituloKpiUnidades" styleClass="kpi-title" text="Unidades" />
                         <Label fx:id="lblTotalUnidades" styleClass="kpi-value" text="—" />
                         <Label styleClass="kpi-desc" text="Unidades en el inventario" wrapText="true" />
                     </VBox>
                     <VBox spacing="10.0" styleClass="kpi-card, kpi-neutral" GridPane.columnIndex="2" GridPane.rowIndex="0">
-                        <Label styleClass="kpi-title" text="Inquilinos activos" />
+                        <Label fx:id="lblTituloKpiInquilinos" styleClass="kpi-title" text="Inquilinos activos" />
                         <Label fx:id="lblTotalInquilinos" styleClass="kpi-value" text="—" />
                         <Label styleClass="kpi-desc" text="Arrendatarios habilitados" wrapText="true" />
                     </VBox>
                     <VBox spacing="10.0" styleClass="kpi-card, kpi-neutral" GridPane.columnIndex="0" GridPane.rowIndex="1">
-                        <Label styleClass="kpi-title" text="Contratos vigentes" />
+                        <Label fx:id="lblTituloKpiContratos" styleClass="kpi-title" text="Contratos vigentes" />
                         <Label fx:id="lblTotalContratos" styleClass="kpi-value" text="—" />
                         <Label styleClass="kpi-desc" text="Contratos en curso" wrapText="true" />
                     </VBox>
-                    <VBox spacing="10.0" styleClass="kpi-card, kpi-neutral" GridPane.columnIndex="1" GridPane.rowIndex="1">
-                        <Label styleClass="kpi-title" text="Cargos pendientes" />
+                    <VBox spacing="10.0" styleClass="kpi-card, kpi-neutral, kpi-financial" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                        <Label fx:id="lblTituloKpiCargos" styleClass="kpi-title" text="Cargos pendientes" />
                         <Label fx:id="lblCargosPendientes" styleClass="kpi-value" text="—" />
-                        <Label fx:id="lblCargosMonto" styleClass="kpi-desc, numeric" text="" wrapText="true" />
+                        <VBox styleClass="kpi-currency-totals">
+                            <Label fx:id="lblCargosMontoUsd" maxWidth="Infinity" styleClass="kpi-desc, numeric" text="" />
+                            <Label fx:id="lblCargosMontoNio" maxWidth="Infinity" styleClass="kpi-desc, numeric" text="" />
+                        </VBox>
                     </VBox>
-                    <VBox spacing="10.0" styleClass="kpi-card, kpi-neutral" GridPane.columnIndex="2" GridPane.rowIndex="1">
-                        <Label styleClass="kpi-title" text="Pagos registrados" />
+                    <VBox spacing="10.0" styleClass="kpi-card, kpi-neutral, kpi-financial" GridPane.columnIndex="2" GridPane.rowIndex="1">
+                        <Label fx:id="lblTituloKpiPagos" styleClass="kpi-title" text="Pagos registrados" />
                         <Label fx:id="lblPagosRegistrados" styleClass="kpi-value" text="—" />
-                        <Label fx:id="lblPagosMonto" styleClass="kpi-desc, numeric" text="" wrapText="true" />
+                        <VBox styleClass="kpi-currency-totals">
+                            <Label fx:id="lblPagosMontoUsd" maxWidth="Infinity" styleClass="kpi-desc, numeric" text="" />
+                            <Label fx:id="lblPagosMontoNio" maxWidth="Infinity" styleClass="kpi-desc, numeric" text="" />
+                        </VBox>
                     </VBox>
                 </GridPane>
                 <VBox spacing="8.0" styleClass="welcome-banner">

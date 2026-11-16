@@ -1,8 +1,8 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.util;
 
-import javafx.scene.Group;
 import javafx.scene.Node;
-import javafx.scene.control.ButtonBase;
+import javafx.scene.control.Labeled;
+import javafx.scene.layout.StackPane;
 import javafx.scene.shape.SVGPath;
 
 /** Catálogo local de iconos vectoriales monocromos. */
@@ -10,7 +10,7 @@ public final class Iconos {
     public enum Nombre {
         PANEL, PROPIEDAD, UNIDAD, PERSONAS, CONTRATO, CARGO, PAGO, TASA,
         BUSCAR, ACTUALIZAR, ADVERTENCIA, CONFIRMACION, CERRAR, RELOJ,
-        MAS, ELIMINAR, EDITAR, ACCIONES, SALIR, TEMA, PUNTO
+        MAS, ELIMINAR, EDITAR, ACCIONES, SALIR, TEMA, PUNTO, VER, ENTRAR
     }
 
     private static final String[] TRAZOS = {
@@ -34,7 +34,9 @@ public final class Iconos {
             "M5 7h14 M5 12h14 M5 17h14",
             "M10 4H4v16h16v-6 M14 3h7v7 M21 3l-9 9",
             "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18 M12 7v5l3 2",
-            "M12 12h.01"
+            "M12 12h.01",
+            "M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
+            "M14 3h7v18h-7 M10 17l5-5-5-5 M15 12H3"
     };
 
     private Iconos() { }
@@ -46,16 +48,20 @@ public final class Iconos {
         path.getStyleClass().add("icon-glyph");
         path.setAccessibleText(nombre.name().toLowerCase().replace('_', ' '));
         path.setMouseTransparent(true);
-        Group grupo = new Group(path);
         double escala = tamano / 24.0;
-        grupo.setScaleX(escala);
-        grupo.setScaleY(escala);
-        grupo.setManaged(false);
-        return grupo;
+        path.setScaleX(escala);
+        path.setScaleY(escala);
+        StackPane icono = new StackPane(path);
+        icono.setMinSize(tamano, tamano);
+        icono.setPrefSize(tamano, tamano);
+        icono.setMaxSize(tamano, tamano);
+        icono.setAccessibleText(nombre.name().toLowerCase().replace('_', ' '));
+        icono.setMouseTransparent(true);
+        return icono;
     }
 
-    public static void asignar(ButtonBase boton, Nombre nombre, double tamano) {
-        boton.setGraphic(crear(nombre, tamano));
+    public static void asignar(Labeled control, Nombre nombre, double tamano) {
+        control.setGraphic(crear(nombre, tamano));
     }
 }
 

@@ -120,7 +120,7 @@ public class TasaController {
         colMotivo.setCellValueFactory(cell -> new SimpleStringProperty(
                 cell.getValue().motivo() == null ? "—" : cell.getValue().motivo()));
         AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>("Seleccionar tasa",
-                tasa -> tblTasas.getSelectionModel().select(tasa))));
+                tasa -> tblTasas.getSelectionModel().select(tasa), Iconos.Nombre.CONFIRMACION)));
         tblTasas.getSelectionModel().selectedItemProperty().addListener((obs, anterior, actual) -> actualizarSeleccion(actual));
         txtBuscar.textProperty().addListener((obs, anterior, actual) -> aplicarFiltro());
         AtajosLista.instalar(rootView, txtBuscar, this::handleRegistrar);

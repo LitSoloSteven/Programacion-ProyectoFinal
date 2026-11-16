@@ -31,7 +31,10 @@ public final class DialogoFormulario {
                 new ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE));
         Node botonAccion = pane.lookupButton(pane.getButtonTypes().getFirst());
         Node botonCancelar = pane.lookupButton(pane.getButtonTypes().get(1));
-        if (botonAccion instanceof ButtonBase boton) Iconos.asignar(boton, Iconos.Nombre.CONFIRMACION, 14);
+        if (botonAccion instanceof ButtonBase boton) {
+            boton.getStyleClass().add("button-primary");
+            Iconos.asignar(boton, Iconos.Nombre.CONFIRMACION, 14);
+        }
         if (botonCancelar instanceof ButtonBase boton) Iconos.asignar(boton, Iconos.Nombre.CERRAR, 14);
         TemaAplicacion.aplicar(pane);
         dialogo.setOnShown(evento -> TransicionesUI.entrada(pane));

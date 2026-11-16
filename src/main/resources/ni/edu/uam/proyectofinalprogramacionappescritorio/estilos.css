@@ -49,7 +49,7 @@
     -latch-text-muted: -latch-slate-400;
     -latch-heading: -latch-slate-100;
     -latch-action: -latch-slate-100;
-    -latch-action-secondary: -latch-navy-800;
+    -latch-action-secondary: -latch-slate-100;
     -latch-focus: -latch-slate-100;
     -latch-border: -latch-field-border-dark;
     -latch-divider: -latch-dark-divider;
@@ -83,6 +83,22 @@
 }
 
 .login-card {
+    -latch-background: -latch-slate-100;
+    -latch-surface: -latch-slate-100;
+    -latch-surface-raised: -latch-slate-100;
+    -latch-text: -latch-ink-900;
+    -latch-text-muted: -latch-navy-800;
+    -latch-heading: -latch-navy-950;
+    -latch-action: -latch-navy-950;
+    -latch-action-secondary: -latch-navy-800;
+    -latch-focus: -latch-navy-950;
+    -latch-icon: -latch-navy-800;
+    -fx-base: -latch-slate-100;
+    -fx-accent: -latch-navy-950;
+    -fx-control-inner-background: -latch-slate-100;
+    -fx-background: -latch-slate-100;
+    -fx-text-base-color: -latch-ink-900;
+    -fx-text-fill: -latch-ink-900;
     -fx-background-color: -latch-slate-100;
     -fx-background-radius: 10px;
     -fx-padding: 24px;
@@ -196,7 +212,28 @@
     -fx-border-color: transparent transparent -latch-divider transparent;
     -fx-border-width: 0 0 1px 0;
 }
-.icon-glyph { -fx-fill: -latch-icon; }
+.icon-glyph {
+    -fx-fill: transparent;
+    -fx-stroke: -latch-icon;
+    -fx-stroke-width: 1.8;
+    -fx-stroke-line-cap: round;
+    -fx-stroke-line-join: round;
+}
+.theme-light .icon-glyph { -fx-stroke: -latch-navy-800; }
+.theme-dark .icon-glyph { -fx-stroke: -latch-slate-100; }
+.sidebar .icon-glyph,
+.nav-item .icon-glyph,
+.nav-btn .icon-glyph,
+.btn-logout .icon-glyph,
+.button-destructive .icon-glyph,
+.btn-danger .icon-glyph,
+.status-emphasis .icon-glyph,
+.status-pending .icon-glyph { -fx-stroke: -latch-slate-100; }
+.button-primary .icon-glyph,
+.btn-primary .icon-glyph,
+.btn-success .icon-glyph { -fx-stroke: -latch-background; }
+.status-secondary .icon-glyph,
+.status-cancelled .icon-glyph { -fx-stroke: -latch-ink-900; }
 .page-title {
     -fx-font-size: 24px;
     -fx-font-weight: 600;
@@ -238,6 +275,7 @@
 .field-help { -fx-text-fill: -latch-text-muted; }
 .field-error { -fx-text-fill: -latch-navy-950; -fx-font-weight: 600; }
 .theme-dark .field-error { -fx-text-fill: -latch-slate-100; }
+.login-card .field-error { -fx-text-fill: -latch-navy-950; }
 .review-panel {
     -fx-background-color: -latch-surface-raised;
     -fx-background-radius: 8px;
@@ -340,6 +378,13 @@
 .btn-danger:hover { -fx-background-color: -latch-navy-950; }
 .button:armed { -fx-opacity: 0.86; }
 .button:disabled { -fx-opacity: 0.58; -fx-cursor: default; }
+.theme-dark .button-primary:disabled,
+.theme-dark .btn-primary:disabled,
+.theme-dark .btn-success:disabled {
+    -fx-opacity: 1;
+    -fx-background-color: -latch-slate-400;
+    -fx-text-fill: -latch-ink-900;
+}
 
 .data-table,
 .table-view {
@@ -404,6 +449,8 @@
     -fx-padding: 16px;
 }
 .kpi-card { -fx-min-height: 124px; -fx-pref-height: 132px; }
+.kpi-card.kpi-financial { -fx-min-height: 148px; -fx-pref-height: 148px; }
+.kpi-currency-totals { -fx-spacing: 2px; }
 .kpi-title { -fx-font-size: 12px; -fx-font-weight: 500; -fx-text-fill: -latch-text-muted; }
 .kpi-value { -fx-font-size: 30px; -fx-font-weight: 600; -fx-text-fill: -latch-heading; }
 .kpi-desc { -fx-font-size: 12px; -fx-text-fill: -latch-text-muted; }
@@ -437,7 +484,19 @@
 .status-cancelled { -fx-background-color: -latch-slate-400; -fx-text-fill: -latch-ink-900; }
 
 .pagination-bar { -fx-min-height: 48px; -fx-alignment: center-right; -fx-spacing: 8px; }
-.row-actions { -fx-min-width: 48px; -fx-pref-width: 48px; -fx-max-width: 48px; }
+.table-view .table-cell.actions-cell { -fx-padding: 0; -fx-alignment: center; }
+.row-actions {
+    -fx-min-width: 36px;
+    -fx-pref-width: 36px;
+    -fx-max-width: 36px;
+    -fx-min-height: 32px;
+    -fx-pref-height: 32px;
+    -fx-max-height: 32px;
+    -fx-padding: 0;
+    -fx-alignment: center;
+    -fx-background-color: transparent;
+}
+.row-actions .arrow-button { -fx-padding: 0 2px; -fx-background-color: transparent; }
 .row-actions .arrow { -fx-background-color: -latch-icon; }
 .menu-button,
 .context-menu,

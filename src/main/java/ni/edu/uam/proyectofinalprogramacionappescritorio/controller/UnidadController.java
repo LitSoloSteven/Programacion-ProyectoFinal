@@ -100,7 +100,8 @@ public class UnidadController {
         colCanon.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getCanonFormateado()));
         colCanon.setCellFactory(FormatoTabla.numerica());
         colDescripcion.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getDescripcion()));
-        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>("Editar unidad", this::abrirEdicion)));
+        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>(
+                "Editar unidad", this::abrirEdicion, Iconos.Nombre.EDITAR)));
         tblUnidades.getSelectionModel().selectedItemProperty().addListener((obs, anterior, actual) -> {
             seleccionada = actual;
             btnEliminar.setDisable(actual == null || !permisoEliminar);

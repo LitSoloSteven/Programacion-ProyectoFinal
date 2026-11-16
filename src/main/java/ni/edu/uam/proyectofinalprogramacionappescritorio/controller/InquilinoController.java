@@ -89,7 +89,8 @@ public class InquilinoController {
         colEmergencia.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getContactoEmergencia()));
         colEstado.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getEstadoTexto()));
         colEstado.setCellFactory(FormatoTabla.estado());
-        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>("Editar inquilino", this::abrirEdicion)));
+        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>(
+                "Editar inquilino", this::abrirEdicion, Iconos.Nombre.EDITAR)));
         tblInquilinos.getSelectionModel().selectedItemProperty().addListener((obs, anterior, actual) -> {
             seleccionada = actual;
             btnDarBaja.setDisable(actual == null || !actual.isActivo());

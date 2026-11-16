@@ -19,6 +19,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TemaAplicacion;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
 
 import java.io.IOException;
 
@@ -35,6 +36,7 @@ public class LoginController {
 
     @FXML
     public void initialize() {
+        Iconos.asignar(btnIngresar, Iconos.Nombre.ENTRAR, 16);
         ocultarError(lblErrorUsuario);
         ocultarError(lblErrorPassword);
     }
@@ -133,7 +135,7 @@ public class LoginController {
     private void ocultarError(Label campo) {
         campo.setText("");
         campo.setVisible(false);
-        campo.setManaged(true);
+        campo.setManaged(false);
     }
 
     private void finalizarIntento() {

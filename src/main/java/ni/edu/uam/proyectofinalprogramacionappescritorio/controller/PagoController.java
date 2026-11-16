@@ -128,7 +128,8 @@ public class PagoController {
         colReferencia.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getReferencia()));
         colEstado.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getEstado()));
         colEstado.setCellFactory(FormatoTabla.estado());
-        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>("Ver pago", this::mostrarDetalle)));
+        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>(
+                "Ver pago", this::mostrarDetalle, Iconos.Nombre.VER)));
         tblPagos.getSelectionModel().selectedItemProperty().addListener((obs, anterior, actual) -> {
             pagoSeleccionado = actual;
             btnAnular.setDisable(actual == null || !permisoAnular || "Anulado".equalsIgnoreCase(actual.getEstado()));

@@ -39,15 +39,15 @@
     <TableView fx:id="tblContratos" styleClass="data-table" VBox.vgrow="ALWAYS">
         <placeholder><Label text="Aún no hay contratos registrados." /></placeholder>
         <columns>
-            <TableColumn fx:id="colInquilino" minWidth="200.0" prefWidth="200.0" text="Inquilino" />
-            <TableColumn fx:id="colUnidad" minWidth="175.0" prefWidth="175.0" text="Unidad" />
-            <TableColumn fx:id="colInicio" minWidth="105.0" prefWidth="105.0" text="Inicio" />
-            <TableColumn fx:id="colFin" minWidth="105.0" prefWidth="105.0" text="Fin" />
-            <TableColumn fx:id="colCanon" minWidth="130.0" prefWidth="130.0" text="Canon" />
-            <TableColumn fx:id="colDiaPago" minWidth="80.0" prefWidth="80.0" text="Día pago" />
-            <TableColumn fx:id="colDeposito" minWidth="120.0" prefWidth="120.0" text="Depósito" />
-            <TableColumn fx:id="colSaldoGarantia" minWidth="135.0" prefWidth="135.0" text="Saldo garantía" />
-            <TableColumn fx:id="colEstado" minWidth="110.0" prefWidth="110.0" text="Estado" />
+            <TableColumn fx:id="colInquilino" minWidth="150.0" prefWidth="200.0" text="Inquilino" />
+            <TableColumn fx:id="colUnidad" minWidth="135.0" prefWidth="175.0" text="Unidad" />
+            <TableColumn fx:id="colInicio" minWidth="85.0" prefWidth="105.0" text="Inicio" />
+            <TableColumn fx:id="colFin" minWidth="85.0" prefWidth="105.0" text="Fin" />
+            <TableColumn fx:id="colCanon" minWidth="110.0" prefWidth="130.0" text="Canon" />
+            <TableColumn fx:id="colDiaPago" minWidth="65.0" prefWidth="80.0" text="Día pago" />
+            <TableColumn fx:id="colDeposito" minWidth="100.0" prefWidth="120.0" text="Depósito" />
+            <TableColumn fx:id="colSaldoGarantia" minWidth="110.0" prefWidth="135.0" text="Saldo garantía" />
+            <TableColumn fx:id="colEstado" minWidth="90.0" prefWidth="110.0" text="Estado" />
             <TableColumn fx:id="colAcciones" minWidth="48.0" prefWidth="48.0" maxWidth="48.0" text="" />
         </columns>
     </TableView>

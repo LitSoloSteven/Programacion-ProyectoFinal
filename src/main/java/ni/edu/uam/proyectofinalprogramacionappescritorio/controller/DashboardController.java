@@ -22,6 +22,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteAuth;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
 
 import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.MetricasDashboardDTO;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.TotalMonedaDTO;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.DashboardService;
@@ -34,8 +35,10 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TransicionesUI;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 /**
  * Controlador del Dashboard principal de Latch.
@@ -58,6 +61,13 @@ public class DashboardController {
 
     @FXML
     private Label lblUsuarioRol;
+
+    @FXML private Label lblTituloKpiPropiedades;
+    @FXML private Label lblTituloKpiUnidades;
+    @FXML private Label lblTituloKpiInquilinos;
+    @FXML private Label lblTituloKpiContratos;
+    @FXML private Label lblTituloKpiCargos;
+    @FXML private Label lblTituloKpiPagos;
 
     @FXML
     private Button btnNavDashboard;
@@ -107,14 +117,14 @@ public class DashboardController {
     @FXML
     private Label lblCargosPendientes;
 
-    @FXML
-    private Label lblCargosMonto;
+    @FXML private Label lblCargosMontoUsd;
+    @FXML private Label lblCargosMontoNio;
 
     @FXML
     private Label lblPagosRegistrados;
 
-    @FXML
-    private Label lblPagosMonto;
+    @FXML private Label lblPagosMontoUsd;
+    @FXML private Label lblPagosMontoNio;
 
     private final DashboardService dashboardService;
 
@@ -139,10 +149,23 @@ public class DashboardController {
 
         actualizarMetricas();
         configurarNavegacion();
+        Iconos.asignar(btnActualizar, Iconos.Nombre.ACTUALIZAR, 16);
+        asignarIconosKpi();
         Iconos.asignar(btnTema, Iconos.Nombre.TEMA, 16);
         btnTema.setAccessibleText("Cambiar tema de color");
         actualizarControlTema();
         Notificaciones.registrarAnfitrion(contentArea);
+    }
+
+    private void asignarIconosKpi() {
+        Label[] titulos = {lblTituloKpiPropiedades, lblTituloKpiUnidades, lblTituloKpiInquilinos,
+                lblTituloKpiContratos, lblTituloKpiCargos, lblTituloKpiPagos};
+        Iconos.Nombre[] iconos = {Iconos.Nombre.PROPIEDAD, Iconos.Nombre.UNIDAD, Iconos.Nombre.PERSONAS,
+                Iconos.Nombre.CONTRATO, Iconos.Nombre.CARGO, Iconos.Nombre.PAGO};
+        for (int i = 0; i < titulos.length; i++) {
+            Iconos.asignar(titulos[i], iconos[i], 14);
+            titulos[i].setGraphicTextGap(6);
+        }
     }
 
     @FXML
@@ -184,12 +207,10 @@ public class DashboardController {
             lblTotalContratos.setText(String.valueOf(metricas.contratosVigentes()));
 
             lblCargosPendientes.setText(String.valueOf(metricas.cantidadCargosPendientes()));
-            lblCargosMonto.setText(String.join("\n", metricas.cargosPendientes().stream()
-                    .map(total -> FormatoMoneda.formatear(total.moneda(), total.total())).toList()));
+            actualizarImportesPorMoneda(metricas.cargosPendientes(), lblCargosMontoUsd, lblCargosMontoNio);
 
             lblPagosRegistrados.setText(String.valueOf(metricas.cantidadPagosRegistrados()));
-            lblPagosMonto.setText(String.join("\n", metricas.pagosRegistrados().stream()
-                    .map(total -> FormatoMoneda.formatear(total.moneda(), total.total())).toList()));
+            actualizarImportesPorMoneda(metricas.pagosRegistrados(), lblPagosMontoUsd, lblPagosMontoNio);
             lblActualizado.setText("Actualizado a las "
                     + HORA_VISIBLE.format(LocalTime.now(RelojService.ZONA_OPERATIVA)));
             if (btnActualizar != null) {
@@ -209,6 +230,19 @@ public class DashboardController {
                         "No fue posible cargar las métricas. Inténtalo nuevamente.");
             }
         });
+    }
+
+    private void actualizarImportesPorMoneda(List<TotalMonedaDTO> importes, Label usd, Label nio) {
+        usd.setText(formatearImporte(importes, "USD"));
+        nio.setText(formatearImporte(importes, "NIO"));
+    }
+
+    private String formatearImporte(List<TotalMonedaDTO> importes, String moneda) {
+        return importes.stream()
+                .filter(total -> moneda.equals(total.moneda()))
+                .findFirst()
+                .map(total -> FormatoMoneda.formatear(total.moneda(), total.total()))
+                .orElseGet(() -> FormatoMoneda.formatear(moneda, BigDecimal.ZERO));
     }
 
     @FXML

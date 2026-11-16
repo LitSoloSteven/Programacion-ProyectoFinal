@@ -142,7 +142,8 @@ public class ContratoController {
         colSaldoGarantia.setCellFactory(FormatoTabla.numerica());
         colEstado.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getEstado()));
         colEstado.setCellFactory(FormatoTabla.estado());
-        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>("Editar contrato", this::abrirEdicion)));
+        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>(
+                "Editar contrato", this::abrirEdicion, Iconos.Nombre.EDITAR)));
         tblContratos.getSelectionModel().selectedItemProperty().addListener((obs, anterior, actual) -> {
             seleccionado = actual;
             actualizarAcciones();

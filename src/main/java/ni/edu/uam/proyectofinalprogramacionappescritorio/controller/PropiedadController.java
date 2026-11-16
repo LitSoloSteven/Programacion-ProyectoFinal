@@ -86,7 +86,8 @@ public class PropiedadController {
         colEstado.setCellFactory(FormatoTabla.estado());
         colFecha.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyObjectWrapper<>(c.getValue().getCreadoEn()));
         colFecha.setCellFactory(FormatoTabla.fechaHora());
-        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>("Editar propiedad", this::abrirEdicion)));
+        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>(
+                "Editar propiedad", this::abrirEdicion, Iconos.Nombre.EDITAR)));
         tblPropiedades.getSelectionModel().selectedItemProperty().addListener((obs, anterior, actual) -> {
             seleccionada = actual;
             btnEliminar.setDisable(actual == null || !permisoEliminar);
