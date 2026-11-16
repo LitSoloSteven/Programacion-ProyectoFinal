@@ -103,6 +103,7 @@ public final class TemaAplicacion {
         movimientoReducido = reducido;
         PREFERENCIAS.putBoolean("movimientoReducido", reducido);
         ejecutarFx(() -> {
+            if (reducido) TransicionesUI.finalizarActivas();
             synchronized (ESCENAS) {
                 ESCENAS.keySet().forEach(scene -> aplicarClase(scene.getRoot()));
             }

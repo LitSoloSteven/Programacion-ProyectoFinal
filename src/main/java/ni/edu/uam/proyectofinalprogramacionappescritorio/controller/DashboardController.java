@@ -29,6 +29,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Notificaciones;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TemaAplicacion;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TransicionesUI;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
 
 import java.io.IOException;
@@ -188,8 +189,7 @@ public class DashboardController {
     public void navegarDashboard() {
         activarBoton(btnNavDashboard);
         lblContexto.setText("Panel principal");
-        contentArea.getChildren().clear();
-        contentArea.getChildren().add(homeView);
+        TransicionesUI.reemplazar(contentArea, homeView);
         actualizarMetricas();
     }
 
@@ -246,8 +246,7 @@ public class DashboardController {
         try {
             FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource(fxmlFile));
             Parent view = loader.load();
-            contentArea.getChildren().clear();
-            contentArea.getChildren().add(view);
+            TransicionesUI.reemplazar(contentArea, view);
         } catch (IOException e) {
             AlertaUtil.mostrarError("No se pudo abrir la pantalla",
                     "La vista solicitada no está disponible. Inténtalo nuevamente.");
