@@ -190,6 +190,13 @@
     -fx-spacing: 16px;
     -fx-alignment: center-left;
 }
+.topbar {
+    -fx-min-height: 56px;
+    -fx-background-color: -latch-surface-raised;
+    -fx-border-color: transparent transparent -latch-divider transparent;
+    -fx-border-width: 0 0 1px 0;
+}
+.icon-glyph { -fx-fill: -latch-icon; }
 .page-title {
     -fx-font-size: 24px;
     -fx-font-weight: 600;
@@ -292,6 +299,9 @@
 .button-primary:hover,
 .btn-primary:hover,
 .btn-success:hover { -fx-background-color: -latch-action-secondary; }
+.theme-dark .button-primary:hover,
+.theme-dark .btn-primary:hover,
+.theme-dark .btn-success:hover { -fx-text-fill: -latch-slate-100; }
 .button-primary:focused,
 .btn-primary:focused,
 .btn-success:focused,

@@ -18,6 +18,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteAuth;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TemaAplicacion;
 
 import java.io.IOException;
 
@@ -28,32 +29,35 @@ import java.io.IOException;
 public class LoginController {
     @FXML private TextField txtUsuario;
     @FXML private PasswordField txtPassword;
-    @FXML private Label lblMensajeError;
+    @FXML private Label lblErrorUsuario;
+    @FXML private Label lblErrorPassword;
     @FXML private Button btnIngresar;
 
     @FXML
     public void initialize() {
-        lblMensajeError.setVisible(false);
-        lblMensajeError.setManaged(false);
+        ocultarError(lblErrorUsuario);
+        ocultarError(lblErrorPassword);
     }
 
     @FXML
     public void handleLogin(ActionEvent event) {
         String nombre = txtUsuario.getText();
         String password = txtPassword.getText();
+        ocultarError(lblErrorUsuario);
+        ocultarError(lblErrorPassword);
         if (nombre == null || nombre.isBlank()) {
-            mostrarError("Ingrese su nombre de usuario.");
+            mostrarError(lblErrorUsuario, "Escribe tu nombre de usuario.");
             txtUsuario.requestFocus();
             return;
         }
         if (password == null || password.isEmpty()) {
-            mostrarError("Ingrese su contraseña.");
+            mostrarError(lblErrorPassword, "Escribe tu contraseña.");
             txtPassword.requestFocus();
             return;
         }
 
-        ocultarError();
         btnIngresar.setDisable(true);
+        btnIngresar.setText("Ingresando…");
         Task<LoginResponse> tarea = new Task<>() {
             @Override
             protected LoginResponse call() {
@@ -68,20 +72,22 @@ public class LoginController {
                 abrirDashboard(event);
             } catch (RuntimeException e) {
                 SesionUsuario.cerrarSesion();
-                mostrarError("La respuesta de sesión del servicio local no es válida.");
+                mostrarError(lblErrorPassword, "No fue posible validar la sesión. Inténtalo nuevamente.");
             } finally {
                 finalizarIntento();
             }
         });
         tarea.setOnFailed(evento -> {
-            mostrarError(mensaje(tarea.getException()));
+            mostrarError(lblErrorPassword, mensaje(tarea.getException()));
             finalizarIntento();
+            txtPassword.requestFocus();
         });
         try {
             HelloApplication.instancia().getTareas().ejecutar(tarea);
         } catch (RuntimeException e) {
             btnIngresar.setDisable(false);
-            mostrarError("No se pudo iniciar la operación. Inténtelo nuevamente.");
+            btnIngresar.setText("Ingresar");
+            mostrarError(lblErrorPassword, "No se pudo iniciar sesión. Inténtalo nuevamente.");
         }
     }
 
@@ -103,34 +109,36 @@ public class LoginController {
         try {
             Parent root = new FXMLLoader(HelloApplication.class.getResource("dashboard-view.fxml")).load();
             Stage stage = (Stage) ((Node) event.getSource()).getScene().getWindow();
-            Scene scene = new Scene(root, 1100, 720);
-            var css = HelloApplication.class.getResource("estilos.css");
-            if (css != null) scene.getStylesheets().add(css.toExternalForm());
+            Scene scene = new Scene(root, 1366, 820);
+            TemaAplicacion.aplicar(scene);
             stage.setTitle("Latch — Sistema de Gestión Inmobiliaria");
             stage.setScene(scene);
-            stage.setMinWidth(960);
-            stage.setMinHeight(640);
+            stage.setResizable(true);
+            stage.setMinWidth(1100);
+            stage.setMinHeight(700);
             stage.centerOnScreen();
             stage.show();
         } catch (IOException e) {
             SesionUsuario.cerrarSesion();
-            mostrarError("No se pudo cargar la vista principal del sistema.");
+            mostrarError(lblErrorPassword, "No se pudo abrir el panel principal. Inténtalo nuevamente.");
         }
     }
 
-    private void mostrarError(String mensaje) {
-        lblMensajeError.setText(mensaje == null ? "No se pudo iniciar sesión." : mensaje);
-        lblMensajeError.setVisible(true);
-        lblMensajeError.setManaged(true);
+    private void mostrarError(Label campo, String mensaje) {
+        campo.setText(mensaje == null ? "No se pudo iniciar sesión." : mensaje);
+        campo.setVisible(true);
+        campo.setManaged(true);
     }
 
-    private void ocultarError() {
-        lblMensajeError.setVisible(false);
-        lblMensajeError.setManaged(false);
+    private void ocultarError(Label campo) {
+        campo.setText("");
+        campo.setVisible(false);
+        campo.setManaged(true);
     }
 
     private void finalizarIntento() {
         txtPassword.clear();
         btnIngresar.setDisable(false);
+        btnIngresar.setText("Ingresar");
     }
 }
