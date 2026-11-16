@@ -9,6 +9,7 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tooltip;
@@ -38,7 +39,7 @@ import java.time.format.DateTimeFormatter;
 
 /**
  * Controlador del Dashboard principal de Latch.
- * Coordina navegación fluida entre módulos y visualización de métricas reales de PostgreSQL.
+ * Coordina la navegación entre módulos y presenta las métricas del panel.
  */
 public class DashboardController {
     private static final DateTimeFormatter HORA_VISIBLE = DateTimeFormatter.ofPattern("HH:mm");
@@ -49,6 +50,8 @@ public class DashboardController {
     @FXML private Label lblContexto;
     @FXML private Label lblActualizado;
     @FXML private Button btnActualizar;
+    @FXML private Button btnTema;
+    @FXML private CheckBox chkReducirMovimiento;
 
     @FXML
     private Label lblUsuarioNombre;
@@ -136,7 +139,30 @@ public class DashboardController {
 
         actualizarMetricas();
         configurarNavegacion();
+        Iconos.asignar(btnTema, Iconos.Nombre.TEMA, 16);
+        btnTema.setAccessibleText("Cambiar tema de color");
+        actualizarControlTema();
         Notificaciones.registrarAnfitrion(contentArea);
+    }
+
+    @FXML
+    public void handleCambiarTema() {
+        TemaAplicacion.Tema nuevo = TemaAplicacion.getTema() == TemaAplicacion.Tema.OSCURO
+                ? TemaAplicacion.Tema.CLARO : TemaAplicacion.Tema.OSCURO;
+        TemaAplicacion.establecerTema(nuevo);
+        actualizarControlTema();
+    }
+
+    @FXML
+    public void handleReducirMovimiento() {
+        TemaAplicacion.establecerMovimientoReducido(chkReducirMovimiento.isSelected());
+    }
+
+    private void actualizarControlTema() {
+        btnTema.setText(TemaAplicacion.getTema() == TemaAplicacion.Tema.OSCURO ? "Tema claro" : "Tema oscuro");
+        btnTema.setTooltip(new Tooltip("Cambiar a tema "
+                + (TemaAplicacion.getTema() == TemaAplicacion.Tema.OSCURO ? "claro" : "oscuro")));
+        chkReducirMovimiento.setSelected(TemaAplicacion.isMovimientoReducido());
     }
 
     @FXML

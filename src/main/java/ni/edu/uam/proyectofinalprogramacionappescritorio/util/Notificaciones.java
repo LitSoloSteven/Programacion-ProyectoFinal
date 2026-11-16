@@ -4,7 +4,6 @@ import javafx.animation.FadeTransition;
 import javafx.animation.PauseTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
@@ -33,7 +32,7 @@ public final class Notificaciones {
         toast.setMaxWidth(440);
         toast.setAccessibleText(mensaje);
 
-        Label icono = new Label("✓");
+        javafx.scene.Node icono = Iconos.crear(Iconos.Nombre.CONFIRMACION, 16);
         icono.getStyleClass().add("toast-icon");
         Label texto = new Label(mensaje);
         texto.setWrapText(true);
