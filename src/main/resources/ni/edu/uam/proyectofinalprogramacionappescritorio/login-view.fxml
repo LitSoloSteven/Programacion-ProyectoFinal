@@ -1,41 +1,40 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
-<?import javafx.scene.control.*?>
-<?import javafx.scene.layout.*?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
 
 <StackPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
            fx:controller="ni.edu.uam.proyectofinalprogramacionappescritorio.controller.LoginController"
-           prefHeight="600.0" prefWidth="800.0" styleClass="login-root">
-
-    <VBox alignment="CENTER" maxWidth="420.0" spacing="18.0" styleClass="login-card">
-        <padding>
-            <Insets bottom="32.0" left="36.0" right="36.0" top="32.0" />
-        </padding>
-
-        <VBox alignment="CENTER" spacing="6.0">
-            <Label styleClass="login-badge" text="SISTEMA INMOBILIARIO" />
-            <Label styleClass="login-title" text="Latch" />
-            <Label styleClass="login-subtitle" text="Administración de Alquileres y Contratos" />
-        </VBox>
-
-        <Separator prefWidth="200.0" />
-
+           prefHeight="520.0" prefWidth="440.0" styleClass="login-root">
+    <VBox alignment="CENTER_LEFT" maxWidth="400.0" spacing="16.0" styleClass="login-card">
+        <padding><Insets bottom="24.0" left="24.0" right="24.0" top="24.0" /></padding>
         <VBox alignment="CENTER_LEFT" spacing="6.0">
-            <Label styleClass="form-label" text="Nombre de usuario" />
-            <TextField fx:id="txtUsuario" promptText="ej. admin o asistente" styleClass="text-field" />
+            <Label styleClass="login-brand" text="Latch" />
+            <Label styleClass="login-title" text="Iniciar sesión" />
+            <Label styleClass="login-subtitle" text="Accede a la administración de alquileres y contratos." wrapText="true" />
         </VBox>
-
-        <VBox alignment="CENTER_LEFT" spacing="6.0">
-            <Label styleClass="form-label" text="Contraseña" />
-            <PasswordField fx:id="txtPassword" promptText="Ingrese su contraseña" styleClass="password-field" />
+        <VBox spacing="6.0">
+            <Label styleClass="field-label" text="Nombre de usuario" />
+            <TextField fx:id="txtUsuario" accessibleText="Nombre de usuario"
+                       promptText="Escribe tu nombre de usuario" styleClass="field" />
+            <Label fx:id="lblErrorUsuario" managed="false" minHeight="18.0"
+                   styleClass="field-error" text="" visible="false" wrapText="true" />
         </VBox>
-
-        <Label fx:id="lblMensajeError" managed="false" styleClass="lbl-error" text="" visible="false" wrapText="true" />
-
-        <Button fx:id="btnIngresar" defaultButton="true" maxWidth="Infinity" onAction="#handleLogin" prefHeight="42.0"
-                styleClass="btn-primary" text="Iniciar Sesión" />
-
+        <VBox spacing="6.0">
+            <Label styleClass="field-label" text="Contraseña" />
+            <PasswordField fx:id="txtPassword" accessibleText="Contraseña"
+                           onAction="#handleLogin" promptText="Escribe tu contraseña" styleClass="field" />
+            <Label fx:id="lblErrorPassword" managed="false" minHeight="18.0"
+                   styleClass="field-error" text="" visible="false" wrapText="true" />
+        </VBox>
+        <Button fx:id="btnIngresar" defaultButton="true" maxWidth="Infinity"
+                onAction="#handleLogin" prefHeight="44.0" styleClass="button-primary"
+                text="Ingresar" />
     </VBox>
-
 </StackPane>
+

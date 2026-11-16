@@ -2,65 +2,90 @@ package ni.edu.uam.proyectofinalprogramacionappescritorio.util;
 
 import javafx.application.Platform;
 import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * Utilidad uniforme para la presentación de mensajes y confirmaciones visuales en JavaFX.
- * Garantiza ejecución segura en el hilo de aplicación de JavaFX (FX Application Thread).
- */
-public class AlertaUtil {
+/** Mensajes y confirmaciones JavaFX con tema y textos de acción explícitos. */
+public final class AlertaUtil {
+    private AlertaUtil() { }
 
     public static void mostrarExito(String titulo, String mensaje) {
         ejecutarEnFx(() -> {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.setTitle(titulo != null ? titulo : "Éxito");
-            alert.setHeaderText(null);
-            alert.setContentText(mensaje);
-            alert.showAndWait();
+            if (!Notificaciones.mostrarExito(mensaje)) mostrar(Alert.AlertType.INFORMATION, titulo, mensaje);
         });
     }
 
     public static void mostrarAdvertencia(String titulo, String mensaje) {
-        ejecutarEnFx(() -> {
-            Alert alert = new Alert(Alert.AlertType.WARNING);
-            alert.setTitle(titulo != null ? titulo : "Advertencia");
-            alert.setHeaderText(null);
-            alert.setContentText(mensaje);
-            alert.showAndWait();
-        });
+        ejecutarEnFx(() -> mostrar(Alert.AlertType.WARNING, titulo, mensaje));
     }
 
     public static void mostrarError(String titulo, String mensaje) {
-        ejecutarEnFx(() -> {
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle(titulo != null ? titulo : "Error");
-            alert.setHeaderText(null);
-            alert.setContentText(mensaje);
-            alert.showAndWait();
-        });
+        ejecutarEnFx(() -> mostrar(Alert.AlertType.ERROR, titulo, mensaje));
     }
 
     public static boolean mostrarConfirmacion(String titulo, String mensaje) {
-        if (!Platform.isFxApplicationThread()) {
-            return false;
-        }
-        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-        alert.setTitle(titulo != null ? titulo : "Confirmación");
-        alert.setHeaderText(null);
-        alert.setContentText(mensaje);
+        return mostrarConfirmacion(titulo, mensaje, "Continuar");
+    }
 
-        Optional<ButtonType> resultado = alert.showAndWait();
-        return resultado.isPresent() && resultado.get() == ButtonType.OK;
+    public static boolean mostrarConfirmacion(String titulo, String mensaje, String accion) {
+        if (!Platform.isFxApplicationThread()) return false;
+        Alert alerta = crear(Alert.AlertType.CONFIRMATION, titulo, mensaje);
+        ButtonType cancelar = new ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE);
+        ButtonType confirmar = new ButtonType(accion, ButtonBar.ButtonData.OK_DONE);
+        alerta.getButtonTypes().setAll(cancelar, confirmar);
+        TemaAplicacion.aplicar(alerta.getDialogPane());
+        Optional<ButtonType> resultado = alerta.showAndWait();
+        return resultado.isPresent() && resultado.get() == confirmar;
+    }
+
+    public static boolean mostrarConfirmacionDestructiva(String titulo, String registro,
+                                                         String consecuencia, String accion) {
+        if (!Platform.isFxApplicationThread()) return false;
+        return mostrarConfirmacionDestructiva(titulo, registro + System.lineSeparator()
+                + System.lineSeparator() + consecuencia, accion);
+    }
+
+    public static boolean mostrarConfirmacionDestructiva(String titulo, String detalle, String accion) {
+        if (!Platform.isFxApplicationThread()) return false;
+        Alert alerta = crear(Alert.AlertType.CONFIRMATION, titulo, detalle);
+        ButtonType cancelar = new ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE);
+        ButtonType confirmar = new ButtonType(accion, ButtonBar.ButtonData.OK_DONE);
+        alerta.getButtonTypes().setAll(cancelar, confirmar);
+        TemaAplicacion.aplicar(alerta.getDialogPane());
+        Optional<ButtonType> resultado = alerta.showAndWait();
+        return resultado.isPresent() && resultado.get() == confirmar;
+    }
+
+    public static boolean confirmarDescartarCambios() {
+        if (!Platform.isFxApplicationThread()) return false;
+        Alert alerta = crear(Alert.AlertType.CONFIRMATION, "Descartar cambios",
+                "Los cambios del formulario se perderán.");
+        ButtonType cancelar = new ButtonType("Seguir editando", ButtonBar.ButtonData.CANCEL_CLOSE);
+        ButtonType descartar = new ButtonType("Descartar cambios", ButtonBar.ButtonData.OK_DONE);
+        alerta.getButtonTypes().setAll(cancelar, descartar);
+        TemaAplicacion.aplicar(alerta.getDialogPane());
+        Optional<ButtonType> resultado = alerta.showAndWait();
+        return resultado.isPresent() && resultado.get() == descartar;
+    }
+
+    private static void mostrar(Alert.AlertType tipo, String titulo, String mensaje) {
+        crear(tipo, titulo, mensaje).showAndWait();
+    }
+
+    private static Alert crear(Alert.AlertType tipo, String titulo, String mensaje) {
+        Alert alerta = new Alert(tipo);
+        alerta.setTitle(titulo == null ? "Latch" : titulo);
+        alerta.setHeaderText(null);
+        alerta.setContentText(mensaje == null ? "" : mensaje);
+        TemaAplicacion.aplicar(alerta.getDialogPane());
+        return alerta;
     }
 
     private static void ejecutarEnFx(Runnable accion) {
-        if (Platform.isFxApplicationThread()) {
-            accion.run();
-        } else {
-            Platform.runLater(accion);
-        }
+        if (Platform.isFxApplicationThread()) accion.run();
+        else Platform.runLater(accion);
     }
 }
+
