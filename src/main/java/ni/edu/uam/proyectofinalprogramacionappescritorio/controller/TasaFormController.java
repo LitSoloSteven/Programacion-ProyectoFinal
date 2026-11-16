@@ -140,7 +140,7 @@ public class TasaFormController {
         for (Label etiqueta : List.of(lblResumenError, lblErrorFecha, lblErrorTasa, lblErrorFuente, lblErrorMotivo)) {
             etiqueta.setText("");
             etiqueta.setVisible(false);
-            etiqueta.setManaged(false);
+            etiqueta.setManaged(true);
         }
     }
 

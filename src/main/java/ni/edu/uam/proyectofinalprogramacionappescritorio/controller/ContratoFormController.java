@@ -130,7 +130,7 @@ public class ContratoFormController {
     }
     private void limpiarErrores() {
         for (Label label : List.of(lblResumenError, lblErrorPartes, lblErrorFechas, lblErrorCanon, lblErrorDiaPago, lblErrorDeposito)) {
-            label.setText(""); label.setVisible(false); label.setManaged(false);
+            label.setText(""); label.setVisible(false); label.setManaged(true);
         }
     }
     private void error(Label label, String mensaje) { label.setText(mensaje); label.setVisible(true); label.setManaged(true); }

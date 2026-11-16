@@ -93,7 +93,7 @@ public class PropiedadFormController {
 
     private void limpiarErrores() {
         for (Label etiqueta : List.of(lblResumenError, lblErrorNombre, lblErrorDireccion, lblErrorPropietario, lblErrorCorreo)) {
-            etiqueta.setText(""); etiqueta.setVisible(false); etiqueta.setManaged(false);
+            etiqueta.setText(""); etiqueta.setVisible(false); etiqueta.setManaged(true);
         }
     }
 

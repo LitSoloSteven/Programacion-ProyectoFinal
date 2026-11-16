@@ -83,7 +83,7 @@ public class InquilinoFormController {
     private void limpiarErrores() {
         for (Label label : List.of(lblResumenError, lblErrorNombre, lblErrorIdentificacion,
                 lblErrorTelefono, lblErrorCorreo, lblErrorEmergencia)) {
-            label.setText(""); label.setVisible(false); label.setManaged(false);
+            label.setText(""); label.setVisible(false); label.setManaged(true);
         }
     }
     private void error(Label label, String mensaje) { label.setText(mensaje); label.setVisible(true); label.setManaged(true); }

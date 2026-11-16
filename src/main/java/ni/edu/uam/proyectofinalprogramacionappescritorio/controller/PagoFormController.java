@@ -145,7 +145,7 @@ public class PagoFormController {
         for (Label etiqueta : List.of(lblResumenError, lblErrorContrato, lblErrorMonto, lblErrorFecha, lblErrorReferencia)) {
             etiqueta.setText("");
             etiqueta.setVisible(false);
-            etiqueta.setManaged(false);
+            etiqueta.setManaged(true);
         }
     }
 
