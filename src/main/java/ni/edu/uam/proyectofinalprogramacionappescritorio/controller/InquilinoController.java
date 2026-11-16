@@ -1,272 +1,247 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
+import javafx.concurrent.Task;
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.scene.control.*;
-import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Node;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.Label;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+import javafx.stage.Window;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Inquilino;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.InquilinoService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AccionesTabla;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AtajosLista;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.DialogoFormulario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoTabla;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PanelEstadoTabla;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
 
+import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Locale;
 
-/**
- * Controlador de la vista de Inquilinos.
- * Gestiona el ciclo de vida de los arrendatarios con persistencia en PostgreSQL 18.
- */
+/** Directorio local de inquilinos y responsable de las operaciones del servicio. */
 public class InquilinoController {
-
-    @FXML
-    private TextField txtNombre;
-
-    @FXML
-    private TextField txtIdentificacion;
-
-    @FXML
-    private TextField txtTelefono;
-
-    @FXML
-    private TextField txtCorreo;
-
-    @FXML
-    private TextField txtContactoEmergencia;
-
-    @FXML
-    private CheckBox chkActivo;
-
-    @FXML
-    private Button btnDarBaja;
-
-    @FXML
-    private Button btnEliminar;
-
-    @FXML
-    private TextField txtBuscar;
-
-    @FXML
-    private TableView<Inquilino> tblInquilinos;
-
-    @FXML
-    private TableColumn<Inquilino, String> colNombre;
-
-    @FXML
-    private TableColumn<Inquilino, String> colIdentificacion;
-
-    @FXML
-    private TableColumn<Inquilino, String> colTelefono;
-
-    @FXML
-    private TableColumn<Inquilino, String> colCorreo;
-
-    @FXML
-    private TableColumn<Inquilino, String> colEmergencia;
-
-    @FXML
-    private TableColumn<Inquilino, String> colEstado;
+    @FXML private VBox rootView;
+    @FXML private HBox eliminarTooltipHost;
+    @FXML private Button btnNuevo;
+    @FXML private Button btnRefrescar;
+    @FXML private Button btnLimpiar;
+    @FXML private Button btnDarBaja;
+    @FXML private Button btnEliminar;
+    @FXML private Label lblTitulo;
+    @FXML private Label lblContador;
+    @FXML private Label lblErrorConsulta;
+    @FXML private TextField txtBuscar;
+    @FXML private TableView<Inquilino> tblInquilinos;
+    @FXML private TableColumn<Inquilino, String> colNombre;
+    @FXML private TableColumn<Inquilino, String> colIdentificacion;
+    @FXML private TableColumn<Inquilino, String> colTelefono;
+    @FXML private TableColumn<Inquilino, String> colCorreo;
+    @FXML private TableColumn<Inquilino, String> colEmergencia;
+    @FXML private TableColumn<Inquilino, String> colEstado;
+    @FXML private TableColumn<Inquilino, Void> colAcciones;
 
     private final InquilinoService inquilinoService;
-    private final ObservableList<Inquilino> listaInquilinos = FXCollections.observableArrayList();
-    private FilteredList<Inquilino> listaFiltrada;
-    private Inquilino inquilinoSeleccionado = null;
+    private final ObservableList<Inquilino> registros = FXCollections.observableArrayList();
+    private final FilteredList<Inquilino> filtrados = new FilteredList<>(registros, item -> true);
+    private Inquilino seleccionada;
+    private final boolean permisoEliminar = SesionUsuario.esPropietario();
+    private long versionConsulta;
 
-    public InquilinoController() {
-        this(HelloApplication.instancia().getComposicion().inquilinos());
-    }
+    public InquilinoController() { this(HelloApplication.instancia().getComposicion().inquilinos()); }
+    public InquilinoController(InquilinoService inquilinoService) { this.inquilinoService = inquilinoService; }
 
-    public InquilinoController(InquilinoService inquilinoService) {
-        this.inquilinoService = inquilinoService;
-    }
-
-    @FXML
-    public void initialize() {
-        configurarTabla();
-        configurarFiltro();
-        aplicarControlPermisos();
+    @FXML public void initialize() {
+        lblTitulo.setGraphic(Iconos.crear(Iconos.Nombre.PERSONAS, 20));
+        Iconos.asignar(btnRefrescar, Iconos.Nombre.ACTUALIZAR, 16);
+        Iconos.asignar(btnNuevo, Iconos.Nombre.MAS, 16);
+        Iconos.asignar(btnLimpiar, Iconos.Nombre.CERRAR, 14);
+        Iconos.asignar(btnDarBaja, Iconos.Nombre.EDITAR, 16);
+        Iconos.asignar(btnEliminar, Iconos.Nombre.ELIMINAR, 16);
+        Tooltip.install(eliminarTooltipHost, new Tooltip(permisoEliminar
+                ? "Selecciona un inquilino para eliminar el registro." : "Solo el propietario puede eliminar inquilinos."));
+        btnDarBaja.setDisable(true);
+        btnEliminar.setDisable(true);
+        tblInquilinos.setItems(filtrados);
+        tblInquilinos.setPlaceholder(PanelEstadoTabla.crear("Cargando inquilinos", "El directorio aparecerá al terminar la consulta.", null, null));
+        colNombre.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getNombre()));
+        colIdentificacion.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getIdentificacion()));
+        colTelefono.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getTelefono()));
+        colCorreo.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getCorreo()));
+        colEmergencia.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getContactoEmergencia()));
+        colEstado.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getEstadoTexto()));
+        colEstado.setCellFactory(FormatoTabla.estado());
+        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>("Editar inquilino", this::abrirEdicion)));
+        tblInquilinos.getSelectionModel().selectedItemProperty().addListener((obs, anterior, actual) -> {
+            seleccionada = actual;
+            btnDarBaja.setDisable(actual == null || !actual.isActivo());
+            btnEliminar.setDisable(actual == null || !permisoEliminar);
+        });
+        txtBuscar.textProperty().addListener((obs, anterior, actual) -> aplicarFiltro(actual));
+        AtajosLista.instalar(rootView, txtBuscar, this::handleNuevo);
+        aplicarFiltro("");
         cargarDatos();
-
-        tblInquilinos.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null) {
-                seleccionarInquilino(newVal);
-            }
-        });
     }
 
-    private void configurarTabla() {
-        colNombre.setCellValueFactory(new PropertyValueFactory<>("nombre"));
-        colIdentificacion.setCellValueFactory(new PropertyValueFactory<>("identificacion"));
-        colTelefono.setCellValueFactory(new PropertyValueFactory<>("telefono"));
-        colCorreo.setCellValueFactory(new PropertyValueFactory<>("correo"));
-        colEmergencia.setCellValueFactory(new PropertyValueFactory<>("contactoEmergencia"));
-        colEstado.setCellValueFactory(new PropertyValueFactory<>("estadoTexto"));
-
-        listaFiltrada = new FilteredList<>(listaInquilinos, i -> true);
-        tblInquilinos.setItems(listaFiltrada);
-    }
-
-    private void configurarFiltro() {
-        txtBuscar.textProperty().addListener((obs, oldVal, newVal) -> {
-            listaFiltrada.setPredicate(inq -> {
-                if (newVal == null || newVal.isBlank()) return true;
-                String filtro = newVal.toLowerCase().trim();
-                boolean matchNom = inq.getNombre() != null && inq.getNombre().toLowerCase().contains(filtro);
-                boolean matchId = inq.getIdentificacion() != null && inq.getIdentificacion().toLowerCase().contains(filtro);
-                boolean matchTel = inq.getTelefono() != null && inq.getTelefono().toLowerCase().contains(filtro);
-                return matchNom || matchId || matchTel;
-            });
-        });
-    }
-
-    private void aplicarControlPermisos() {
-        boolean esAdmin = SesionUsuario.esPropietario();
-        btnEliminar.setVisible(esAdmin);
-        btnEliminar.setManaged(esAdmin);
+    private void aplicarFiltro(String texto) {
+        String filtro = texto == null ? "" : texto.strip().toLowerCase(Locale.ROOT);
+        filtrados.setPredicate(i -> filtro.isEmpty() || contiene(i.getNombre(), filtro)
+                || contiene(i.getIdentificacion(), filtro) || contiene(i.getTelefono(), filtro)
+                || contiene(i.getCorreo(), filtro) || contiene(i.getContactoEmergencia(), filtro));
+        lblContador.setText(filtrados.size() + (filtrados.size() == 1 ? " registro" : " registros"));
+        tblInquilinos.setPlaceholder(PanelEstadoTabla.crear(filtro.isEmpty() ? "Aún no hay inquilinos" : "No hay coincidencias",
+                filtro.isEmpty() ? "Los inquilinos registrados aparecerán aquí." : "Prueba con otro término o limpia la búsqueda.",
+                filtro.isEmpty() ? "Nuevo inquilino" : "Limpiar búsqueda",
+                filtro.isEmpty() ? this::handleNuevo : this::limpiarFiltros));
     }
 
     public void cargarDatos() {
-        try {
-            List<Inquilino> datos = inquilinoService.listarTodos();
-            listaInquilinos.setAll(datos);
-        } catch (SQLException e) {
-            AlertaUtil.mostrarError("Error al cargar inquilinos", "No fue posible consultar los inquilinos desde PostgreSQL.");
-        }
-    }
-
-    @FXML
-    public void refrescarTabla() {
-        cargarDatos();
-        limpiarFormulario();
-        AlertaUtil.mostrarExito("Tabla actualizada", "El listado de inquilinos ha sido sincronizado con PostgreSQL.");
-    }
-
-    @FXML
-    public void handleGuardar() {
-        String nombre = txtNombre.getText();
-        String identificacion = txtIdentificacion.getText();
-        String telefono = txtTelefono.getText();
-        String correo = txtCorreo.getText();
-        String emergencia = txtContactoEmergencia.getText();
-        boolean activo = chkActivo.isSelected();
-
-        // Validaciones previas
-        if (nombre == null || nombre.trim().isEmpty()) {
-            AlertaUtil.mostrarAdvertencia("Campo obligatorio", "Debe ingresar el nombre completo del inquilino.");
-            txtNombre.requestFocus();
-            return;
-        }
-
-        try {
-            if (inquilinoSeleccionado == null) {
-                // Nuevo inquilino
-                Inquilino nuevo = new Inquilino();
-                nuevo.setNombre(nombre.trim());
-                nuevo.setIdentificacion(identificacion != null && !identificacion.isBlank() ? identificacion.trim() : null);
-                nuevo.setTelefono(telefono != null && !telefono.isBlank() ? telefono.trim() : null);
-                nuevo.setCorreo(correo != null && !correo.isBlank() ? correo.trim() : null);
-                nuevo.setContactoEmergencia(emergencia != null && !emergencia.isBlank() ? emergencia.trim() : null);
-                nuevo.setActivo(activo);
-
-                inquilinoService.guardar(nuevo);
-                AlertaUtil.mostrarExito("Registro exitoso", "El inquilino ha sido registrado correctamente en PostgreSQL.");
-            } else {
-                inquilinoService.actualizar(inquilinoSeleccionado.getId(),
-                        inquilinoSeleccionado.getVersion(), nombre.trim(),
-                        identificacion != null && !identificacion.isBlank() ? identificacion.trim() : null,
-                        telefono != null && !telefono.isBlank() ? telefono.trim() : null,
-                        correo != null && !correo.isBlank() ? correo.trim() : null,
-                        emergencia != null && !emergencia.isBlank() ? emergencia.trim() : null,
-                        activo);
-                AlertaUtil.mostrarExito("Actualización exitosa", "Los datos del inquilino fueron actualizados.");
+        btnRefrescar.setDisable(true);
+        long version = ++versionConsulta;
+        Task<List<Inquilino>> tarea = new Task<>() {
+            @Override protected List<Inquilino> call() throws SQLException { return inquilinoService.listarTodos(); }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
+            if (version != versionConsulta) return;
+            registros.setAll(datos);
+            aplicarFiltro(txtBuscar.getText());
+            ocultarError();
+            btnRefrescar.setDisable(false);
+        }, error -> {
+            if (version == versionConsulta) {
+                lblErrorConsulta.setText("No se pudieron cargar los inquilinos. Vuelve a intentarlo.");
+                lblErrorConsulta.setVisible(true); lblErrorConsulta.setManaged(true);
+                tblInquilinos.setPlaceholder(PanelEstadoTabla.crear("No se pudieron cargar los inquilinos",
+                        "Vuelve a intentarlo.", "Reintentar", this::cargarDatos));
             }
+            btnRefrescar.setDisable(false);
+        });
+    }
 
+    @FXML public void refrescarTabla() { cargarDatos(); }
+    @FXML public void handleNuevo() { abrirFormulario(null); }
+    private void abrirEdicion(Inquilino inquilino) { abrirFormulario(inquilino); }
+
+    private void abrirFormulario(Inquilino existente) {
+        try {
+            FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource("inquilino-form.fxml"));
+            Node contenido = loader.load();
+            InquilinoFormController formulario = loader.getController();
+            if (existente != null) formulario.cargar(existente);
+            Window propietario = tblInquilinos.getScene() == null ? null : tblInquilinos.getScene().getWindow();
+            boolean nuevo = existente == null;
+            Dialog<ButtonType> dialogo = DialogoFormulario.crear(nuevo ? "Nuevo inquilino" : "Editar inquilino",
+                    contenido, propietario, 620, 620, nuevo ? "Guardar inquilino" : "Guardar cambios");
+            DialogoFormulario.protegerCambiosSinGuardar(dialogo, nuevo ? btnNuevo : tblInquilinos, formulario::hayCambios);
+            ButtonType tipoAccion = dialogo.getDialogPane().getButtonTypes().getFirst();
+            Button accion = (Button) dialogo.getDialogPane().lookupButton(tipoAccion);
+            accion.addEventFilter(ActionEvent.ACTION, evento -> {
+                evento.consume();
+                if (!formulario.validar()) return;
+                InquilinoFormController.Datos datos = formulario.datos();
+                accion.setDisable(true); accion.setText("Guardando inquilino…");
+                Task<Void> tarea = new Task<>() {
+                    @Override protected Void call() throws SQLException {
+                        if (nuevo) {
+                            ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Inquilino inquilino = new ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Inquilino();
+                            inquilino.setNombre(datos.nombre());
+                            inquilino.setIdentificacion(datos.identificacion());
+                            inquilino.setTelefono(datos.telefono());
+                            inquilino.setCorreo(datos.correo());
+                            inquilino.setContactoEmergencia(datos.emergencia());
+                            inquilino.setActivo(datos.activo());
+                            inquilinoService.guardar(inquilino);
+                        } else {
+                            inquilinoService.actualizar(existente.getId(), existente.getVersion(), datos.nombre(),
+                                    datos.identificacion(), datos.telefono(), datos.correo(), datos.emergencia(), datos.activo());
+                        }
+                        return null;
+                    }
+                };
+                TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+                    formulario.marcarLimpio(); DialogoFormulario.cerrar(dialogo);
+                    AlertaUtil.mostrarExito(nuevo ? "Inquilino registrado" : "Inquilino actualizado",
+                            nuevo ? "El inquilino quedó registrado." : "Los cambios quedaron guardados.");
+                    cargarDatos();
+                }, error -> {
+                    accion.setDisable(false); accion.setText(nuevo ? "Guardar inquilino" : "Guardar cambios");
+                    formulario.mostrarError(mensajeError(error));
+                });
+            });
+            dialogo.showAndWait();
+        } catch (IOException error) {
+            AlertaUtil.mostrarError("No se pudo abrir el formulario", "Vuelve a intentarlo.");
+        }
+    }
+
+    @FXML public void handleDarDeBaja() {
+        Inquilino inquilino = seleccionada;
+        if (inquilino == null || !inquilino.isActivo()) return;
+        if (!AlertaUtil.mostrarConfirmacionDestructiva("Deshabilitar inquilino",
+                inquilino.getNombre() + (inquilino.getIdentificacion() == null ? "" : " · " + inquilino.getIdentificacion()),
+                "El inquilino quedará inactivo; su historial se conservará.", "Deshabilitar")) return;
+        btnDarBaja.setDisable(true);
+        Task<Void> tarea = new Task<>() {
+            @Override protected Void call() throws SQLException { inquilinoService.darDeBaja(inquilino.getId()); return null; }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+            AlertaUtil.mostrarExito("Inquilino deshabilitado", "El inquilino quedó inactivo.");
             cargarDatos();
-            limpiarFormulario();
-        } catch (IllegalArgumentException e) {
-            AlertaUtil.mostrarAdvertencia("Datos inválidos", e.getMessage());
-        } catch (SecurityException e) {
-            AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
-        } catch (IllegalStateException e) {
-            AlertaUtil.mostrarError("Error de persistencia", e.getMessage());
-        } catch (SQLException e) {
-            AlertaUtil.mostrarError("Error de persistencia", "No fue posible guardar el registro del inquilino en PostgreSQL.");
-        }
+        }, error -> {
+            btnDarBaja.setDisable(false);
+            AlertaUtil.mostrarError("No se pudo deshabilitar el inquilino", "Vuelve a intentarlo.");
+        });
     }
 
-    @FXML
-    public void handleDarDeBaja() {
-        if (inquilinoSeleccionado == null) {
-            AlertaUtil.mostrarAdvertencia("Selección requerida", "Seleccione un inquilino de la tabla para deshabilitar.");
-            return;
-        }
-
-        boolean confirma = AlertaUtil.mostrarConfirmacion(
-                "Confirmar baja lógica",
-                "¿Desea deshabilitar (marcar inactivo) al inquilino '" + inquilinoSeleccionado.getNombre() + "'?"
-        );
-
-        if (confirma) {
-            try {
-                inquilinoService.darDeBaja(inquilinoSeleccionado.getId());
-                AlertaUtil.mostrarExito("Inquilino deshabilitado", "El inquilino ha quedado marcado como inactivo.");
-                cargarDatos();
-                limpiarFormulario();
-            } catch (SQLException e) {
-                AlertaUtil.mostrarError("Error", "No se pudo actualizar el estado del inquilino en la base de datos.");
+    @FXML public void handleEliminar() {
+        Inquilino inquilino = seleccionada;
+        if (inquilino == null || !permisoEliminar) return;
+        String registro = "Inquilino: " + inquilino.getNombre()
+                + (inquilino.getIdentificacion() == null ? "" : " · " + inquilino.getIdentificacion());
+        if (!AlertaUtil.mostrarConfirmacionDestructiva("Eliminar registro de inquilino", registro,
+                "El registro se eliminará físicamente y no podrá restaurarse.", "Eliminar registro")) return;
+        btnEliminar.setDisable(true);
+        Task<Void> tarea = new Task<>() {
+            @Override protected Void call() throws SQLException { inquilinoService.eliminar(inquilino.getId()); return null; }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+            AlertaUtil.mostrarExito("Registro eliminado", "El registro del inquilino se eliminó.");
+            cargarDatos();
+        }, error -> {
+            btnEliminar.setDisable(false);
+            if (error instanceof SecurityException) {
+                AlertaUtil.mostrarAdvertencia("No tienes permiso", "Solo el propietario puede eliminar registros de inquilinos.");
+            } else {
+                AlertaUtil.mostrarAdvertencia("No se puede eliminar el registro",
+                        "El inquilino tiene contratos o historial asociado. Usa Deshabilitar para conservarlo.");
             }
-        }
+        });
     }
 
-    @FXML
-    public void handleEliminar() {
-        if (inquilinoSeleccionado == null) {
-            AlertaUtil.mostrarAdvertencia("Selección requerida", "Seleccione un inquilino de la tabla para eliminar.");
-            return;
-        }
-
-        boolean confirma = AlertaUtil.mostrarConfirmacion(
-                "Confirmar eliminación",
-                "¿Está seguro de que desea eliminar permanentemente al inquilino '" + inquilinoSeleccionado.getNombre() + "'?"
-        );
-
-        if (confirma) {
-            try {
-                inquilinoService.eliminar(inquilinoSeleccionado.getId());
-                AlertaUtil.mostrarExito("Registro eliminado", "El inquilino fue eliminado físicamente de PostgreSQL.");
-                cargarDatos();
-                limpiarFormulario();
-            } catch (SecurityException e) {
-                AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
-            } catch (IllegalStateException e) {
-                AlertaUtil.mostrarError("Error de persistencia", e.getMessage());
-            } catch (SQLException e) {
-                AlertaUtil.mostrarError("Restricción de integridad", "No es posible eliminar el inquilino porque tiene contratos o cobros históricos asociados. Utilice 'Deshabilitar' en su lugar.");
-            }
-        }
-    }
-
-    @FXML
-    public void limpiarFormulario() {
-        inquilinoSeleccionado = null;
-        txtNombre.clear();
-        txtIdentificacion.clear();
-        txtTelefono.clear();
-        txtCorreo.clear();
-        txtContactoEmergencia.clear();
-        chkActivo.setSelected(true);
-        tblInquilinos.getSelectionModel().clearSelection();
-    }
-
-    private void seleccionarInquilino(Inquilino inq) {
-        this.inquilinoSeleccionado = inq;
-        txtNombre.setText(inq.getNombre());
-        txtIdentificacion.setText(inq.getIdentificacion() != null ? inq.getIdentificacion() : "");
-        txtTelefono.setText(inq.getTelefono() != null ? inq.getTelefono() : "");
-        txtCorreo.setText(inq.getCorreo() != null ? inq.getCorreo() : "");
-        txtContactoEmergencia.setText(inq.getContactoEmergencia() != null ? inq.getContactoEmergencia() : "");
-        chkActivo.setSelected(inq.isActivo());
+    @FXML public void limpiarFiltros() { txtBuscar.clear(); }
+    private void ocultarError() { lblErrorConsulta.setText(""); lblErrorConsulta.setVisible(false); lblErrorConsulta.setManaged(false); }
+    private static boolean contiene(String valor, String filtro) { return valor != null && valor.toLowerCase(Locale.ROOT).contains(filtro); }
+    private static String mensajeError(Throwable error) {
+        if (error instanceof IllegalArgumentException || error instanceof SecurityException
+                || error instanceof IllegalStateException) return error.getMessage();
+        return "No se pudo guardar el inquilino. Revisa los datos e inténtalo de nuevo.";
     }
 }

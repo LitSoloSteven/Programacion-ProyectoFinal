@@ -47,6 +47,19 @@ public final class FormatoTabla {
         };
     }
 
+    public static <S> Callback<TableColumn<S, Integer>, TableCell<S, Integer>> entero() {
+        return columna -> new TableCell<>() {
+            {
+                if (!getStyleClass().contains("col-numeric")) getStyleClass().add("col-numeric");
+            }
+            @Override protected void updateItem(Integer valor, boolean vacia) {
+                super.updateItem(valor, vacia);
+                setText(vacia || valor == null ? null : valor.toString());
+                setGraphic(null);
+            }
+        };
+    }
+
     public static <S> Callback<TableColumn<S, String>, TableCell<S, String>> estado() {
         return columna -> new TableCell<>() {
             @Override protected void updateItem(String valor, boolean vacia) {

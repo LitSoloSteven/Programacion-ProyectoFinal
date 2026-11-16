@@ -1,109 +1,45 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.geometry.Insets?>
-<?import javafx.scene.control.*?>
-<?import javafx.scene.layout.*?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
 
 <VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
-      fx:controller="ni.edu.uam.proyectofinalprogramacionappescritorio.controller.UnidadController"
-      spacing="18.0" styleClass="view-container">
-
-    <padding>
-        <Insets bottom="24.0" left="28.0" right="28.0" top="24.0" />
-    </padding>
-
-    <!-- ENCABEZADO -->
-    <HBox alignment="CENTER_LEFT" spacing="12.0">
+      fx:id="rootView" fx:controller="ni.edu.uam.proyectofinalprogramacionappescritorio.controller.UnidadController"
+      spacing="16.0" styleClass="view-container">
+    <HBox alignment="CENTER_LEFT" spacing="16.0" styleClass="page-header">
         <VBox spacing="4.0" HBox.hgrow="ALWAYS">
-            <Label styleClass="page-title" text="🚪 Gestión de Unidades Inmobiliarias" />
-            <Label styleClass="page-subtitle" text="Administre cuartos, apartamentos, casas y locales con datos de PostgreSQL" />
+            <Label fx:id="lblTitulo" styleClass="page-title" text="Unidades" />
+            <Label styleClass="page-subtitle" text="Inventario, disponibilidad y canon base." />
         </VBox>
-        <Button onAction="#refrescarTabla" styleClass="btn-secondary" text="🔄 Refrescar" />
+        <Button fx:id="btnRefrescar" onAction="#refrescarTabla" styleClass="button-secondary" text="Actualizar" />
+        <Button fx:id="btnNuevo" onAction="#handleNuevo" styleClass="button-primary" text="Nueva unidad" />
     </HBox>
-
-    <!-- FORMULARIO DE REGISTRO / EDICIÓN -->
-    <VBox spacing="14.0" styleClass="form-card">
-        <Label styleClass="form-card-title" text="Datos de la Unidad" />
-
-        <GridPane hgap="16.0" vgap="12.0">
-            <columnConstraints>
-                <ColumnConstraints percentWidth="30.0" />
-                <ColumnConstraints percentWidth="20.0" />
-                <ColumnConstraints percentWidth="20.0" />
-                <ColumnConstraints percentWidth="15.0" />
-                <ColumnConstraints percentWidth="15.0" />
-            </columnConstraints>
-
-            <!-- Propiedad asociada (ComboBox con datos reales de PostgreSQL) -->
-            <VBox spacing="4.0" GridPane.columnIndex="0" GridPane.rowIndex="0">
-                <Label styleClass="form-label" text="Propiedad / Inmueble *" />
-                <ComboBox fx:id="cmbPropiedad" maxWidth="Infinity" promptText="Seleccione inmueble..." />
-            </VBox>
-
-            <!-- Código de unidad -->
-            <VBox spacing="4.0" GridPane.columnIndex="1" GridPane.rowIndex="0">
-                <Label styleClass="form-label" text="Código / N° *" />
-                <TextField fx:id="txtCodigo" promptText="ej. A-101, C-02" />
-            </VBox>
-
-            <VBox spacing="4.0" GridPane.columnIndex="0" GridPane.rowIndex="2" GridPane.columnSpan="2">
-                <Label styleClass="form-label" text="Descripción" />
-                <TextField fx:id="txtDescripcion" promptText="Detalles de la unidad (máximo 255 caracteres)" />
-            </VBox>
-
-            <!-- Tipo de unidad -->
-            <VBox spacing="4.0" GridPane.columnIndex="2" GridPane.rowIndex="0">
-                <Label styleClass="form-label" text="Tipo *" />
-                <ComboBox fx:id="cmbTipo" maxWidth="Infinity" />
-            </VBox>
-
-            <!-- Canon de Referencia -->
-            <VBox spacing="4.0" GridPane.columnIndex="3" GridPane.rowIndex="0">
-                <Label styleClass="form-label" text="Canon Base *" />
-                <TextField fx:id="txtCanon" promptText="ej. 450.00" />
-            </VBox>
-
-            <!-- Moneda -->
-            <VBox spacing="4.0" GridPane.columnIndex="4" GridPane.rowIndex="0">
-                <Label styleClass="form-label" text="Moneda *" />
-                <ComboBox fx:id="cmbMoneda" maxWidth="Infinity" />
-            </VBox>
-
-            <!-- Estado de disponibilidad -->
-            <VBox spacing="4.0" GridPane.columnIndex="0" GridPane.rowIndex="1">
-                <Label styleClass="form-label" text="Estado de Disponibilidad *" />
-                <ComboBox fx:id="cmbEstado" maxWidth="Infinity" />
-            </VBox>
-        </GridPane>
-
-        <!-- BOTONES DE ACCIÓN -->
-        <HBox alignment="CENTER_RIGHT" spacing="10.0">
-            <Button onAction="#limpiarFormulario" styleClass="btn-secondary" text="Limpiar Formulario" />
-            <Button fx:id="btnEliminar" onAction="#handleEliminar" styleClass="btn-danger" text="Eliminar Unidad" />
-            <Button onAction="#handleGuardar" styleClass="btn-primary" text="Guardar Unidad" />
+    <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
+        <TextField fx:id="txtBuscar" prefWidth="360.0" promptText="Buscar por código, tipo, descripción o propiedad" styleClass="search-field" />
+        <Button fx:id="btnLimpiar" onAction="#limpiarFiltros" styleClass="button-secondary" text="Limpiar" />
+        <Label fx:id="lblContador" styleClass="secondary-text" text="0 registros" HBox.hgrow="ALWAYS" />
+        <HBox fx:id="eliminarTooltipHost">
+            <Button fx:id="btnEliminar" disable="true" onAction="#handleEliminar"
+                    styleClass="button-destructive" text="Eliminar unidad" />
         </HBox>
-    </VBox>
-
-    <!-- TABLA DE UNIDADES -->
-    <VBox spacing="8.0" VBox.vgrow="ALWAYS">
-        <HBox alignment="CENTER_LEFT" spacing="12.0">
-            <Label styleClass="table-title" text="Inventario de Unidades" HBox.hgrow="ALWAYS" />
-            <TextField fx:id="txtBuscar" promptText="🔍 Buscar por código, tipo o inmueble..." prefWidth="320.0" />
-        </HBox>
-
-        <TableView fx:id="tblUnidades" VBox.vgrow="ALWAYS">
-            <columns>
-                <TableColumn fx:id="colPropiedad" prefWidth="260.0" text="Inmueble / Propiedad" />
-                <TableColumn fx:id="colCodigo" prefWidth="120.0" text="Código" />
-                <TableColumn fx:id="colTipo" prefWidth="160.0" text="Tipo" />
-                <TableColumn fx:id="colEstado" prefWidth="140.0" text="Estado" />
-                <TableColumn fx:id="colCanon" prefWidth="150.0" text="Canon de Referencia" />
-                <TableColumn fx:id="colDescripcion" prefWidth="220.0" text="Descripción" />
-            </columns>
-            <placeholder>
-                <Label text="No hay unidades registradas en PostgreSQL." />
-            </placeholder>
-        </TableView>
-    </VBox>
-
+    </HBox>
+    <Label fx:id="lblErrorConsulta" managed="false" minHeight="18.0" styleClass="field-error"
+           text="" visible="false" wrapText="true" />
+    <TableView fx:id="tblUnidades" styleClass="data-table" VBox.vgrow="ALWAYS">
+        <placeholder><Label text="Aún no hay unidades registradas." /></placeholder>
+        <columns>
+            <TableColumn fx:id="colPropiedad" minWidth="220.0" prefWidth="220.0" text="Propiedad" />
+            <TableColumn fx:id="colCodigo" minWidth="110.0" prefWidth="110.0" text="Código" />
+            <TableColumn fx:id="colTipo" minWidth="145.0" prefWidth="145.0" text="Tipo" />
+            <TableColumn fx:id="colEstado" minWidth="130.0" prefWidth="130.0" text="Disponibilidad" />
+            <TableColumn fx:id="colCanon" minWidth="145.0" prefWidth="145.0" text="Canon" />
+            <TableColumn fx:id="colDescripcion" minWidth="210.0" prefWidth="210.0" text="Descripción" />
+            <TableColumn fx:id="colAcciones" minWidth="48.0" prefWidth="48.0" maxWidth="48.0" text="" />
+        </columns>
+    </TableView>
 </VBox>

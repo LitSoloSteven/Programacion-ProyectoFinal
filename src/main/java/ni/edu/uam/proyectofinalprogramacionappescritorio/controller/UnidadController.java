@@ -1,321 +1,247 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
+import javafx.concurrent.Task;
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.scene.control.*;
-import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Node;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.Label;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+import javafx.stage.Window;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propiedad;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Unidad;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PropiedadService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.UnidadService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AccionesTabla;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AtajosLista;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.DialogoFormulario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoTabla;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PanelEstadoTabla;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Locale;
 
-/**
- * Controlador de la vista de Unidades.
- * Consume datos reales de propiedades y unidades desde PostgreSQL mediante Services.
- */
+/** Inventario de unidades con filtros locales y operaciones fuera del hilo FX. */
 public class UnidadController {
-
-    @FXML
-    private ComboBox<Propiedad> cmbPropiedad;
-
-    @FXML
-    private TextField txtCodigo;
-
-    @FXML
-    private TextField txtDescripcion;
-
-    @FXML
-    private ComboBox<String> cmbTipo;
-
-    @FXML
-    private ComboBox<String> cmbEstado;
-
-    @FXML
-    private TextField txtCanon;
-
-    @FXML
-    private ComboBox<String> cmbMoneda;
-
-    @FXML
-    private Button btnEliminar;
-
-    @FXML
-    private TextField txtBuscar;
-
-    @FXML
-    private TableView<Unidad> tblUnidades;
-
-    @FXML
-    private TableColumn<Unidad, String> colPropiedad;
-
-    @FXML
-    private TableColumn<Unidad, String> colCodigo;
-
-    @FXML
-    private TableColumn<Unidad, String> colTipo;
-
-    @FXML
-    private TableColumn<Unidad, String> colEstado;
-
-    @FXML
-    private TableColumn<Unidad, String> colCanon;
-
-    @FXML
-    private TableColumn<Unidad, String> colDescripcion;
+    @FXML private VBox rootView;
+    @FXML private HBox eliminarTooltipHost;
+    @FXML private Button btnNuevo;
+    @FXML private Button btnRefrescar;
+    @FXML private Button btnLimpiar;
+    @FXML private Button btnEliminar;
+    @FXML private Label lblTitulo;
+    @FXML private Label lblContador;
+    @FXML private Label lblErrorConsulta;
+    @FXML private TextField txtBuscar;
+    @FXML private TableView<Unidad> tblUnidades;
+    @FXML private TableColumn<Unidad, String> colPropiedad;
+    @FXML private TableColumn<Unidad, String> colCodigo;
+    @FXML private TableColumn<Unidad, String> colTipo;
+    @FXML private TableColumn<Unidad, String> colEstado;
+    @FXML private TableColumn<Unidad, String> colCanon;
+    @FXML private TableColumn<Unidad, String> colDescripcion;
+    @FXML private TableColumn<Unidad, Void> colAcciones;
 
     private final UnidadService unidadService;
     private final PropiedadService propiedadService;
+    private final ObservableList<Unidad> registros = FXCollections.observableArrayList();
+    private final FilteredList<Unidad> filtrados = new FilteredList<>(registros, item -> true);
+    private List<Propiedad> propiedadesDisponibles = List.of();
+    private Unidad seleccionada;
+    private final boolean permisoEliminar = SesionUsuario.esPropietario();
+    private long versionConsulta;
 
-    private final ObservableList<Unidad> listaUnidades = FXCollections.observableArrayList();
-    private FilteredList<Unidad> listaFiltrada;
-    private Unidad unidadSeleccionada = null;
+    private record DatosTabla(List<Propiedad> propiedades, List<Unidad> unidades) { }
 
     public UnidadController() {
         this(HelloApplication.instancia().getComposicion().unidades(),
                 HelloApplication.instancia().getComposicion().propiedades());
     }
-
     public UnidadController(UnidadService unidadService, PropiedadService propiedadService) {
         this.unidadService = unidadService;
         this.propiedadService = propiedadService;
     }
 
-    @FXML
-    public void initialize() {
-        inicializarCombos();
-        configurarTabla();
-        configurarFiltro();
-        aplicarControlPermisos();
-
-        cargarPropiedadesReales();
+    @FXML public void initialize() {
+        lblTitulo.setGraphic(Iconos.crear(Iconos.Nombre.UNIDAD, 20));
+        Iconos.asignar(btnRefrescar, Iconos.Nombre.ACTUALIZAR, 16);
+        Iconos.asignar(btnNuevo, Iconos.Nombre.MAS, 16);
+        Iconos.asignar(btnLimpiar, Iconos.Nombre.CERRAR, 14);
+        Iconos.asignar(btnEliminar, Iconos.Nombre.ELIMINAR, 16);
+        Tooltip.install(eliminarTooltipHost, new Tooltip(permisoEliminar
+                ? "Selecciona una unidad para eliminarla." : "Solo el propietario puede eliminar unidades."));
+        btnEliminar.setDisable(true);
+        tblUnidades.setItems(filtrados);
+        tblUnidades.setPlaceholder(PanelEstadoTabla.crear("Cargando unidades", "El inventario aparecerá al terminar la consulta.", null, null));
+        colPropiedad.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getPropiedadNombre()));
+        colCodigo.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getCodigo()));
+        colTipo.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getTipo()));
+        colEstado.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getEstado()));
+        colEstado.setCellFactory(FormatoTabla.estado());
+        colCanon.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getCanonFormateado()));
+        colCanon.setCellFactory(FormatoTabla.numerica());
+        colDescripcion.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getDescripcion()));
+        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>("Editar unidad", this::abrirEdicion)));
+        tblUnidades.getSelectionModel().selectedItemProperty().addListener((obs, anterior, actual) -> {
+            seleccionada = actual;
+            btnEliminar.setDisable(actual == null || !permisoEliminar);
+        });
+        txtBuscar.textProperty().addListener((obs, anterior, actual) -> aplicarFiltro(actual));
+        AtajosLista.instalar(rootView, txtBuscar, this::handleNuevo);
+        aplicarFiltro("");
         cargarDatos();
-
-        tblUnidades.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null) {
-                seleccionarUnidad(newVal);
-            }
-        });
     }
 
-    private void inicializarCombos() {
-        cmbTipo.setItems(FXCollections.observableArrayList("Apartamento", "Casa", "Cuarto", "Local comercial"));
-        cmbTipo.getSelectionModel().selectFirst();
-
-        cmbEstado.setItems(FXCollections.observableArrayList("Disponible", "En mantenimiento", "Inactiva"));
-        cmbEstado.getSelectionModel().selectFirst();
-
-        cmbMoneda.setItems(FXCollections.observableArrayList("USD", "NIO"));
-        cmbMoneda.getSelectionModel().selectFirst();
-    }
-
-    private void configurarTabla() {
-        colPropiedad.setCellValueFactory(new PropertyValueFactory<>("propiedadNombre"));
-        colCodigo.setCellValueFactory(new PropertyValueFactory<>("codigo"));
-        colTipo.setCellValueFactory(new PropertyValueFactory<>("tipo"));
-        colEstado.setCellValueFactory(new PropertyValueFactory<>("estado"));
-        colCanon.setCellValueFactory(new PropertyValueFactory<>("canonFormateado"));
-        colDescripcion.setCellValueFactory(new PropertyValueFactory<>("descripcion"));
-
-        listaFiltrada = new FilteredList<>(listaUnidades, u -> true);
-        tblUnidades.setItems(listaFiltrada);
-    }
-
-    private void configurarFiltro() {
-        txtBuscar.textProperty().addListener((obs, oldVal, newVal) -> {
-            listaFiltrada.setPredicate(u -> {
-                if (newVal == null || newVal.isBlank()) return true;
-                String filtro = newVal.toLowerCase().trim();
-                boolean matchCod = u.getCodigo() != null && u.getCodigo().toLowerCase().contains(filtro);
-                boolean matchProp = u.getPropiedadNombre() != null && u.getPropiedadNombre().toLowerCase().contains(filtro);
-                boolean matchTipo = u.getTipo() != null && u.getTipo().toLowerCase().contains(filtro);
-                boolean matchDescripcion = u.getDescripcion() != null && u.getDescripcion().toLowerCase().contains(filtro);
-                return matchCod || matchProp || matchTipo || matchDescripcion;
-            });
-        });
-    }
-
-    private void aplicarControlPermisos() {
-        boolean esAdmin = SesionUsuario.esPropietario();
-        btnEliminar.setVisible(esAdmin);
-        btnEliminar.setManaged(esAdmin);
-    }
-
-    public void cargarPropiedadesReales() {
-        try {
-            List<Propiedad> props = propiedadService.listarActivas();
-            cmbPropiedad.setItems(FXCollections.observableArrayList(props));
-            if (!props.isEmpty()) {
-                cmbPropiedad.getSelectionModel().selectFirst();
-            }
-        } catch (SQLException e) {
-            AlertaUtil.mostrarError("Error al cargar propiedades", "No se pudieron obtener las propiedades reales de la base de datos.");
-        }
+    private void aplicarFiltro(String texto) {
+        String filtro = texto == null ? "" : texto.strip().toLowerCase(Locale.ROOT);
+        filtrados.setPredicate(unidad -> filtro.isEmpty()
+                || contiene(unidad.getCodigo(), filtro) || contiene(unidad.getPropiedadNombre(), filtro)
+                || contiene(unidad.getTipo(), filtro) || contiene(unidad.getDescripcion(), filtro));
+        lblContador.setText(filtrados.size() + (filtrados.size() == 1 ? " registro" : " registros"));
+        tblUnidades.setPlaceholder(PanelEstadoTabla.crear(filtro.isEmpty() ? "Aún no hay unidades" : "No hay coincidencias",
+                filtro.isEmpty() ? "Las unidades registradas aparecerán aquí." : "Prueba con otro término o limpia la búsqueda.",
+                filtro.isEmpty() ? "Nueva unidad" : "Limpiar búsqueda",
+                filtro.isEmpty() ? this::handleNuevo : this::limpiarFiltros));
     }
 
     public void cargarDatos() {
+        btnRefrescar.setDisable(true);
+        long version = ++versionConsulta;
+        Task<DatosTabla> tarea = new Task<>() {
+            @Override protected DatosTabla call() throws SQLException {
+                return new DatosTabla(propiedadService.listarActivas(), unidadService.listarTodas());
+            }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
+            if (version != versionConsulta) return;
+            propiedadesDisponibles = datos.propiedades();
+            registros.setAll(datos.unidades());
+            aplicarFiltro(txtBuscar.getText());
+            ocultarError();
+            btnRefrescar.setDisable(false);
+        }, error -> {
+            if (version == versionConsulta) {
+                lblErrorConsulta.setText("No se pudieron cargar las unidades. Vuelve a intentarlo.");
+                lblErrorConsulta.setVisible(true); lblErrorConsulta.setManaged(true);
+                tblUnidades.setPlaceholder(PanelEstadoTabla.crear("No se pudieron cargar las unidades",
+                        "Vuelve a intentarlo.", "Reintentar", this::cargarDatos));
+            }
+            btnRefrescar.setDisable(false);
+        });
+    }
+
+    @FXML public void refrescarTabla() { cargarDatos(); }
+    @FXML public void handleNuevo() { abrirFormulario(null); }
+    private void abrirEdicion(Unidad unidad) { abrirFormulario(unidad); }
+
+    private void abrirFormulario(Unidad existente) {
         try {
-            List<Unidad> datos = unidadService.listarTodas();
-            listaUnidades.setAll(datos);
-        } catch (SQLException e) {
-            AlertaUtil.mostrarError("Error al cargar unidades", "No fue posible consultar las unidades desde PostgreSQL.");
+            FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource("unidad-form.fxml"));
+            Node contenido = loader.load();
+            UnidadFormController formulario = loader.getController();
+            formulario.establecerPropiedades(propiedadesDisponibles);
+            if (existente != null) formulario.cargar(existente);
+            Window propietario = tblUnidades.getScene() == null ? null : tblUnidades.getScene().getWindow();
+            boolean nueva = existente == null;
+            Dialog<ButtonType> dialogo = DialogoFormulario.crear(nueva ? "Nueva unidad" : "Editar unidad",
+                    contenido, propietario, 680, 640, nueva ? "Guardar unidad" : "Guardar cambios");
+            DialogoFormulario.protegerCambiosSinGuardar(dialogo, nueva ? btnNuevo : tblUnidades, formulario::hayCambios);
+            ButtonType tipoAccion = dialogo.getDialogPane().getButtonTypes().getFirst();
+            Button accion = (Button) dialogo.getDialogPane().lookupButton(tipoAccion);
+            accion.addEventFilter(ActionEvent.ACTION, evento -> {
+                evento.consume();
+                if (!formulario.validar()) return;
+                UnidadFormController.Datos datos = formulario.datos();
+                accion.setDisable(true); accion.setText("Guardando unidad…");
+                Task<Void> tarea = new Task<>() {
+                    @Override protected Void call() throws SQLException {
+                        if (nueva) {
+                            Unidad nuevaUnidad = new Unidad();
+                            nuevaUnidad.setPropiedadId(datos.propiedad().getId());
+                            nuevaUnidad.setCodigo(datos.codigo());
+                            nuevaUnidad.setDescripcion(datos.descripcion());
+                            nuevaUnidad.setTipo(datos.tipo());
+                            nuevaUnidad.setEstado(datos.estado());
+                            nuevaUnidad.setCanonReferencia(datos.canon());
+                            nuevaUnidad.setMoneda(datos.moneda());
+                            unidadService.guardar(nuevaUnidad);
+                        } else {
+                            unidadService.actualizar(existente.getId(), existente.getVersion(), datos.propiedad().getId(),
+                                    datos.codigo(), datos.descripcion(), datos.tipo(), datos.estado(), datos.canon(), datos.moneda());
+                        }
+                        return null;
+                    }
+                };
+                TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+                    formulario.marcarLimpio(); DialogoFormulario.cerrar(dialogo);
+                    AlertaUtil.mostrarExito(nueva ? "Unidad registrada" : "Unidad actualizada",
+                            nueva ? "La unidad quedó registrada." : "Los cambios quedaron guardados.");
+                    cargarDatos();
+                }, error -> {
+                    accion.setDisable(false); accion.setText(nueva ? "Guardar unidad" : "Guardar cambios");
+                    formulario.mostrarError(mensajeError(error));
+                });
+            });
+            dialogo.showAndWait();
+        } catch (IOException error) {
+            AlertaUtil.mostrarError("No se pudo abrir el formulario", "Vuelve a intentarlo.");
         }
     }
 
-    @FXML
-    public void refrescarTabla() {
-        cargarPropiedadesReales();
-        cargarDatos();
-        limpiarFormulario();
-        AlertaUtil.mostrarExito("Tabla actualizada", "El inventario de unidades ha sido sincronizado con PostgreSQL.");
-    }
-
-    @FXML
-    public void handleGuardar() {
-        Propiedad prop = cmbPropiedad.getValue();
-        String codigo = txtCodigo.getText();
-        String tipo = cmbTipo.getValue();
-        String estado = cmbEstado.getValue();
-        String strCanon = txtCanon.getText();
-        String moneda = cmbMoneda.getValue();
-
-        // Validaciones de formulario
-        if (prop == null) {
-            AlertaUtil.mostrarAdvertencia("Campo obligatorio", "Debe seleccionar un inmueble para asociar la unidad.");
-            cmbPropiedad.requestFocus();
-            return;
-        }
-
-        if (codigo == null || codigo.trim().isEmpty()) {
-            AlertaUtil.mostrarAdvertencia("Campo obligatorio", "Debe ingresar el código o número de la unidad.");
-            txtCodigo.requestFocus();
-            return;
-        }
-
-        BigDecimal canon;
-        try {
-            canon = new BigDecimal(strCanon.trim());
-            if (canon.compareTo(BigDecimal.ZERO) <= 0) {
-                AlertaUtil.mostrarAdvertencia("Valor inválido", "El canon de referencia debe ser mayor a cero.");
-                txtCanon.requestFocus();
-                return;
-            }
-        } catch (Exception e) {
-            AlertaUtil.mostrarAdvertencia("Formato numérico inválido", "Ingrese un valor decimal válido para el canon (ej. 450.00).");
-            txtCanon.requestFocus();
-            return;
-        }
-
-        try {
-            if (unidadSeleccionada == null) {
-                // Nueva unidad
-                Unidad nueva = new Unidad();
-                nueva.setPropiedadId(prop.getId());
-                nueva.setCodigo(codigo.trim());
-                nueva.setDescripcion(normalizarDescripcion(txtDescripcion.getText()));
-                nueva.setTipo(tipo);
-                nueva.setEstado(estado);
-                nueva.setCanonReferencia(canon);
-                nueva.setMoneda(moneda);
-
-                unidadService.guardar(nueva);
-                AlertaUtil.mostrarExito("Registro exitoso", "La unidad ha sido guardada satisfactoriamente en PostgreSQL.");
-            } else {
-                unidadService.actualizar(unidadSeleccionada.getId(),
-                        unidadSeleccionada.getVersion(), prop.getId(), codigo.trim(),
-                        normalizarDescripcion(txtDescripcion.getText()), tipo, estado,
-                        canon, moneda);
-                AlertaUtil.mostrarExito("Actualización exitosa", "Los datos de la unidad fueron actualizados.");
-            }
-
+    @FXML public void handleEliminar() {
+        Unidad unidad = seleccionada;
+        if (unidad == null || !permisoEliminar) return;
+        String registro = "Unidad: " + unidad.getCodigo() + " · " + unidad.getPropiedadNombre();
+        if (!AlertaUtil.mostrarConfirmacionDestructiva("Eliminar unidad", registro,
+                "El registro se eliminará físicamente si no tiene contratos o cargos asociados.", "Eliminar unidad")) return;
+        btnEliminar.setDisable(true);
+        Task<Void> tarea = new Task<>() {
+            @Override protected Void call() throws SQLException { unidadService.eliminar(unidad.getId()); return null; }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+            seleccionada = null;
+            AlertaUtil.mostrarExito("Unidad eliminada", "El registro de la unidad se eliminó.");
             cargarDatos();
-            limpiarFormulario();
-        } catch (IllegalArgumentException e) {
-            AlertaUtil.mostrarAdvertencia("Datos inválidos", e.getMessage());
-        } catch (SecurityException e) {
-            AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
-        } catch (IllegalStateException e) {
-            AlertaUtil.mostrarError("Error de persistencia", e.getMessage());
-        } catch (SQLException e) {
-            AlertaUtil.mostrarError("Error de persistencia", "No fue posible guardar la unidad. Verifique que el código no esté duplicado en el mismo inmueble.");
-        }
-    }
-
-    @FXML
-    public void handleEliminar() {
-        if (unidadSeleccionada == null) {
-            AlertaUtil.mostrarAdvertencia("Selección requerida", "Seleccione una unidad de la tabla para eliminar.");
-            return;
-        }
-
-        boolean confirma = AlertaUtil.mostrarConfirmacion(
-                "Confirmar eliminación",
-                "¿Está seguro de que desea eliminar la unidad '" + unidadSeleccionada.getCodigo() + "'?"
-        );
-
-        if (confirma) {
-            try {
-                unidadService.eliminar(unidadSeleccionada.getId());
-                AlertaUtil.mostrarExito("Registro eliminado", "La unidad fue eliminada correctamente.");
-                cargarDatos();
-                limpiarFormulario();
-            } catch (SecurityException e) {
-                AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
-            } catch (IllegalStateException e) {
-                AlertaUtil.mostrarError("Error de persistencia", e.getMessage());
-            } catch (SQLException e) {
-                AlertaUtil.mostrarError("Restricción de integridad", "No es posible eliminar la unidad porque tiene contratos o cobros asociados.");
+        }, error -> {
+            btnEliminar.setDisable(seleccionada == null || !permisoEliminar);
+            if (error instanceof SecurityException) {
+                AlertaUtil.mostrarAdvertencia("No tienes permiso", "Solo el propietario puede eliminar unidades.");
+            } else if (error instanceof IllegalStateException) {
+                AlertaUtil.mostrarAdvertencia("La unidad tiene registros asociados",
+                        "No se puede eliminar mientras tenga contratos o cargos. Puedes marcarla como Inactiva.");
+            } else {
+                AlertaUtil.mostrarError("No se pudo eliminar la unidad", "Revisa las relaciones asociadas e inténtalo de nuevo.");
             }
-        }
+        });
     }
 
-    @FXML
-    public void limpiarFormulario() {
-        unidadSeleccionada = null;
-        txtCodigo.clear();
-        txtDescripcion.clear();
-        txtCanon.clear();
-        if (!cmbPropiedad.getItems().isEmpty()) {
-            cmbPropiedad.getSelectionModel().selectFirst();
-        } else {
-            cmbPropiedad.getSelectionModel().clearSelection();
-        }
-        if (!cmbTipo.getItems().isEmpty()) cmbTipo.getSelectionModel().selectFirst();
-        if (!cmbEstado.getItems().isEmpty()) cmbEstado.getSelectionModel().selectFirst();
-        if (!cmbMoneda.getItems().isEmpty()) cmbMoneda.getSelectionModel().selectFirst();
-        tblUnidades.getSelectionModel().clearSelection();
+    @FXML public void limpiarFiltros() { txtBuscar.clear(); }
+    private void ocultarError() { lblErrorConsulta.setText(""); lblErrorConsulta.setVisible(false); lblErrorConsulta.setManaged(false); }
+    private static boolean contiene(String texto, String filtro) {
+        return texto != null && texto.toLowerCase(Locale.ROOT).contains(filtro);
     }
-
-    private void seleccionarUnidad(Unidad u) {
-        this.unidadSeleccionada = u;
-        txtCodigo.setText(u.getCodigo());
-        txtDescripcion.setText(u.getDescripcion());
-        txtCanon.setText(u.getCanonReferencia() != null ? u.getCanonReferencia().toPlainString() : "");
-        cmbTipo.setValue(u.getTipo());
-        cmbEstado.setValue(u.getEstado());
-        cmbMoneda.setValue(u.getMoneda());
-
-        // Seleccionar en ComboBox de Propiedad
-        for (Propiedad p : cmbPropiedad.getItems()) {
-            if (p.getId().equals(u.getPropiedadId())) {
-                cmbPropiedad.setValue(p);
-                break;
-            }
-        }
-    }
-
-    private String normalizarDescripcion(String descripcion) {
-        if (descripcion == null || descripcion.isBlank()) return null;
-        String valor = descripcion.strip();
-        if (valor.length() > 255) throw new IllegalArgumentException("La descripción no puede superar 255 caracteres.");
-        return valor;
+    private static String mensajeError(Throwable error) {
+        if (error instanceof IllegalArgumentException || error instanceof SecurityException
+                || error instanceof IllegalStateException) return error.getMessage();
+        return "No se pudo guardar la unidad. Revisa los datos e inténtalo de nuevo.";
     }
 }
