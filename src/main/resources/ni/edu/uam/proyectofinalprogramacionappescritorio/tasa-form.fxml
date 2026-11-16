@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.DatePicker?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="ni.edu.uam.proyectofinalprogramacionappescritorio.controller.TasaFormController"
+      spacing="16.0" styleClass="form-dialog-content">
+    <padding><Insets bottom="20.0" left="20.0" right="20.0" top="16.0" /></padding>
+    <Label fx:id="lblResumenError" managed="false" styleClass="field-error"
+           text="" visible="false" wrapText="true" />
+    <VBox fx:id="panelRegistro" spacing="14.0">
+        <Label styleClass="section-title" text="Registrar tasa informativa" />
+        <GridPane hgap="16.0" vgap="8.0">
+            <columnConstraints><ColumnConstraints percentWidth="32.0" /><ColumnConstraints percentWidth="33.0" /><ColumnConstraints percentWidth="35.0" /></columnConstraints>
+            <VBox spacing="6.0" GridPane.columnIndex="0">
+                <Label styleClass="field-label" text="Fecha *" />
+                <DatePicker fx:id="dpFecha" maxWidth="Infinity" styleClass="field" />
+                <Label fx:id="lblErrorFecha" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
+            </VBox>
+            <VBox spacing="6.0" GridPane.columnIndex="1">
+                <Label styleClass="field-label" text="Tasa NIO por USD *" />
+                <TextField fx:id="txtTasa" promptText="36.75000000" styleClass="field" />
+                <Label fx:id="lblErrorTasa" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
+            </VBox>
+            <VBox spacing="6.0" GridPane.columnIndex="2">
+                <Label styleClass="field-label" text="Fuente *" />
+                <TextField fx:id="txtFuente" promptText="BCN" styleClass="field" />
+                <Label fx:id="lblErrorFuente" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
+            </VBox>
+        </GridPane>
+        <Label styleClass="field-help" text="La tasa se registra como referencia y requiere autorización antes de usarse en pagos. Se conserva con la precisión devuelta por el servicio." wrapText="true" />
+    </VBox>
+    <VBox fx:id="panelAutorizacion" managed="false" spacing="12.0" visible="false">
+        <Label styleClass="section-title" text="Autorización" />
+        <Label fx:id="lblTasaSeleccionada" styleClass="review-value" wrapText="true" />
+        <Label fx:id="lblFuenteSeleccionada" styleClass="field-help" wrapText="true" />
+        <Label fx:id="lblBandaInformativa" styleClass="field-help" wrapText="true" />
+        <Label styleClass="field-label" text="Motivo de autorización *" />
+        <TextField fx:id="txtMotivo" promptText="Explica por qué autorizas esta tasa" styleClass="field" />
+        <Label fx:id="lblErrorMotivo" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
+    </VBox>
+</VBox>

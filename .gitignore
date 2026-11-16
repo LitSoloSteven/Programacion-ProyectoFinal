@@ -1,6 +1,8 @@
 target/
 .idea/
 *.iml
+.agents/
+docs/dashboard-latch-mockup.svg
 .env
 .env.*
 !.env.example
