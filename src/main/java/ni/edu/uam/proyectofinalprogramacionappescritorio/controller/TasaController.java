@@ -4,13 +4,22 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Node;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
-import javafx.scene.control.DatePicker;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+import javafx.stage.Window;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.TasaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
@@ -19,36 +28,46 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteExc
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.TipoCambio;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AccionesTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AtajosLista;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.DialogoFormulario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoTasa;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.InsigniaEstado;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PanelEstadoTabla;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.SesionExpiradaUtil;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TemaAplicacion;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Consumer;
 
-/**
- * Pantalla de tasas NIO por USD. Toda la comunicación pasa por la API local y
- * se ejecuta en segundo plano para no bloquear el hilo de JavaFX.
- */
+/** Registro informativo y autorización de tasas NIO por USD. */
 public class TasaController {
-    private static final DateTimeFormatter FECHA_VISIBLE =
-            DateTimeFormatter.ofPattern("dd/MM/yyyy");
-    private static final DateTimeFormatter INSTANTE_VISIBLE =
-            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
-                    .withZone(RelojService.ZONA_OPERATIVA);
+    private static final DateTimeFormatter FECHA_VISIBLE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final DateTimeFormatter INSTANTE_VISIBLE = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
+            .withZone(RelojService.ZONA_OPERATIVA);
 
-    @FXML private DatePicker dpFecha;
-    @FXML private TextField txtTasa;
-    @FXML private TextField txtFuente;
-    @FXML private TextField txtMotivo;
+    @FXML private VBox rootView;
+    @FXML private HBox autorizacionTooltipHost;
     @FXML private Button btnRegistrar;
     @FXML private Button btnAutorizar;
     @FXML private Button btnRefrescar;
+    @FXML private Button btnLimpiar;
+    @FXML private Label lblContador;
+    @FXML private Label lblErrorConsulta;
     @FXML private Label lblSeleccion;
+    @FXML private Label lblTitulo;
+    @FXML private TextField txtBuscar;
     @FXML private TableView<TasaResponse> tblTasas;
     @FXML private TableColumn<TasaResponse, String> colFecha;
     @FXML private TableColumn<TasaResponse, String> colTasa;
@@ -57,198 +76,228 @@ public class TasaController {
     @FXML private TableColumn<TasaResponse, String> colAutorizadoPor;
     @FXML private TableColumn<TasaResponse, String> colRegistrado;
     @FXML private TableColumn<TasaResponse, String> colMotivo;
+    @FXML private TableColumn<TasaResponse, Void> colAcciones;
 
-    private final ObservableList<TasaResponse> tasas = FXCollections.observableArrayList();
-    private final ClienteTasas cliente = new ClienteTasas(ClienteLatch.api());
+    private final ObservableList<TasaResponse> tasasVisibles = FXCollections.observableArrayList();
+    private final List<TasaResponse> tasasCargadas = new ArrayList<>();
+    private final ClienteTasas cliente;
     private TasaResponse seleccionada;
+    private final boolean permisoAutorizar;
     private int operacionesEnCurso;
+    private long versionConsulta;
 
-    @FXML
-    public void initialize() {
-        configurarTabla();
-        dpFecha.setValue(LocalDate.now(RelojService.ZONA_OPERATIVA));
-        boolean propietario = SesionUsuario.esPropietario();
-        btnAutorizar.setVisible(propietario);
-        btnAutorizar.setManaged(propietario);
-        actualizarSeleccion(null);
+    public TasaController() { this(new ClienteTasas(ClienteLatch.api())); }
+
+    public TasaController(ClienteTasas cliente) {
+        this.cliente = cliente;
+        this.permisoAutorizar = SesionUsuario.esPropietario();
+    }
+
+    @FXML public void initialize() {
+        lblTitulo.setGraphic(Iconos.crear(Iconos.Nombre.TASA, 20));
+        Iconos.asignar(btnRefrescar, Iconos.Nombre.ACTUALIZAR, 16);
+        Iconos.asignar(btnRegistrar, Iconos.Nombre.MAS, 16);
+        Iconos.asignar(btnLimpiar, Iconos.Nombre.CERRAR, 14);
+        Iconos.asignar(btnAutorizar, Iconos.Nombre.CONFIRMACION, 16);
+        boolean puedeAutorizar = SesionUsuario.esPropietario();
+        Tooltip.install(autorizacionTooltipHost, new Tooltip(puedeAutorizar
+                ? "Selecciona una tasa informativa pendiente." : "Solo el propietario puede autorizar tasas."));
+        btnAutorizar.setDisable(true);
+        tblTasas.setItems(tasasVisibles);
+        tblTasas.setPlaceholder(PanelEstadoTabla.crear("Cargando tasas",
+                "Las tasas aparecerán al terminar la consulta.", null, null));
+        colFecha.setCellValueFactory(cell -> new SimpleStringProperty(fechaVisible(cell.getValue().fecha())));
+        colTasa.setCellValueFactory(cell -> new SimpleStringProperty(
+                FormatoTasa.formatear(new BigDecimal(cell.getValue().nioPorUsd()))));
+        colTasa.setCellFactory(FormatoTabla.numerica());
+        colFuente.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().fuente()));
+        colEstado.setCellValueFactory(cell -> new SimpleStringProperty(
+                cell.getValue().autorizada() ? "Autorizada" : "Pendiente de autorización"));
+        colEstado.setCellFactory(FormatoTabla.estado());
+        colAutorizadoPor.setCellValueFactory(cell -> new SimpleStringProperty(
+                cell.getValue().autorizadoPorNombre() == null ? "—" : cell.getValue().autorizadoPorNombre()));
+        colRegistrado.setCellValueFactory(cell -> new SimpleStringProperty(instanteVisible(cell.getValue().registradoEn())));
+        colMotivo.setCellValueFactory(cell -> new SimpleStringProperty(
+                cell.getValue().motivo() == null ? "—" : cell.getValue().motivo()));
+        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>("Seleccionar tasa",
+                tasa -> tblTasas.getSelectionModel().select(tasa))));
+        tblTasas.getSelectionModel().selectedItemProperty().addListener((obs, anterior, actual) -> actualizarSeleccion(actual));
+        txtBuscar.textProperty().addListener((obs, anterior, actual) -> aplicarFiltro());
+        AtajosLista.instalar(rootView, txtBuscar, this::handleRegistrar);
         cargarTasas();
     }
 
-    private void configurarTabla() {
-        colFecha.setCellValueFactory(cd ->
-                new SimpleStringProperty(fechaVisible(cd.getValue().fecha())));
-        colTasa.setCellValueFactory(cd ->
-                new SimpleStringProperty(FormatoTasa.formatear(
-                        new BigDecimal(cd.getValue().nioPorUsd()))));
-        colFuente.setCellValueFactory(cd ->
-                new SimpleStringProperty(cd.getValue().fuente()));
-        colEstado.setCellValueFactory(cd ->
-                new SimpleStringProperty(cd.getValue().autorizada()
-                        ? "AUTORIZADA" : "INFORMATIVA"));
-        colAutorizadoPor.setCellValueFactory(cd -> new SimpleStringProperty(
-                cd.getValue().autorizadoPorNombre() == null
-                        ? "—" : cd.getValue().autorizadoPorNombre()));
-        colRegistrado.setCellValueFactory(cd ->
-                new SimpleStringProperty(instanteVisible(cd.getValue().registradoEn())));
-        colMotivo.setCellValueFactory(cd -> new SimpleStringProperty(
-                cd.getValue().motivo() == null ? "—" : cd.getValue().motivo()));
-
-        tblTasas.setItems(tasas);
-        tblTasas.getSelectionModel().selectedItemProperty().addListener(
-                (obs, anterior, actual) -> actualizarSeleccion(actual));
-    }
-
-    @FXML
-    public void cargarTasas() {
+    @FXML public void cargarTasas() {
+        iniciarOperacion();
+        long version = ++versionConsulta;
         Task<List<TasaResponse>> tarea = new Task<>() {
-            @Override
-            protected List<TasaResponse> call() {
-                return cliente.listar(null, null, 200);
-            }
+            @Override protected List<TasaResponse> call() { return cliente.listar(null, null, 200); }
         };
         ejecutar(tarea, lista -> {
-            tasas.setAll(lista);
+            if (version != versionConsulta) return;
+            tasasCargadas.clear();
+            tasasCargadas.addAll(lista);
+            aplicarFiltro();
+            lblErrorConsulta.setText("");
+            lblErrorConsulta.setVisible(false);
+            lblErrorConsulta.setManaged(false);
+        }, error -> {
+            if (version == versionConsulta) {
+                mostrarErrorConsulta(error);
+                if (error instanceof ErrorClienteException clienteError && clienteError.esNoAutenticado()) {
+                    SesionExpiradaUtil.mostrar(tblTasas.getScene() == null ? null : tblTasas.getScene().getWindow(), null);
+                }
+                tblTasas.setPlaceholder(PanelEstadoTabla.crear("No se pudieron cargar las tasas",
+                        "Revisa la conexión e inténtalo de nuevo.", "Reintentar", this::cargarTasas));
+            }
+        });
+    }
+
+    @FXML public void refrescarTabla() { cargarTasas(); }
+
+    @FXML public void limpiarFiltros() { txtBuscar.clear(); }
+
+    private void aplicarFiltro() {
+        String filtro = txtBuscar.getText() == null ? "" : txtBuscar.getText().strip().toLowerCase(Locale.ROOT);
+        List<TasaResponse> resultado = tasasCargadas.stream().filter(tasa -> {
+            if (filtro.isEmpty()) return true;
+            return (tasa.fecha() + " " + tasa.nioPorUsd() + " " + tasa.fuente() + " "
+                    + (tasa.autorizada() ? "Autorizada" : "Pendiente de autorización") + " "
+                    + tasa.autorizadoPorNombre() + " " + tasa.motivo()).toLowerCase(Locale.ROOT).contains(filtro);
+        }).toList();
+        tasasVisibles.setAll(resultado);
+        lblContador.setText(resultado.size() + (resultado.size() == 1 ? " tasa" : " tasas"));
+        if (seleccionada != null && !resultado.contains(seleccionada)) {
+            tblTasas.getSelectionModel().clearSelection();
             actualizarSeleccion(null);
-        });
-    }
-
-    @FXML
-    public void refrescarTabla() {
-        cargarTasas();
-    }
-
-    @FXML
-    public void limpiarFormulario() {
-        dpFecha.setValue(LocalDate.now(RelojService.ZONA_OPERATIVA));
-        txtTasa.clear();
-        txtFuente.clear();
-        txtMotivo.clear();
-        tblTasas.getSelectionModel().clearSelection();
-        actualizarSeleccion(null);
-    }
-
-    @FXML
-    public void handleRegistrar() {
-        LocalDate fecha = dpFecha.getValue();
-        if (fecha == null) {
-            AlertaUtil.mostrarAdvertencia("Fecha requerida",
-                    "Seleccione la fecha a la que corresponde la tasa.");
-            dpFecha.requestFocus();
-            return;
         }
-        if (fecha.isAfter(LocalDate.now(RelojService.ZONA_OPERATIVA))) {
-            AlertaUtil.mostrarAdvertencia("Fecha inválida",
-                    "La tasa no puede corresponder a una fecha futura.");
-            return;
-        }
-        BigDecimal valor;
+        tblTasas.setPlaceholder(PanelEstadoTabla.crear(filtro.isEmpty() ? "Aún no hay tasas" : "No hay coincidencias",
+                filtro.isEmpty() ? "Las tasas registradas aparecerán aquí." : "Prueba con otro término o limpia la búsqueda.",
+                filtro.isEmpty() ? "Registrar tasa" : "Limpiar búsqueda",
+                filtro.isEmpty() ? this::handleRegistrar : this::limpiarFiltros));
+    }
+
+    @FXML public void handleRegistrar() { abrirFormularioRegistro(); }
+
+    private void abrirFormularioRegistro() {
         try {
-            valor = new BigDecimal(txtTasa.getText().strip().replace(',', '.'));
-        } catch (NumberFormatException e) {
-            AlertaUtil.mostrarAdvertencia("Tasa inválida",
-                    "Escriba la tasa como un número decimal, por ejemplo 36.75000000.");
-            txtTasa.requestFocus();
-            return;
+            FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource("tasa-form.fxml"));
+            Node contenido = loader.load();
+            TasaFormController formulario = loader.getController();
+            formulario.mostrarRegistro();
+            Window propietario = tblTasas.getScene() == null ? null : tblTasas.getScene().getWindow();
+            Dialog<ButtonType> dialogo = DialogoFormulario.crear("Registrar tasa informativa", contenido,
+                    propietario, 720, 620, "Registrar tasa");
+            DialogoFormulario.protegerCambiosSinGuardar(dialogo, btnRegistrar, formulario::hayCambios);
+            ButtonType tipoAccion = dialogo.getDialogPane().getButtonTypes().getFirst();
+            Button accion = (Button) dialogo.getDialogPane().lookupButton(tipoAccion);
+            accion.addEventFilter(ActionEvent.ACTION, evento -> {
+                evento.consume();
+                if (!formulario.validarRegistro()) return;
+                TasaFormController.Datos datos = formulario.datos();
+                accion.setDisable(true);
+                accion.setText("Guardando tasa…");
+                Task<TasaResponse> tarea = new Task<>() {
+                    @Override protected TasaResponse call() {
+                        return cliente.registrar(datos.fecha(), datos.tasa(), datos.fuente().strip());
+                    }
+                };
+                ejecutar(tarea, registro -> {
+                    formulario.marcarLimpio();
+                    DialogoFormulario.cerrar(dialogo);
+                    AlertaUtil.mostrarExito("Tasa informativa registrada", "La tasa del "
+                            + fechaVisible(registro.fecha()) + " quedó registrada: "
+                            + FormatoTasa.formatear(new BigDecimal(registro.nioPorUsd())) + " NIO/USD."
+                            + " Fuente: " + registro.fuente() + ". Pendiente de autorización.");
+                    cargarTasas();
+                }, error -> manejarErrorFormulario(error, propietario, dialogo, formulario, accion,
+                        "Registrar tasa"));
+            });
+            dialogo.showAndWait();
+        } catch (IOException error) {
+            AlertaUtil.mostrarError("No se pudo abrir el formulario", "Vuelve a intentarlo.");
         }
-        if (valor.signum() <= 0) {
-            AlertaUtil.mostrarAdvertencia("Tasa inválida",
-                    "La tasa debe ser mayor que cero.");
-            txtTasa.requestFocus();
-            return;
-        }
-        String fuente = txtFuente.getText();
-        if (fuente == null || fuente.isBlank()) {
-            AlertaUtil.mostrarAdvertencia("Fuente requerida",
-                    "Indique la fuente de la tasa, por ejemplo BCN.");
-            txtFuente.requestFocus();
-            return;
-        }
-
-        Task<TasaResponse> tarea = new Task<>() {
-            @Override
-            protected TasaResponse call() {
-                return cliente.registrar(fecha, valor, fuente.strip());
-            }
-        };
-        ejecutar(tarea, registro -> {
-            AlertaUtil.mostrarExito("Tasa registrada",
-                    "La tasa informativa quedó registrada. Un propietario debe autorizarla "
-                            + "antes de usarla en pagos.");
-            limpiarFormulario();
-            cargarTasas();
-        });
     }
 
-    @FXML
-    public void handleAutorizar() {
-        if (seleccionada == null) {
-            AlertaUtil.mostrarAdvertencia("Selección requerida",
-                    "Seleccione una tasa informativa de la tabla.");
-            return;
-        }
-        if (seleccionada.autorizada()) {
-            AlertaUtil.mostrarAdvertencia("Tasa ya autorizada",
-                    "La tasa seleccionada ya está autorizada.");
-            return;
-        }
-        String motivo = txtMotivo.getText();
-        if (motivo == null || motivo.isBlank()) {
-            AlertaUtil.mostrarAdvertencia("Motivo requerido",
-                    "Explique brevemente por qué autoriza esta tasa.");
-            txtMotivo.requestFocus();
-            return;
-        }
-        boolean fueraDeBanda = new BigDecimal(seleccionada.nioPorUsd())
-                .compareTo(TipoCambio.BANDA_MINIMA) < 0
-                || new BigDecimal(seleccionada.nioPorUsd())
-                .compareTo(TipoCambio.BANDA_MAXIMA) > 0;
-        boolean confirmar;
-        if (fueraDeBanda) {
-            confirmar = AlertaUtil.mostrarConfirmacion("Tasa fuera de banda",
-                    "La tasa del " + fechaVisible(seleccionada.fecha())
-                            + " está fuera de la banda comercial 1–100 NIO/USD. "
-                            + "Revise la fuente antes de confirmar. ¿Desea autorizarla?");
-        } else {
-            confirmar = AlertaUtil.mostrarConfirmacion("Autorizar tasa",
-                    "La tasa del " + fechaVisible(seleccionada.fecha())
-                            + " quedará disponible para convertir pagos. ¿Desea continuar?");
-        }
-        if (!confirmar) return;
-
-        Task<TasaResponse> tarea = new Task<>() {
-            @Override
-            protected TasaResponse call() {
-                return cliente.autorizar(seleccionada.id(), motivo.strip(), fueraDeBanda);
-            }
-        };
-        ejecutar(tarea, autorizada -> {
-            AlertaUtil.mostrarExito("Tasa autorizada",
-                    "La tasa quedó autorizada y disponible para pagos.");
-            txtMotivo.clear();
-            cargarTasas();
-        });
+    @FXML public void handleAutorizar() {
+        TasaResponse tasa = seleccionada;
+        if (tasa == null || !permisoAutorizar || tasa.autorizada()) return;
+        abrirFormularioAutorizacion(tasa);
     }
 
-    private <T> void ejecutar(Task<T> tarea, Consumer<T> alExito) {
+    private void abrirFormularioAutorizacion(TasaResponse tasa) {
+        try {
+            FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource("tasa-form.fxml"));
+            Node contenido = loader.load();
+            TasaFormController formulario = loader.getController();
+            formulario.mostrarAutorizacion(tasa);
+            Window propietario = tblTasas.getScene() == null ? null : tblTasas.getScene().getWindow();
+            Dialog<ButtonType> dialogo = DialogoFormulario.crear("Autorizar tasa", contenido,
+                    propietario, 720, 620, "Autorizar tasa");
+            DialogoFormulario.protegerCambiosSinGuardar(dialogo, btnAutorizar, formulario::hayCambios);
+            ButtonType tipoAccion = dialogo.getDialogPane().getButtonTypes().getFirst();
+            Button accion = (Button) dialogo.getDialogPane().lookupButton(tipoAccion);
+            formulario.enlazarMotivoConAccion(accion);
+            accion.addEventFilter(ActionEvent.ACTION, evento -> {
+                evento.consume();
+                if (!formulario.validarMotivo()) return;
+                String motivo = formulario.motivo();
+                BigDecimal valor = new BigDecimal(tasa.nioPorUsd());
+                boolean fueraDeBanda = valor.compareTo(TipoCambio.BANDA_MINIMA) < 0
+                        || valor.compareTo(TipoCambio.BANDA_MAXIMA) > 0;
+                if (fueraDeBanda) {
+                    String banda = FormatoTasa.formatear(TipoCambio.BANDA_MINIMA) + "–"
+                            + FormatoTasa.formatear(TipoCambio.BANDA_MAXIMA) + " NIO/USD";
+                    String detalle = "Tasa del " + fechaVisible(tasa.fecha()) + ": "
+                            + FormatoTasa.formatear(valor) + " NIO/USD. Fuente: " + tasa.fuente()
+                            + ". Banda de referencia: " + banda + ".\nMotivo: " + motivo;
+                    if (!AlertaUtil.mostrarConfirmacion("Confirmar tasa fuera de banda", detalle,
+                            "Autorizar tasa")) return;
+                } else if (!AlertaUtil.mostrarConfirmacion("Autorizar tasa",
+                        "La tasa del " + fechaVisible(tasa.fecha()) + " de "
+                                + FormatoTasa.formatear(valor) + " NIO/USD, fuente " + tasa.fuente()
+                                + ", quedará disponible para pagos. Motivo: " + motivo,
+                        "Autorizar tasa")) return;
+
+                accion.setDisable(true);
+                accion.setText("Autorizando tasa…");
+                Task<TasaResponse> tarea = new Task<>() {
+                    @Override protected TasaResponse call() {
+                        return cliente.autorizar(tasa.id(), motivo.strip(), fueraDeBanda);
+                    }
+                };
+                ejecutar(tarea, autorizada -> {
+                    formulario.marcarLimpio();
+                    DialogoFormulario.cerrar(dialogo);
+                    AlertaUtil.mostrarExito("Tasa autorizada", "La tasa del "
+                            + fechaVisible(autorizada.fecha()) + " quedó autorizada con valor "
+                            + FormatoTasa.formatear(new BigDecimal(autorizada.nioPorUsd())) + " NIO/USD.");
+                    cargarTasas();
+                }, error -> manejarErrorFormulario(error, propietario, dialogo, formulario, accion,
+                        "Autorizar tasa"));
+            });
+            dialogo.showAndWait();
+        } catch (IOException error) {
+            AlertaUtil.mostrarError("No se pudo abrir el formulario", "Vuelve a intentarlo.");
+        }
+    }
+
+    private <T> void ejecutar(Task<T> tarea, Consumer<T> exito, Consumer<Throwable> fallo) {
         iniciarOperacion();
         tarea.setOnSucceeded(evento -> {
-            try {
-                alExito.accept(tarea.getValue());
-            } finally {
-                terminarOperacion();
-            }
+            try { exito.accept(tarea.getValue()); }
+            finally { terminarOperacion(); }
         });
         tarea.setOnFailed(evento -> {
             terminarOperacion();
-            mostrarError(tarea.getException());
+            fallo.accept(tarea.getException());
         });
         tarea.setOnCancelled(evento -> terminarOperacion());
         try {
             HelloApplication.instancia().getTareas().ejecutar(tarea);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException error) {
             terminarOperacion();
-            AlertaUtil.mostrarError("Servicio ocupado",
-                    "No se pudo iniciar la operación. Inténtelo nuevamente.");
+            fallo.accept(error);
         }
     }
 
@@ -262,62 +311,69 @@ public class TasaController {
         actualizarControles();
     }
 
-    private void actualizarSeleccion(TasaResponse actual) {
-        seleccionada = actual;
-        if (actual == null) {
-            lblSeleccion.setText(
-                    "Seleccione una tasa informativa de la tabla para autorizarla.");
-        } else if (actual.autorizada()) {
-            lblSeleccion.setText("Tasa autorizada el " + instanteVisible(actual.registradoEn())
-                    + " por " + (actual.autorizadoPorNombre() == null
-                    ? "un propietario" : actual.autorizadoPorNombre()) + ".");
+    private void actualizarSeleccion(TasaResponse tasa) {
+        seleccionada = tasa;
+        if (tasa == null) {
+            lblSeleccion.setText("");
+            lblSeleccion.setVisible(false);
+            lblSeleccion.setManaged(false);
         } else {
-            lblSeleccion.setText("Tasa informativa del " + fechaVisible(actual.fecha())
-                    + ". Escriba un motivo y autorícela.");
+            lblSeleccion.setText(tasa.autorizada()
+                    ? "Autorizada · " + fechaVisible(tasa.fecha()) + " · fuente " + tasa.fuente()
+                    : "Pendiente de autorización · " + fechaVisible(tasa.fecha()) + " · fuente " + tasa.fuente());
+            lblSeleccion.setVisible(true);
+            lblSeleccion.setManaged(true);
         }
         actualizarControles();
     }
 
     private void actualizarControles() {
         boolean ocupado = operacionesEnCurso > 0;
-        boolean puedeAutorizar = !ocupado && seleccionada != null
-                && !seleccionada.autorizada() && SesionUsuario.esPropietario();
         btnRegistrar.setDisable(ocupado);
         btnRefrescar.setDisable(ocupado);
-        btnAutorizar.setDisable(!puedeAutorizar);
-    }
-
-    private void mostrarError(Throwable error) {
-        String mensaje;
-        if (error instanceof ErrorClienteException clienteError) {
-            if (clienteError.esSinConexion()) {
-                mensaje = "No se pudo conectar con el servicio local de Latch. "
-                        + "Verifique que la aplicación siga iniciada.";
-            } else if (clienteError.esNoAutenticado()) {
-                mensaje = "La sesión expiró. Cierre sesión y vuelva a iniciar.";
-            } else {
-                mensaje = clienteError.getMessage();
-            }
-        } else {
-            mensaje = "Ocurrió un error inesperado al comunicarse con el servicio local.";
-        }
-        AlertaUtil.mostrarError("No se pudo completar la operación", mensaje);
-    }
-
-    private static String fechaVisible(String valor) {
-        try {
-            return LocalDate.parse(valor).format(FECHA_VISIBLE);
-        } catch (DateTimeParseException e) {
-            return valor;
+        btnLimpiar.setDisable(ocupado);
+        btnAutorizar.setDisable(ocupado || seleccionada == null || seleccionada.autorizada() || !permisoAutorizar);
+        if (seleccionada != null && !seleccionada.autorizada() && !permisoAutorizar) {
+            Tooltip.install(autorizacionTooltipHost, new Tooltip("Solo el propietario puede autorizar tasas."));
         }
     }
 
-    private static String instanteVisible(String valor) {
-        try {
-            return INSTANTE_VISIBLE.format(OffsetDateTime.parse(valor).toInstant());
-        } catch (DateTimeParseException e) {
-            return valor;
+    private void manejarErrorFormulario(Throwable error, Window propietario, Dialog<?> dialogo,
+                                        TasaFormController formulario, Button accion,
+                                        String textoAccion) {
+        accion.setDisable("Autorizar tasa".equals(textoAccion) && formulario.motivo().isBlank());
+        accion.setText(textoAccion);
+        if (error instanceof ErrorClienteException clienteError && clienteError.esNoAutenticado()) {
+            formulario.mostrarError("Tu sesión expiró.");
+            SesionExpiradaUtil.mostrar(propietario, dialogo);
+            return;
         }
+        formulario.mostrarError(mensajeError(error));
     }
 
+    private void mostrarErrorConsulta(Throwable error) {
+        lblErrorConsulta.setText(mensajeError(error));
+        lblErrorConsulta.setVisible(true);
+        lblErrorConsulta.setManaged(true);
     }
+
+    private String mensajeError(Throwable error) {
+        if (error instanceof ErrorClienteException clienteError && clienteError.esSinConexion()) {
+            return "No se pudo conectar con el servicio de Latch. Revisa la conexión e inténtalo de nuevo.";
+        }
+        if (error instanceof ErrorClienteException clienteError && clienteError.esNoAutenticado()) {
+            return "Tu sesión expiró.";
+        }
+        return "No se pudo completar la solicitud. Revisa los datos e inténtalo de nuevo.";
+    }
+
+    private static String fechaVisible(String fecha) {
+        try { return LocalDate.parse(fecha).format(FECHA_VISIBLE); }
+        catch (DateTimeParseException ignorado) { return fecha; }
+    }
+
+    private static String instanteVisible(String instante) {
+        try { return INSTANTE_VISIBLE.format(OffsetDateTime.parse(instante).toInstant()); }
+        catch (DateTimeParseException ignorado) { return instante; }
+    }
+}

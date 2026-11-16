@@ -26,17 +26,30 @@ public final class AlertaUtil {
     }
 
     public static boolean mostrarConfirmacion(String titulo, String mensaje) {
+        return mostrarConfirmacion(titulo, mensaje, "Continuar");
+    }
+
+    public static boolean mostrarConfirmacion(String titulo, String mensaje, String accion) {
         if (!Platform.isFxApplicationThread()) return false;
         Alert alerta = crear(Alert.AlertType.CONFIRMATION, titulo, mensaje);
+        ButtonType cancelar = new ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE);
+        ButtonType confirmar = new ButtonType(accion, ButtonBar.ButtonData.OK_DONE);
+        alerta.getButtonTypes().setAll(cancelar, confirmar);
+        TemaAplicacion.aplicar(alerta.getDialogPane());
         Optional<ButtonType> resultado = alerta.showAndWait();
-        return resultado.isPresent() && resultado.get() == ButtonType.OK;
+        return resultado.isPresent() && resultado.get() == confirmar;
     }
 
     public static boolean mostrarConfirmacionDestructiva(String titulo, String registro,
                                                          String consecuencia, String accion) {
         if (!Platform.isFxApplicationThread()) return false;
-        Alert alerta = crear(Alert.AlertType.CONFIRMATION, titulo,
-                registro + System.lineSeparator() + System.lineSeparator() + consecuencia);
+        return mostrarConfirmacionDestructiva(titulo, registro + System.lineSeparator()
+                + System.lineSeparator() + consecuencia, accion);
+    }
+
+    public static boolean mostrarConfirmacionDestructiva(String titulo, String detalle, String accion) {
+        if (!Platform.isFxApplicationThread()) return false;
+        Alert alerta = crear(Alert.AlertType.CONFIRMATION, titulo, detalle);
         ButtonType cancelar = new ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE);
         ButtonType confirmar = new ButtonType(accion, ButtonBar.ButtonData.OK_DONE);
         alerta.getButtonTypes().setAll(cancelar, confirmar);

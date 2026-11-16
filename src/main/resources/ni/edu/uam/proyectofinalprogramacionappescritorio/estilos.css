@@ -237,6 +237,15 @@
 }
 .field-help { -fx-text-fill: -latch-text-muted; }
 .field-error { -fx-text-fill: -latch-navy-950; -fx-font-weight: 600; }
+.theme-dark .field-error { -fx-text-fill: -latch-slate-100; }
+.review-panel {
+    -fx-background-color: -latch-surface-raised;
+    -fx-background-radius: 8px;
+    -fx-border-color: -latch-border;
+    -fx-border-radius: 8px;
+    -fx-padding: 16px;
+}
+.review-value { -fx-text-fill: -latch-heading; -fx-font-weight: 600; }
 .field,
 .text-field,
 .password-field,
@@ -475,6 +484,7 @@
     -fx-max-width: 440px;
 }
 .toast .label { -fx-text-fill: -latch-slate-100; }
+.toast .icon-glyph { -fx-fill: -latch-slate-100; }
 .toast-close { -fx-background-color: transparent; -fx-text-fill: -latch-slate-100; -fx-min-width: 32px; }
 
 
