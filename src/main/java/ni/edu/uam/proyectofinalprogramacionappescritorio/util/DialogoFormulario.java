@@ -6,6 +6,9 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.DialogPane;
 import javafx.stage.Window;
+import javafx.scene.Node;
+import javafx.application.Platform;
+import java.util.function.BooleanSupplier;
 
 
 /** Construye la carcasa accesible común para diálogos de formularios. */
@@ -28,6 +31,18 @@ public final class DialogoFormulario {
                 new ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE));
         TemaAplicacion.aplicar(pane);
         return dialogo;
+    }
+
+    public static void protegerCambiosSinGuardar(Dialog<?> dialogo, Node disparador,
+                                                 BooleanSupplier modificado) {
+        dialogo.setOnCloseRequest(evento -> {
+            if (modificado.getAsBoolean() && !AlertaUtil.confirmarDescartarCambios()) {
+                evento.consume();
+            }
+        });
+        dialogo.setOnHidden(evento -> {
+            if (disparador != null) Platform.runLater(disparador::requestFocus);
+        });
     }
 }
 

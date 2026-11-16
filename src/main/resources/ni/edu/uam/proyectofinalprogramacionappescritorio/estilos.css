@@ -380,6 +380,7 @@
 .table-row-cell:selected:focused { -fx-background-color: -latch-selected, -latch-surface; }
 .table-row-cell:focused { -fx-border-color: -latch-focus; -fx-border-width: 1px; }
 .table-cell.col-numeric { -fx-alignment: center-right; -fx-font-family: "Fira Code", "Consolas", monospace; }
+.table-view .table-cell.col-numeric { -fx-alignment: center-right; -fx-font-family: "Fira Code", "Consolas", monospace; }
 .table-view .placeholder .label { -fx-text-fill: -latch-text-muted; -fx-font-size: 13px; }
 
 .kpi-card,

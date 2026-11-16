@@ -45,6 +45,18 @@ public final class AlertaUtil {
         return resultado.isPresent() && resultado.get() == confirmar;
     }
 
+    public static boolean confirmarDescartarCambios() {
+        if (!Platform.isFxApplicationThread()) return false;
+        Alert alerta = crear(Alert.AlertType.CONFIRMATION, "Descartar cambios",
+                "Los cambios del formulario se perderán.");
+        ButtonType cancelar = new ButtonType("Seguir editando", ButtonBar.ButtonData.CANCEL_CLOSE);
+        ButtonType descartar = new ButtonType("Descartar cambios", ButtonBar.ButtonData.OK_DONE);
+        alerta.getButtonTypes().setAll(cancelar, descartar);
+        TemaAplicacion.aplicar(alerta.getDialogPane());
+        Optional<ButtonType> resultado = alerta.showAndWait();
+        return resultado.isPresent() && resultado.get() == descartar;
+    }
+
     private static void mostrar(Alert.AlertType tipo, String titulo, String mensaje) {
         crear(tipo, titulo, mensaje).showAndWait();
     }

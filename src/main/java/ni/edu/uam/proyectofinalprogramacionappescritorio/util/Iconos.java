@@ -2,7 +2,7 @@ package ni.edu.uam.proyectofinalprogramacionappescritorio.util;
 
 import javafx.scene.Group;
 import javafx.scene.Node;
-import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBase;
 import javafx.scene.shape.SVGPath;
 
 /** Catálogo local de iconos vectoriales monocromos. */
@@ -54,7 +54,7 @@ public final class Iconos {
         return grupo;
     }
 
-    public static void asignar(Button boton, Nombre nombre, double tamano) {
+    public static void asignar(ButtonBase boton, Nombre nombre, double tamano) {
         boton.setGraphic(crear(nombre, tamano));
     }
 }

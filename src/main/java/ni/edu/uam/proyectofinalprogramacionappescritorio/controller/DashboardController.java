@@ -43,6 +43,7 @@ public class DashboardController {
     private static final DateTimeFormatter HORA_VISIBLE = DateTimeFormatter.ofPattern("HH:mm");
 
     @FXML private VBox sidebar;
+    @FXML private VBox navContainer;
     @FXML private VBox userProfile;
     @FXML private Label lblContexto;
     @FXML private Label lblActualizado;
