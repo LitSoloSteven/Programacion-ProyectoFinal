@@ -1,100 +1,49 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.geometry.Insets?>
-<?import javafx.scene.control.*?>
-<?import javafx.scene.layout.*?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
 
 <VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
-      fx:controller="ni.edu.uam.proyectofinalprogramacionappescritorio.controller.TasaController"
-      spacing="18.0" styleClass="view-container">
-
-    <padding>
-        <Insets bottom="24.0" left="28.0" right="28.0" top="24.0" />
-    </padding>
-
-    <!-- ENCABEZADO -->
-    <HBox alignment="CENTER_LEFT" spacing="12.0">
+      fx:id="rootView" fx:controller="ni.edu.uam.proyectofinalprogramacionappescritorio.controller.TasaController"
+      spacing="16.0" styleClass="view-container">
+    <HBox alignment="CENTER_LEFT" spacing="16.0" styleClass="page-header">
         <VBox spacing="4.0" HBox.hgrow="ALWAYS">
-            <Label styleClass="page-title" text="💱 Tasas de Cambio" />
-            <Label styleClass="page-subtitle"
-                   text="Registre la referencia NIO por USD y autorícela antes de usarla en pagos" />
+            <Label fx:id="lblTitulo" styleClass="page-title" text="Tasas de cambio" />
+            <Label styleClass="page-subtitle" text="Registro informativo y autorización de tasas NIO por USD." />
         </VBox>
-        <Button fx:id="btnRefrescar" onAction="#refrescarTabla" styleClass="btn-secondary"
-                text="🔄 Refrescar" />
+        <Button fx:id="btnRefrescar" onAction="#refrescarTabla" styleClass="button-secondary" text="Actualizar" />
+        <Button fx:id="btnRegistrar" onAction="#handleRegistrar" styleClass="button-primary" text="Registrar tasa informativa" />
     </HBox>
-
-    <!-- REGISTRO DE TASA INFORMATIVA -->
-    <VBox spacing="14.0" styleClass="form-card">
-        <Label styleClass="form-card-title" text="Registrar tasa informativa" />
-
-        <GridPane hgap="16.0" vgap="12.0">
-            <columnConstraints>
-                <ColumnConstraints percentWidth="30.0" />
-                <ColumnConstraints percentWidth="32.0" />
-                <ColumnConstraints percentWidth="38.0" />
-            </columnConstraints>
-
-            <VBox spacing="4.0" GridPane.columnIndex="0" GridPane.rowIndex="0">
-                <Label styleClass="form-label" text="Fecha *" />
-                <DatePicker fx:id="dpFecha" maxWidth="Infinity" />
-            </VBox>
-
-            <VBox spacing="4.0" GridPane.columnIndex="1" GridPane.rowIndex="0">
-                <Label styleClass="form-label" text="Tasa NIO por USD *" />
-                <TextField fx:id="txtTasa" promptText="ej. 36.75000000" />
-            </VBox>
-
-            <VBox spacing="4.0" GridPane.columnIndex="2" GridPane.rowIndex="0">
-                <Label styleClass="form-label" text="Fuente *" />
-                <TextField fx:id="txtFuente" promptText="ej. BCN" />
-            </VBox>
-        </GridPane>
-
-        <Label styleClass="form-label" wrapText="true"
-               text="La tasa se guarda con ocho decimales y redondeo HALF_EVEN. Una tasa informativa no puede convertir pagos hasta que un propietario la autorice." />
-
-        <HBox alignment="CENTER_RIGHT" spacing="10.0">
-            <Button onAction="#limpiarFormulario" styleClass="btn-secondary"
-                    text="Limpiar Formulario" />
-            <Button fx:id="btnRegistrar" onAction="#handleRegistrar" styleClass="btn-primary"
-                    text="Registrar Tasa" />
+    <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
+        <TextField fx:id="txtBuscar" prefWidth="360.0" promptText="Buscar por fecha, fuente o estado"
+                   styleClass="search-field" />
+        <Button fx:id="btnLimpiar" onAction="#limpiarFiltros" styleClass="button-secondary" text="Limpiar" />
+        <Label fx:id="lblContador" styleClass="secondary-text" text="0 tasas" HBox.hgrow="ALWAYS" />
+        <HBox fx:id="autorizacionTooltipHost">
+            <Button fx:id="btnAutorizar" disable="true" onAction="#handleAutorizar"
+                    styleClass="button-secondary" text="Autorizar tasa" />
         </HBox>
-
-        <Separator />
-
-        <Label styleClass="form-card-title" text="Autorización (solo propietario)" />
-        <Label fx:id="lblSeleccion" styleClass="page-subtitle" wrapText="true"
-               text="Seleccione una tasa informativa de la tabla para autorizarla." />
-
-        <HBox alignment="CENTER_LEFT" spacing="12.0">
-            <VBox spacing="4.0" HBox.hgrow="ALWAYS">
-                <Label styleClass="form-label" text="Motivo de autorización *" />
-                <TextField fx:id="txtMotivo"
-                           promptText="ej. Tasa oficial del BCN verificada para la fecha" />
-            </VBox>
-            <Button fx:id="btnAutorizar" onAction="#handleAutorizar" styleClass="btn-success"
-                    text="Autorizar Tasa" />
-        </HBox>
-    </VBox>
-
-    <!-- HISTORIAL -->
-    <VBox spacing="8.0" VBox.vgrow="ALWAYS">
-        <Label styleClass="table-title" text="Historial de Tasas Registradas" />
-
-        <TableView fx:id="tblTasas" VBox.vgrow="ALWAYS">
-            <columns>
-                <TableColumn fx:id="colFecha" prefWidth="95.0" text="Fecha" />
-                <TableColumn fx:id="colTasa" prefWidth="135.0" text="NIO por USD" />
-                <TableColumn fx:id="colFuente" prefWidth="170.0" text="Fuente" />
-                <TableColumn fx:id="colEstado" prefWidth="115.0" text="Estado" />
-                <TableColumn fx:id="colAutorizadoPor" prefWidth="140.0" text="Autorizada por" />
-                <TableColumn fx:id="colRegistrado" prefWidth="145.0" text="Registrada" />
-                <TableColumn fx:id="colMotivo" prefWidth="220.0" text="Motivo" />
-            </columns>
-            <placeholder>
-                <Label text="No hay tasas registradas. Registre la primera tasa informativa." />
-            </placeholder>
-        </TableView>
-    </VBox>
-
+    </HBox>
+    <Label fx:id="lblSeleccion" managed="false" styleClass="secondary-text" text=""
+           visible="false" wrapText="true" />
+    <Label fx:id="lblErrorConsulta" managed="false" minHeight="18.0"
+           styleClass="field-error" text="" visible="false" wrapText="true" />
+    <TableView fx:id="tblTasas" styleClass="data-table" VBox.vgrow="ALWAYS">
+        <placeholder><Label text="Aún no hay tasas registradas." /></placeholder>
+        <columns>
+            <TableColumn fx:id="colFecha" minWidth="100.0" prefWidth="100.0" text="Fecha" />
+            <TableColumn fx:id="colTasa" minWidth="145.0" prefWidth="145.0" text="NIO por USD" />
+            <TableColumn fx:id="colFuente" minWidth="145.0" prefWidth="145.0" text="Fuente" />
+            <TableColumn fx:id="colEstado" minWidth="120.0" prefWidth="120.0" text="Estado" />
+            <TableColumn fx:id="colAutorizadoPor" minWidth="150.0" prefWidth="150.0" text="Autorizador" />
+            <TableColumn fx:id="colRegistrado" minWidth="145.0" prefWidth="145.0" text="Registro" />
+            <TableColumn fx:id="colMotivo" minWidth="220.0" prefWidth="220.0" text="Motivo" />
+            <TableColumn fx:id="colAcciones" minWidth="48.0" prefWidth="48.0" maxWidth="48.0" text="" />
+        </columns>
+    </TableView>
 </VBox>

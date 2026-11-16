@@ -10,6 +10,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ServidorApi;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TemaAplicacion;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasSegundoPlano;
 
 import java.io.IOException;
@@ -66,6 +67,7 @@ public class HelloApplication extends Application {
 
     @Override
     public void start(Stage stage) throws IOException {
+        TemaAplicacion.inicializar();
         instancia = this;
         String problema = iniciarServicioLocal();
         if (problema != null) {
@@ -75,11 +77,13 @@ public class HelloApplication extends Application {
         }
 
         FXMLLoader fxmlLoader = new FXMLLoader(HelloApplication.class.getResource("login-view.fxml"));
-        Scene scene = new Scene(fxmlLoader.load(), 850, 620);
-        var css = HelloApplication.class.getResource("estilos.css");
-        if (css != null) scene.getStylesheets().add(css.toExternalForm());
+        Scene scene = new Scene(fxmlLoader.load(), 440, 520);
+        TemaAplicacion.aplicar(scene);
         stage.setTitle("Latch — Iniciar sesión");
         stage.setScene(scene);
+        stage.setResizable(false);
+        stage.setMinWidth(440);
+        stage.setMinHeight(520);
         stage.show();
     }
 

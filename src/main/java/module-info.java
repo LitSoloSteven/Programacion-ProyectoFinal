@@ -8,6 +8,7 @@ module ni.edu.uam.proyectofinalprogramacionappescritorio {
     requires org.postgresql.jdbc;
     requires jdk.httpserver;
     requires java.net.http;
+    requires java.prefs;
     requires com.google.gson;
 
 
