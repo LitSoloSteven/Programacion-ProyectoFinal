@@ -4,6 +4,7 @@ import javafx.fxml.FXML;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ValidacionFormulario;
 
 import java.util.List;
 
@@ -52,8 +53,8 @@ public class InquilinoFormController {
         if (txtIdentificacion.getText() != null && txtIdentificacion.getText().strip().length() > 40) {
             error(lblErrorIdentificacion, "La identificación admite hasta 40 caracteres."); errores++; valido = false;
         }
-        if (txtTelefono.getText() != null && txtTelefono.getText().strip().length() > 30) {
-            error(lblErrorTelefono, "El teléfono admite hasta 30 caracteres."); errores++; valido = false;
+        if (!ni.edu.uam.proyectofinalprogramacionappescritorio.util.ValidadorEntrada.esTelefonoValido(txtTelefono.getText())) {
+            error(lblErrorTelefono, "Escribe un teléfono válido con 7 a 15 dígitos; puedes usar +, espacios o guiones."); errores++; valido = false;
         }
         String correo = txtCorreo.getText();
         if (correo != null && !correo.isBlank()
@@ -63,7 +64,7 @@ public class InquilinoFormController {
         if (txtContactoEmergencia.getText() != null && txtContactoEmergencia.getText().strip().length() > 200) {
             error(lblErrorEmergencia, "El contacto de emergencia admite hasta 200 caracteres."); errores++; valido = false;
         }
-        if (errores > 1) mostrarError("Revisa los campos señalados antes de guardar.");
+        if (!valido) ValidacionFormulario.mostrar(lblResumenError, lblErrorNombre, lblErrorIdentificacion, lblErrorTelefono, lblErrorCorreo, lblErrorEmergencia);
         return valido;
     }
 

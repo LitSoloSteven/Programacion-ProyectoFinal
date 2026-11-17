@@ -5,6 +5,7 @@ import javafx.fxml.FXML;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ValidacionFormulario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propiedad;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Unidad;
 
@@ -83,7 +84,7 @@ public class UnidadFormController {
         if (descripcion != null && descripcion.length() > 255) {
             error(lblErrorDescripcion, "La descripción admite hasta 255 caracteres."); errores++; valido = false;
         }
-        if (errores > 1) mostrarError("Revisa los campos señalados antes de guardar.");
+        if (!valido) ValidacionFormulario.mostrar(lblResumenError, lblErrorPropiedad, lblErrorCodigo, lblErrorCanon, lblErrorDescripcion);
         return valido;
     }
 

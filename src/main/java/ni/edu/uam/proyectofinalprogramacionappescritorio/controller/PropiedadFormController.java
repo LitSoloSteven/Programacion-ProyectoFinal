@@ -4,6 +4,7 @@ import javafx.fxml.FXML;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ValidacionFormulario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propiedad;
 
 import java.util.List;
@@ -24,6 +25,7 @@ public class PropiedadFormController {
     @FXML private Label lblErrorDireccion;
     @FXML private Label lblErrorPropietario;
     @FXML private Label lblErrorCorreo;
+    @FXML private Label lblErrorTelefono;
 
     private String estadoInicial = "";
 
@@ -62,11 +64,18 @@ public class PropiedadFormController {
         if (txtNombrePropietario.getText() == null || txtNombrePropietario.getText().isBlank()) {
             error(lblErrorPropietario, "Escribe el nombre del propietario."); errores++; valido = false;
         }
-        String correo = txtCorreoPropietario.getText();
-        if (correo == null || correo.isBlank() || !correo.strip().matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+")) {
-            error(lblErrorCorreo, "Escribe un correo válido para el propietario."); errores++; valido = false;
+        if (txtNombrePropietario.getText() != null && txtNombrePropietario.getText().strip().length() > 100) {
+            error(lblErrorPropietario, "El nombre del propietario admite hasta 100 caracteres."); errores++; valido = false;
         }
-        if (errores > 1) mostrarError("Revisa los campos señalados antes de guardar.");
+        String telefono = txtTelefonoPropietario.getText();
+        if (telefono != null && telefono.strip().length() > 20) {
+            error(lblErrorTelefono, "El teléfono admite hasta 20 caracteres."); errores++; valido = false;
+        }
+        String correo = txtCorreoPropietario.getText();
+        if (correo == null || correo.isBlank() || correo.strip().length() > 150 || !correo.strip().matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+")) {
+            error(lblErrorCorreo, "Escribe un correo válido de hasta 150 caracteres para el propietario."); errores++; valido = false;
+        }
+        if (!valido) ValidacionFormulario.mostrar(lblResumenError, lblErrorNombre, lblErrorDireccion, lblErrorPropietario, lblErrorCorreo, lblErrorTelefono);
         return valido;
     }
 
@@ -92,7 +101,7 @@ public class PropiedadFormController {
     }
 
     private void limpiarErrores() {
-        for (Label etiqueta : List.of(lblResumenError, lblErrorNombre, lblErrorDireccion, lblErrorPropietario, lblErrorCorreo)) {
+        for (Label etiqueta : List.of(lblResumenError, lblErrorNombre, lblErrorDireccion, lblErrorPropietario, lblErrorCorreo, lblErrorTelefono)) {
             etiqueta.setText(""); etiqueta.setVisible(false); etiqueta.setManaged(true);
         }
     }

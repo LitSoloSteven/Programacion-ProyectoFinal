@@ -50,6 +50,7 @@
                 <VBox spacing="6.0" GridPane.columnIndex="0" GridPane.rowIndex="1">
                     <Label styleClass="field-label" text="Teléfono" />
                     <TextField fx:id="txtTelefonoPropietario" styleClass="field" />
+                    <Label fx:id="lblErrorTelefono" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
                 </VBox>
             </GridPane>
         </VBox>
