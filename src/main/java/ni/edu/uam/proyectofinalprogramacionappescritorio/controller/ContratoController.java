@@ -319,6 +319,7 @@ public class ContratoController {
                 error.setText("El saldo debe estar entre cero y " + maximo.toPlainString()
                         + " y tener hasta dos decimales.");
                 error.setVisible(true); error.setManaged(true);
+                ni.edu.uam.proyectofinalprogramacionappescritorio.util.ValidacionFormulario.mostrar(error, error);
                 return;
             }
             accion.setDisable(true); accion.setText("Guardando ajuste…");

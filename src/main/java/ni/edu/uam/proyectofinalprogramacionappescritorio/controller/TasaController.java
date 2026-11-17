@@ -341,7 +341,7 @@ public class TasaController {
     private void manejarErrorFormulario(Throwable error, Window propietario, Dialog<?> dialogo,
                                         TasaFormController formulario, Button accion,
                                         String textoAccion) {
-        accion.setDisable("Autorizar tasa".equals(textoAccion) && formulario.motivo().isBlank());
+        accion.setDisable(false);
         accion.setText(textoAccion);
         if (error instanceof ErrorClienteException clienteError && clienteError.esNoAutenticado()) {
             formulario.mostrarError("Tu sesión expiró.");

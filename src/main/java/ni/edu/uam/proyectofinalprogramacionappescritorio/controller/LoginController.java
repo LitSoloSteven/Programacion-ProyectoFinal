@@ -47,14 +47,19 @@ public class LoginController {
         String password = txtPassword.getText();
         ocultarError(lblErrorUsuario);
         ocultarError(lblErrorPassword);
+        boolean invalido = false;
         if (nombre == null || nombre.isBlank()) {
             mostrarError(lblErrorUsuario, "Escribe tu nombre de usuario.");
-            txtUsuario.requestFocus();
-            return;
+            invalido = true;
         }
         if (password == null || password.isEmpty()) {
             mostrarError(lblErrorPassword, "Escribe tu contraseña.");
-            txtPassword.requestFocus();
+            invalido = true;
+        }
+        if (invalido) {
+            ni.edu.uam.proyectofinalprogramacionappescritorio.util.ValidacionFormulario.mostrar(
+                    lblErrorUsuario.isVisible() ? lblErrorUsuario : lblErrorPassword,
+                    lblErrorUsuario, lblErrorPassword);
             return;
         }
 

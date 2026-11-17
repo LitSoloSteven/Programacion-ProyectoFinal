@@ -6,6 +6,7 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ValidacionFormulario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Inquilino;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Unidad;
@@ -108,7 +109,7 @@ public class ContratoFormController {
         } catch (RuntimeException error) {
             error(lblErrorDeposito, "El depósito debe ser cero o mayor."); errores++; valido = false;
         }
-        if (errores > 1) mostrarError("Revisa los campos señalados antes de guardar.");
+        if (!valido) ValidacionFormulario.mostrar(lblResumenError, lblErrorPartes, lblErrorFechas, lblErrorCanon, lblErrorDiaPago, lblErrorDeposito);
         return valido;
     }
 

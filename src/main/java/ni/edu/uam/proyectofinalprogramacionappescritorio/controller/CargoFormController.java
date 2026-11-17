@@ -6,6 +6,7 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ValidacionFormulario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Cargo;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
@@ -95,7 +96,7 @@ public class CargoFormController {
             error(lblErrorFechas, "Completa las fechas y verifica que el vencimiento no preceda la emisión.");
             cantidad++; valido = false;
         }
-        if (cantidad > 1) mostrarError("Revisa los campos señalados antes de guardar.");
+        if (!valido) ValidacionFormulario.mostrar(lblResumenError, lblErrorContrato, lblErrorImporte, lblErrorConcepto, lblErrorFechas);
         return valido;
     }
 

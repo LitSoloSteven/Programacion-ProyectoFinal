@@ -6,6 +6,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ValidacionFormulario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.TasaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.TipoCambio;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
@@ -94,7 +95,7 @@ public class TasaFormController {
             error(lblErrorFuente, "La fuente admite hasta 500 caracteres.");
             errores++; valido = false;
         }
-        if (errores > 1) mostrarError("Revisa los campos señalados antes de continuar.");
+        if (!valido) ValidacionFormulario.mostrar(lblResumenError, lblErrorFecha, lblErrorTasa, lblErrorFuente, lblErrorMotivo);
         return valido;
     }
 
@@ -102,10 +103,12 @@ public class TasaFormController {
         limpiarErrores();
         if (txtMotivo.getText() == null || txtMotivo.getText().isBlank()) {
             error(lblErrorMotivo, "Escribe el motivo de autorización.");
+            ValidacionFormulario.mostrar(lblResumenError, lblErrorMotivo);
             return false;
         }
         if (txtMotivo.getText().length() > 500) {
             error(lblErrorMotivo, "El motivo admite hasta 500 caracteres.");
+            ValidacionFormulario.mostrar(lblResumenError, lblErrorMotivo);
             return false;
         }
         return true;
@@ -118,9 +121,7 @@ public class TasaFormController {
 
     public String motivo() { return txtMotivo.getText().strip(); }
     public void enlazarMotivoConAccion(Button accion) {
-        accion.setDisable(txtMotivo.getText() == null || txtMotivo.getText().isBlank());
-        txtMotivo.textProperty().addListener((obs, anterior, actual) ->
-                accion.setDisable(actual == null || actual.isBlank()));
+        accion.setDisable(false);
     }
     public TasaResponse tasaSeleccionada() { return tasaSeleccionada; }
     public boolean hayCambios() { return !estadoInicial.equals(instantanea()); }

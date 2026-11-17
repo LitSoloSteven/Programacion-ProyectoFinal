@@ -7,6 +7,7 @@ import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ValidacionFormulario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
 
@@ -89,7 +90,7 @@ public class PagoFormController {
             error(lblErrorReferencia, "La referencia admite hasta 100 caracteres.");
             errores++; valido = false;
         }
-        if (errores > 1) mostrarError("Revisa los campos señalados antes de continuar.");
+        if (!valido) ValidacionFormulario.mostrar(lblResumenError, lblErrorContrato, lblErrorMonto, lblErrorFecha, lblErrorReferencia);
         return valido;
     }
 

@@ -30,6 +30,7 @@ public final class Notificaciones {
         toast.getStyleClass().add("toast");
         toast.setAlignment(Pos.CENTER_LEFT);
         toast.setMaxWidth(440);
+        toast.setMaxHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
         toast.setAccessibleText(mensaje);
 
         javafx.scene.Node icono = Iconos.crear(Iconos.Nombre.CONFIRMACION, 16);
