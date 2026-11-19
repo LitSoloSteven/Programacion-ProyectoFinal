@@ -37,7 +37,17 @@ public final class DialogoFormulario {
         }
         if (botonCancelar instanceof ButtonBase boton) Iconos.asignar(boton, Iconos.Nombre.CERRAR, 14);
         TemaAplicacion.aplicar(pane);
-        dialogo.setOnShown(evento -> TransicionesUI.entrada(pane));
+        dialogo.setOnShown(evento -> {
+            TransicionesUI.entrada(pane);
+            if (propietario != null && pane.getScene() != null && pane.getScene().getWindow() != null) {
+                Window ventanaDialogo = pane.getScene().getWindow();
+                Platform.runLater(() -> {
+                    double yCentrada = propietario.getY()
+                            + (propietario.getHeight() - ventanaDialogo.getHeight()) / 2.0;
+                    ventanaDialogo.setY(Math.max(propietario.getY() + 20.0, yCentrada + 36.0));
+                });
+            }
+        });
         return dialogo;
     }
 
@@ -55,10 +65,30 @@ public final class DialogoFormulario {
             }
             evento.consume();
             cerrando[0] = true;
-            TransicionesUI.salida(dialogo.getDialogPane(), () -> {
+            Runnable cerrarDefinitivo = () -> {
                 dialogo.setOnCloseRequest(null);
-                dialogo.close();
-            });
+                Platform.runLater(() -> {
+                    if (dialogo instanceof Dialog<?> d) {
+                        @SuppressWarnings("unchecked")
+                        Dialog<Object> objDialog = (Dialog<Object>) d;
+                        objDialog.setResult(ButtonType.CANCEL);
+                    }
+                    if (dialogo.isShowing()) {
+                        dialogo.close();
+                    }
+                    if (dialogo.getDialogPane() != null
+                            && dialogo.getDialogPane().getScene() != null
+                            && dialogo.getDialogPane().getScene().getWindow() != null
+                            && dialogo.getDialogPane().getScene().getWindow().isShowing()) {
+                        dialogo.getDialogPane().getScene().getWindow().hide();
+                    }
+                });
+            };
+            try {
+                TransicionesUI.salida(dialogo.getDialogPane(), cerrarDefinitivo);
+            } catch (RuntimeException ex) {
+                cerrarDefinitivo.run();
+            }
         });
         dialogo.setOnHidden(evento -> {
             if (disparador != null) Platform.runLater(disparador::requestFocus);
@@ -68,7 +98,22 @@ public final class DialogoFormulario {
     public static void cerrar(Dialog<?> dialogo) {
         if (dialogo == null) return;
         dialogo.setOnCloseRequest(null);
-        TransicionesUI.salida(dialogo.getDialogPane(), dialogo::close);
+        Runnable cerrarDefinitivo = () -> Platform.runLater(() -> {
+            if (dialogo.isShowing()) {
+                dialogo.close();
+            }
+            if (dialogo.getDialogPane() != null
+                    && dialogo.getDialogPane().getScene() != null
+                    && dialogo.getDialogPane().getScene().getWindow() != null
+                    && dialogo.getDialogPane().getScene().getWindow().isShowing()) {
+                dialogo.getDialogPane().getScene().getWindow().hide();
+            }
+        });
+        try {
+            TransicionesUI.salida(dialogo.getDialogPane(), cerrarDefinitivo);
+        } catch (RuntimeException ex) {
+            cerrarDefinitivo.run();
+        }
     }
 }
 

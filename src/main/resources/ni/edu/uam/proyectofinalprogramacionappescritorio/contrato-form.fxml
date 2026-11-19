@@ -15,7 +15,7 @@
             fx:controller="ni.edu.uam.proyectofinalprogramacionappescritorio.controller.ContratoFormController">
     <content>
         <VBox spacing="16.0" styleClass="form-dialog-content">
-            <padding><Insets bottom="20.0" left="20.0" right="20.0" top="16.0" /></padding>
+            <padding><Insets bottom="20.0" left="20.0" right="20.0" top="36.0" /></padding>
             <Label fx:id="lblResumenError" managed="false" styleClass="field-error" text="" visible="false" wrapText="true" />
             <Label styleClass="section-title" text="Partes" />
             <VBox spacing="8.0">
