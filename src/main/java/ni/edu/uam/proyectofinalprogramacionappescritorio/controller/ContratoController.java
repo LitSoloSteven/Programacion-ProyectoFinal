@@ -1,5 +1,7 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
 
+import lombok.RequiredArgsConstructor;
+
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
@@ -21,15 +23,17 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.ContratoRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteCatalogos;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Garantia;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Inquilino;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Unidad;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ContratoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.GarantiaService;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.InquilinoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.UnidadService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AccionesTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AtajosLista;
@@ -45,10 +49,13 @@ import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.Locale;
 import java.util.UUID;
 
 /** Lista, acciones contractuales y guardado del diálogo de contrato. */
+@RequiredArgsConstructor
 public class ContratoController {
     @FXML private VBox rootView;
     @FXML private HBox eliminarTooltipHost;
@@ -75,9 +82,8 @@ public class ContratoController {
     @FXML private TableColumn<Contrato, String> colEstado;
     @FXML private TableColumn<Contrato, Void> colAcciones;
 
+    private final ClienteCatalogos clienteCatalogos = new ClienteCatalogos(ClienteLatch.api());
     private final ContratoService contratoService;
-    private final UnidadService unidadService;
-    private final InquilinoService inquilinoService;
     private final GarantiaService garantiaService;
     private final ObservableList<Contrato> registros = FXCollections.observableArrayList();
     private final FilteredList<Contrato> filtrados = new FilteredList<>(registros, item -> true);
@@ -89,30 +95,20 @@ public class ContratoController {
     private long versionConsulta;
 
     private record Catalogos(List<Unidad> unidades, List<Inquilino> inquilinos) { }
-    private record DatosTabla(Catalogos catalogos, List<Contrato> contratos) { }
+    private record DatosTabla(Catalogos catalogos, List<Contrato> contratos, Map<UUID, Garantia> garantias) { }
+
+    private Map<UUID, Garantia> garantias = Map.of();
 
     public ContratoController() {
         this(HelloApplication.instancia().getComposicion().contratos(),
-                HelloApplication.instancia().getComposicion().unidades(),
-                HelloApplication.instancia().getComposicion().inquilinos(),
                 HelloApplication.instancia().getComposicion().garantias());
-    }
-    public ContratoController(ContratoService contratoService, UnidadService unidadService,
-                              InquilinoService inquilinoService) {
-        this(contratoService, unidadService, inquilinoService, new GarantiaService());
-    }
-    public ContratoController(ContratoService contratoService, UnidadService unidadService,
-                              InquilinoService inquilinoService, GarantiaService garantiaService) {
-        this.contratoService = contratoService;
-        this.unidadService = unidadService;
-        this.inquilinoService = inquilinoService;
-        this.garantiaService = garantiaService;
     }
 
     @FXML public void initialize() {
         lblTitulo.setGraphic(Iconos.crear(Iconos.Nombre.CONTRATO, 20));
         Iconos.asignar(btnRefrescar, Iconos.Nombre.ACTUALIZAR, 16);
         Iconos.asignar(btnNuevo, Iconos.Nombre.MAS, 16);
+        btnNuevo.disableProperty().bind(btnRefrescar.disableProperty());
         Iconos.asignar(btnLimpiar, Iconos.Nombre.CERRAR, 14);
         Iconos.asignar(btnTerminar, Iconos.Nombre.CONFIRMACION, 16);
         Iconos.asignar(btnEliminar, Iconos.Nombre.ELIMINAR, 16);
@@ -138,7 +134,7 @@ public class ContratoController {
         colDiaPago.setCellFactory(FormatoTabla.entero());
         colDeposito.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getDepositoFormateado()));
         colDeposito.setCellFactory(FormatoTabla.numerica());
-        colSaldoGarantia.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getGarantiaSaldoFormateado()));
+        colSaldoGarantia.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(saldoGarantia(c.getValue())));
         colSaldoGarantia.setCellFactory(FormatoTabla.numerica());
         colEstado.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getEstado()));
         colEstado.setCellFactory(FormatoTabla.estado());
@@ -172,13 +168,17 @@ public class ContratoController {
         long version = ++versionConsulta;
         Task<DatosTabla> tarea = new Task<>() {
             @Override protected DatosTabla call() throws SQLException {
-                Catalogos catalogos = new Catalogos(unidadService.listarTodas(), inquilinoService.listarActivos());
-                return new DatosTabla(catalogos, contratoService.listarTodos());
+                Catalogos catalogos = new Catalogos(clienteCatalogos.unidades(), clienteCatalogos.inquilinos(true));
+                List<Contrato> contratos = clienteCatalogos.contratos(false);
+                Map<UUID, Garantia> seguimiento = garantiaService.listarTodas().stream()
+                        .collect(Collectors.toMap(g -> g.getContrato().getId(), g -> g));
+                return new DatosTabla(catalogos, contratos, seguimiento);
             }
         };
         TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
             if (version != versionConsulta) return;
             mostrarCatalogos(datos.catalogos());
+            garantias = datos.garantias();
             registros.setAll(datos.contratos());
             aplicarFiltro(txtBuscar.getText());
             ocultarError();
@@ -195,7 +195,9 @@ public class ContratoController {
     }
 
     @FXML public void refrescarTabla() { cargarDatos(); }
-    @FXML public void handleNuevo() { abrirFormulario(null); }
+    @FXML public void handleNuevo() {
+        if (!btnNuevo.isDisabled()) abrirFormulario(null);
+    }
     private void abrirEdicion(Contrato contrato) { abrirFormulario(contrato); }
 
     private void abrirFormulario(Contrato existente) {
@@ -225,23 +227,11 @@ public class ContratoController {
                 accion.setDisable(true); accion.setText("Guardando contrato…");
                 Task<Void> tarea = new Task<>() {
                     @Override protected Void call() throws SQLException {
-                        if (nuevo) {
-                            Contrato contrato = new Contrato();
-                            contrato.setUnidadId(unidadId);
-                            contrato.setInquilinoId(inquilinoId);
-                            contrato.setInicio(datos.inicio());
-                            contrato.setFin(datos.fin());
-                            contrato.setCanon(canonGuardado);
-                            contrato.setMoneda(datos.moneda());
-                            contrato.setDiaPago(datos.diaPago());
-                            contrato.setDepositoPactado(depositoGuardado);
-                            contrato.setEstado(datos.estado());
-                            contratoService.guardar(contrato);
-                        } else {
-                            contratoService.actualizar(contratoId, version, unidadId, inquilinoId,
-                                    datos.inicio(), datos.fin(), canonGuardado, datos.moneda(), datos.diaPago(),
-                                    depositoGuardado, datos.estado());
-                        }
+                        clienteCatalogos.guardarContrato(contratoId,
+                                new ContratoRequest(unidadId.toString(), inquilinoId.toString(),
+                            datos.inicio().toString(), datos.fin().toString(), datos.canon().toPlainString(),
+                            datos.moneda(), datos.diaPago(), datos.deposito().toPlainString(), datos.estado(),
+                            nuevo ? null : version));
                         return null;
                     }
                 };
@@ -252,6 +242,13 @@ public class ContratoController {
                     cargarDatos();
                 }, error -> {
                     accion.setDisable(false); accion.setText(nuevo ? "Guardar contrato" : "Guardar cambios");
+                    if (!nuevo && error instanceof ErrorClienteException api && api.getEstado() == 409) {
+                        DialogoFormulario.cerrar(dialogo);
+                        cargarDatos();
+                        AlertaUtil.mostrarAdvertencia("No se guardaron los cambios",
+                                api.getMessage() + " Abre el registro actualizado para volver a editarlo.");
+                        return;
+                    }
                     formulario.mostrarError(mensajeError(error));
                 });
             });
@@ -271,7 +268,7 @@ public class ContratoController {
         UUID contratoId = contrato.getId();
         btnTerminar.setDisable(true);
         Task<Void> tarea = new Task<>() {
-            @Override protected Void call() throws SQLException { contratoService.terminarContrato(contratoId); return null; }
+            @Override protected Void call() throws SQLException { clienteCatalogos.terminarContrato(contratoId); return null; }
         };
         TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
             AlertaUtil.mostrarExito("Contrato finalizado", "El contrato quedó marcado como Terminado.");
@@ -284,8 +281,8 @@ public class ContratoController {
 
     @FXML public void handleAjustarGarantia() {
         Contrato contrato = seleccionado;
-        if (!permisoAjustarGarantia || contrato == null || contrato.getGarantiaSeguimiento() == null) return;
-        Garantia garantia = contrato.getGarantiaSeguimiento();
+        if (!permisoAjustarGarantia || contrato == null || garantias.get(contrato.getId()) == null) return;
+        Garantia garantia = garantias.get(contrato.getId());
         UUID garantiaId = garantia.getId();
         BigDecimal maximo = garantia.getMontoInicial();
         TextField txtSaldo = new TextField(garantia.getSaldoActual().toPlainString());
@@ -375,13 +372,19 @@ public class ContratoController {
         inquilinosDisponibles = catalogos.inquilinos();
     }
 
+    private String saldoGarantia(Contrato contrato) {
+        Garantia garantia = garantias.get(contrato.getId());
+        return garantia == null ? contrato.getGarantiaSaldoFormateado()
+                : ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoMoneda.formatear(contrato.getMoneda(), garantia.getSaldoActual());
+    }
+
     private void actualizarAcciones() {
         btnTerminar.setDisable(seleccionado == null || !sePuedeFinalizar(seleccionado));
         btnEliminar.setDisable(seleccionado == null || !permisoEliminar);
-        boolean puedeAjustar = seleccionado != null && seleccionado.getGarantiaSeguimiento() != null
+        boolean puedeAjustar = seleccionado != null && garantias.containsKey(seleccionado.getId())
                 && permisoAjustarGarantia;
         btnAjustarGarantia.setDisable(!puedeAjustar);
-        if (seleccionado != null && seleccionado.getGarantiaSeguimiento() == null) {
+        if (seleccionado != null && !garantias.containsKey(seleccionado.getId())) {
             Tooltip.install(garantiaTooltipHost, new Tooltip("Este contrato no tiene seguimiento de garantía."));
         } else if (!permisoAjustarGarantia) {
             Tooltip.install(garantiaTooltipHost, new Tooltip("Solo el propietario puede ajustar garantías."));
@@ -399,6 +402,7 @@ public class ContratoController {
     private static boolean contiene(String texto, String filtro) { return texto != null && texto.toLowerCase(Locale.ROOT).contains(filtro); }
     private static String fecha(LocalDate fecha) { return fecha == null ? "—" : fecha.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")); }
     private static String mensajeError(Throwable error) {
+        if (error instanceof ErrorClienteException) return error.getMessage();
         if (error instanceof IllegalArgumentException || error instanceof SecurityException || error instanceof IllegalStateException) {
             return error.getMessage();
         }

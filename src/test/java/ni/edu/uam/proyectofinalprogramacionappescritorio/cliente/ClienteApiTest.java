@@ -1,19 +1,14 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.cliente;
 
+import java.util.concurrent.atomic.AtomicInteger;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.piloto.ServidorSpringPrueba;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.dto.LoginResponse;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ApiConfig;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.Router;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ServidorApi;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.TokenService;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.RutasTasas;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.TasaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Rol;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.AutenticacionService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.TipoCambioService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PasswordHasher;
 import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.AfterAll;
@@ -38,7 +33,7 @@ class ClienteApiTest {
     private static final LocalDate FECHA = LocalDate.now().minusDays(1);
 
     private static SessionFactory factory;
-    private static ServidorApi servidor;
+    private static ServidorSpringPrueba servidor;
     private static String nombrePropietario;
 
     @BeforeAll
@@ -62,17 +57,13 @@ class ClienteApiTest {
         });
         SesionUsuario.cerrarSesion();
 
-        Router router = new Router();
-        new RutasTasas(new TipoCambioService(tx)).registrar(router);
-        servidor = new ServidorApi(ApiConfig.paraPruebas(0),
-                new AutenticacionService(tx), new TokenService(), router);
-        servidor.iniciar();
+        servidor = new ServidorSpringPrueba(factory);
     }
 
     @AfterAll
     static void cerrar() {
-        if (servidor != null) servidor.detener();
-        if (factory != null) factory.close();
+        if (servidor != null) servidor.close();
+        if (factory != null && !factory.isClosed()) factory.close();
         SesionUsuario.cerrarSesion();
     }
 
@@ -110,6 +101,24 @@ class ClienteApiTest {
         ErrorClienteException error = assertThrows(ErrorClienteException.class,
                 () -> tasas.listar(FECHA, null, 50));
         assertEquals(401, error.getEstado());
+    }
+
+    @Test
+    void unTokenRevocadoDescartaLaSesionYNotificaSoloUnaVez() {
+        ClienteApi api = new ClienteApi(servidor.urlBase());
+        ClienteAuth auth = new ClienteAuth(api);
+        var avisos = new AtomicInteger();
+        api.alExpirar(avisos::incrementAndGet);
+
+        LoginResponse sesion = auth.login(nombrePropietario, new String(PASSWORD));
+        auth.logout(sesion.token());
+        for (int intento = 0; intento < 2; intento++) {
+            var error = assertThrows(ErrorClienteException.class,
+                    () -> api.get("/api/v1/dashboard/metricas", Void.class));
+            assertEquals(401, error.getEstado());
+        }
+        assertFalse(api.sesionActiva());
+        assertEquals(1, avisos.get());
     }
 
     @Test

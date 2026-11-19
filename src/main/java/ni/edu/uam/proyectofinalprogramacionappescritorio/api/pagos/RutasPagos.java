@@ -1,11 +1,9 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos;
 
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ContextoPeticion;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.PeticionApi;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ExcepcionApi;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.Json;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.LectorCuerpo;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.RespuestaJson;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.Router;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.AnulacionRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ConflictoDatosException;
@@ -29,18 +27,7 @@ public final class RutasPagos {
         this.servicio = Objects.requireNonNull(servicio);
     }
 
-    public void registrar(Router router) {
-        router.registrar("POST", "/api/v1/pagos", false, this::registrarPago);
-        router.registrar("GET", "/api/v1/pagos", false, this::listarPagos);
-        router.registrar("GET", "/api/v1/cargos", false, this::listarCargos);
-        router.registrar("GET", "/api/v1/pagos/{id}", false, this::obtenerPago);
-        router.registrar("GET", "/api/v1/recibos/{numero}", false, this::obtenerRecibo);
-        router.registrar("POST", "/api/v1/pagos/{id}/anulacion", false, this::anularPago);
-        router.registrar("GET", "/api/v1/contratos/{id}/estado-cuenta", false,
-                this::estadoCuenta);
-    }
-
-    private RespuestaJson listarPagos(ContextoPeticion contexto) {
+    public RespuestaJson listarPagos(PeticionApi contexto) {
         int pagina = pagina(contexto.consulta("pagina"));
         int tamano = tamano(contexto.consulta("tamano"));
         String texto = contexto.consulta("texto");
@@ -48,7 +35,7 @@ public final class RutasPagos {
                 () -> servicio.listarPagos(pagina, tamano, texto)));
     }
 
-    private RespuestaJson listarCargos(ContextoPeticion contexto) {
+    public RespuestaJson listarCargos(PeticionApi contexto) {
         int pagina = pagina(contexto.consulta("pagina"));
         int tamano = tamano(contexto.consulta("tamano"));
         String texto = contexto.consulta("texto");
@@ -56,8 +43,8 @@ public final class RutasPagos {
                 () -> servicio.listarCargos(pagina, tamano, texto)));
     }
 
-    private RespuestaJson registrarPago(ContextoPeticion contexto) throws Exception {
-        String clave = contexto.intercambio().getRequestHeaders().getFirst("Idempotency-Key");
+    public RespuestaJson registrarPago(PeticionApi contexto) throws Exception {
+        String clave = contexto.cabecera("Idempotency-Key");
         if (clave == null || clave.isBlank()) {
             throw ExcepcionApi.solicitudInvalida(
                     "La cabecera Idempotency-Key es obligatoria.");
@@ -73,17 +60,17 @@ public final class RutasPagos {
         }
     }
 
-    private RespuestaJson obtenerPago(ContextoPeticion contexto) {
+    public RespuestaJson obtenerPago(PeticionApi contexto) {
         UUID id = identificador(contexto.parametro("id"));
         return RespuestaJson.ok(enSesion(contexto, () -> servicio.obtenerPago(id)));
     }
 
-    private RespuestaJson obtenerRecibo(ContextoPeticion contexto) {
+    public RespuestaJson obtenerRecibo(PeticionApi contexto) {
         long numero = numeroRecibo(contexto.parametro("numero"));
         return RespuestaJson.ok(enSesion(contexto, () -> servicio.obtenerRecibo(numero)));
     }
 
-    private RespuestaJson anularPago(ContextoPeticion contexto) throws Exception {
+    public RespuestaJson anularPago(PeticionApi contexto) throws Exception {
         UUID id = identificador(contexto.parametro("id"));
         AnulacionRequest solicitud = leer(contexto, AnulacionRequest.class);
         try {
@@ -96,18 +83,18 @@ public final class RutasPagos {
         }
     }
 
-    private RespuestaJson estadoCuenta(ContextoPeticion contexto) {
+    public RespuestaJson estadoCuenta(PeticionApi contexto) {
         UUID contratoId = identificador(contexto.parametro("id"));
         LocalDate corte = fechaOpcional(contexto.consulta("corte"));
         return RespuestaJson.ok(enSesion(contexto,
                 () -> servicio.estadoCuenta(contratoId, corte)));
     }
 
-    private static <T> T leer(ContextoPeticion contexto, Class<T> tipo) throws Exception {
-        return Json.leer(LectorCuerpo.leerJson(contexto.intercambio()), tipo);
+    private static <T> T leer(PeticionApi contexto, Class<T> tipo) throws Exception {
+        return Json.leer(contexto.leerCuerpo(), tipo);
     }
 
-    private <T> T enSesion(ContextoPeticion contexto, Supplier<T> operacion) {
+    private <T> T enSesion(PeticionApi contexto, Supplier<T> operacion) {
         return SesionUsuario.ejecutarComo(contexto.sesion().comoUsuario(),
                 () -> servicio.enTransaccion(operacion));
     }

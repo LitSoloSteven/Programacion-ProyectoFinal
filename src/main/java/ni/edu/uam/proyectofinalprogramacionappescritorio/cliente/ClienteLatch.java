@@ -16,6 +16,10 @@ public final class ClienteLatch {
         api = new ClienteApi("http://127.0.0.1:" + puerto);
     }
 
+    public static void alExpirar(Runnable accion) {
+        api().alExpirar(accion);
+    }
+
     public static ClienteApi api() {
         ClienteApi actual = api;
         if (actual == null) {

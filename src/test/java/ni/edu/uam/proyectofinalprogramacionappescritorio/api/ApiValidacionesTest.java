@@ -1,27 +1,23 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.api;
 
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.piloto.ServidorSpringPrueba;
 import com.google.gson.Gson;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.dto.LoginRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.dto.LoginResponse;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ApiConfig;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ErrorApi;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.Router;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ServidorApi;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.TokenService;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.validaciones.RutasValidaciones;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.validaciones.dto.ValidacionRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.validaciones.dto.ValidacionResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Rol;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.AutenticacionService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PasswordHasher;
 import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -37,18 +33,19 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class ApiValidacionesTest {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class ApiValidacionesTest {
     private static final char[] PASSWORD = "ClaveSintetica-2026".toCharArray();
     private static final Gson GSON = new Gson();
 
-    private static SessionFactory factory;
-    private static ServidorApi servidor;
-    private static HttpClient cliente;
-    private static String base;
-    private static String nombreUsuario;
+    private SessionFactory factory;
+    private ServidorPrueba servidor;
+    private HttpClient cliente;
+    private String base;
+    private String nombreUsuario;
 
     @BeforeAll
-    static void iniciar() throws Exception {
+    void iniciar() throws Exception {
         Properties p = new Properties();
         p.setProperty("hibernate.connection.driver_class", "org.h2.Driver");
         p.setProperty("hibernate.connection.url",
@@ -69,19 +66,23 @@ class ApiValidacionesTest {
         });
         SesionUsuario.cerrarSesion();
 
-        Router router = new Router();
-        new RutasValidaciones(tx).registrar(router);
-        servidor = new ServidorApi(ApiConfig.paraPruebas(0),
-                new AutenticacionService(tx), new TokenService(), router);
-        servidor.iniciar();
-        base = servidor.urlBase();
+        servidor = iniciarServidor(factory);
+        base = servidor.url();
         cliente = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     }
 
+    protected ServidorPrueba iniciarServidor(SessionFactory factory) throws Exception {
+        var api = new ServidorSpringPrueba(factory);
+        return new ServidorPrueba(api.urlBase(), api);
+    }
+
+    public record ServidorPrueba(String url, AutoCloseable cierre) { }
+
     @AfterAll
-    static void cerrar() {
-        if (servidor != null) servidor.detener();
-        if (factory != null) factory.close();
+    void cerrar() throws Exception {
+        if (cliente != null) cliente.close();
+        if (servidor != null) servidor.cierre().close();
+        if (factory != null && !factory.isClosed()) factory.close();
         SesionUsuario.cerrarSesion();
     }
 
@@ -162,14 +163,14 @@ class ApiValidacionesTest {
         assertEquals("JSON_INVALIDO", error(respuesta).error().codigo());
     }
 
-    private static ValidacionResponse validar(String token, ValidacionRequest solicitud)
+    private ValidacionResponse validar(String token, ValidacionRequest solicitud)
             throws Exception {
         HttpResponse<String> respuesta = postJson(solicitud, token);
         assertEquals(200, respuesta.statusCode(), respuesta.body());
         return GSON.fromJson(respuesta.body(), ValidacionResponse.class);
     }
 
-    private static String login() throws Exception {
+    private String login() throws Exception {
         HttpResponse<String> respuesta = enviar("/api/v1/auth/login", GSON.toJson(
                 new LoginRequest(nombreUsuario, new String(PASSWORD))), null);
         assertEquals(200, respuesta.statusCode(), respuesta.body());
@@ -178,12 +179,12 @@ class ApiValidacionesTest {
         return sesion.token();
     }
 
-    private static HttpResponse<String> postJson(ValidacionRequest solicitud, String token)
+    private HttpResponse<String> postJson(ValidacionRequest solicitud, String token)
             throws Exception {
         return enviar("/api/v1/validaciones", GSON.toJson(solicitud), token);
     }
 
-    private static HttpResponse<String> enviar(String ruta, String cuerpo, String token)
+    private HttpResponse<String> enviar(String ruta, String cuerpo, String token)
             throws Exception {
         HttpRequest.Builder constructor = HttpRequest.newBuilder(
                         URI.create(base + ruta))

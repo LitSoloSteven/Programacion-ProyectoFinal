@@ -1,17 +1,14 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.api;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.hibernate.resource.jdbc.spi.StatementInspector;
 import com.google.gson.Gson;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.dto.LoginRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.dto.LoginResponse;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ApiConfig;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ErrorApi;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.Router;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ServidorApi;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.TokenService;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.indicadores.RutasIndicadores;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.piloto.ServidorSpringPrueba;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.indicadores.dto.MetricasResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.indicadores.dto.TotalMonedaResponse;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.RutasPagos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.ServicioPagos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.DistribucionRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.EstadoCuentaResponse;
@@ -33,8 +30,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.SolicitudIdempot
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.TipoCambio;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Unidad;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.AutenticacionService;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.DashboardService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PasswordHasher;
 import org.hibernate.SessionFactory;
@@ -77,9 +73,10 @@ class ApiPagosTest {
     private static final LocalDate CORTE = LocalDate.of(2026, 11, 30);
     private static final BigDecimal TASA = new BigDecimal("36.6243");
 
+    private static final AtomicBoolean DESFASAR_RELOJ = new AtomicBoolean();
     private static SessionFactory factory;
     private static HibernateTransactions tx;
-    private static ServidorApi servidor;
+    private static ServidorSpringPrueba servidor;
     private static HttpClient cliente;
     private static String base;
     private static String nombrePropietario;
@@ -106,6 +103,12 @@ class ApiPagosTest {
         p.setProperty("hibernate.jdbc.time_zone", "UTC");
         p.setProperty("hibernate.show_sql", "false");
 
+        p.put("hibernate.session_factory.statement_inspector", (StatementInspector) sql ->
+                DESFASAR_RELOJ.get() && sql.strip().equalsIgnoreCase("select current_timestamp")
+                        ? (Boolean.getBoolean("latch.test.postgres")
+                            ? "select current_timestamp - interval '10 minutes'"
+                            : "select dateadd('MINUTE', -10, current_timestamp)")
+                        : sql);
         factory = HibernateUtil.construir(p);
         if (Boolean.getBoolean("latch.test.postgres")) {
             PostgresTestSupport.aplicarMigraciones(p);
@@ -127,20 +130,16 @@ class ApiPagosTest {
         });
         SesionUsuario.cerrarSesion();
 
-        Router router = new Router();
-        new RutasPagos(new ServicioPagos(tx)).registrar(router);
-        new RutasIndicadores(new DashboardService(tx)).registrar(router);
-        servidor = new ServidorApi(ApiConfig.paraPruebas(0),
-                new AutenticacionService(tx), new TokenService(), router);
-        servidor.iniciar();
+        servidor = new ServidorSpringPrueba(factory);
         base = servidor.urlBase();
         cliente = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     }
 
     @AfterAll
     static void cerrar() {
-        if (servidor != null) servidor.detener();
-        if (factory != null) factory.close();
+        if (cliente != null) cliente.close();
+        if (servidor != null) servidor.close();
+        if (factory != null && !factory.isClosed()) factory.close();
         if (Boolean.getBoolean("latch.test.postgres")) {
             PostgresTestSupport.eliminarFuncionRecibo();
         }
@@ -373,15 +372,17 @@ class ApiPagosTest {
                 new DistribucionRequest(cargoRentaId.toString(), "400.00"),
                 new DistribucionRequest(cargoServicioId.toString(), "600.00")));
 
-        Instant inicioSolicitud = Instant.now();
+        Instant inicioSolicitud = tx.ejecutar(s -> new RelojService().leer(s).instante());
         HttpResponse<String> primera = postJson("/api/v1/pagos",
                 GSON.toJson(solicitud), token, clave);
-        Instant finSolicitud = Instant.now();
+        Instant finSolicitud = tx.ejecutar(s -> new RelojService().leer(s).instante());
         assertEquals(201, primera.statusCode(), primera.body());
         PagoRegistroResponse registro = GSON.fromJson(primera.body(), PagoRegistroResponse.class);
         assertNotNull(registro.pagoId());
         assertTrue(registro.numeroRecibo() > 0);
         assertEquals("1000.00", registro.montoContrato());
+        assertTrue(com.google.gson.JsonParser.parseString(primera.body()).getAsJsonObject()
+                .get("montoContrato").getAsJsonPrimitive().isString());
         assertEquals("0.00", registro.credito());
         Pago pagoGuardado = tx.ejecutar(session ->
                 session.find(Pago.class, UUID.fromString(registro.pagoId())));
@@ -416,6 +417,8 @@ class ApiPagosTest {
         assertEquals(200, reciboRespuesta.statusCode(), reciboRespuesta.body());
         ReciboResponse recibo = GSON.fromJson(reciboRespuesta.body(), ReciboResponse.class);
         assertEquals("1000.00", recibo.montoOriginal());
+        assertTrue(com.google.gson.JsonParser.parseString(reciboRespuesta.body()).getAsJsonObject()
+                .get("montoOriginal").getAsJsonPrimitive().isString());
         assertFalse(recibo.anulado());
 
         assertEquals(404, get("/api/v1/pagos/" + UUID.randomUUID(), token).statusCode());
@@ -454,12 +457,31 @@ class ApiPagosTest {
         assertEquals(0, contar("select count(p) from Pago p"));
         assertEquals(0, contar("select count(r) from Recibo r"));
 
-        HttpResponse<String> confirmada = postJson("/api/v1/pagos",
-                GSON.toJson(pago("1000.00", null)), token, UUID.randomUUID().toString());
+        String claveValida = UUID.randomUUID().toString();
+        String cuerpoValido = GSON.toJson(pago("1000.00", null));
+        if (Boolean.getBoolean("latch.test.postgres")) {
+            PostgresTestSupport.impedirAuditoriaFinanciera(tx);
+            try {
+                var fallida = postJson("/api/v1/pagos", cuerpoValido, token, claveValida);
+                assertEquals(500, fallida.statusCode(), fallida.body());
+                assertEquals("ERROR_INTERNO", error(fallida).error().codigo());
+                assertEquals(numeroEsperado, siguienteNumeroRecibo());
+                assertEquals(0, contar("select count(p) from Pago p"));
+                assertEquals(0, contar("select count(r) from Recibo r"));
+                assertEquals(0, contar("select count(i) from SolicitudIdempotente i"));
+                assertEquals(0, contar("select count(a) from Auditoria a where a.accion = 'PAGO_REGISTRADO'"));
+            } finally {
+                PostgresTestSupport.permitirAuditoriaFinanciera(tx);
+            }
+        }
+        HttpResponse<String> confirmada = postJson("/api/v1/pagos", cuerpoValido, token, claveValida);
         assertEquals(201, confirmada.statusCode(), confirmada.body());
         PagoRegistroResponse resultado = GSON.fromJson(confirmada.body(),
                 PagoRegistroResponse.class);
         assertEquals(numeroEsperado, resultado.numeroRecibo());
+        assertEquals(1, contar("select count(r) from Recibo r"));
+        assertEquals(1, contar("select count(i) from SolicitudIdempotente i"));
+        assertEquals(1, contar("select count(a) from Auditoria a where a.accion = 'PAGO_REGISTRADO'"));
     }
 
     @Test
@@ -534,6 +556,8 @@ class ApiPagosTest {
         PagoRegistroResponse registro = GSON.fromJson(respuesta.body(),
                 PagoRegistroResponse.class);
         assertEquals("1000.00", registro.montoContrato());
+        assertTrue(com.google.gson.JsonParser.parseString(respuesta.body()).getAsJsonObject()
+                .get("montoContrato").getAsJsonPrimitive().isString());
         assertEquals("1000.00", registro.credito());
         assertEquals(1, contar("select count(p) from Pago p"));
 
@@ -768,6 +792,27 @@ class ApiPagosTest {
         assertEquals(409, ajena.statusCode(), ajena.body());
         assertEquals("CONFLICTO", error(ajena).error().codigo());
         assertEquals(1, contar("select count(p) from Pago p"));
+    }
+
+    @Test
+    void desfaseDelRelojImpidePersistirPagoReciboEIdempotencia() throws Exception {
+        String token = login(nombrePropietario);
+        String clave = UUID.randomUUID().toString();
+        String cuerpo = GSON.toJson(pago("1000.00", null));
+        HttpResponse<String> respuesta;
+        DESFASAR_RELOJ.set(true);
+        try {
+            respuesta = postJson("/api/v1/pagos", cuerpo, token, clave);
+        } finally {
+            DESFASAR_RELOJ.set(false);
+        }
+
+        assertEquals(503, respuesta.statusCode(), respuesta.body());
+        assertEquals("ERR-057", error(respuesta).error().codigo());
+        assertEquals(0, contar("select count(p) from Pago p"));
+        assertEquals(0, contar("select count(r) from Recibo r"));
+        assertEquals(0, contar("select count(i) from SolicitudIdempotente i"));
+        assertEquals(201, postJson("/api/v1/pagos", cuerpo, token, clave).statusCode());
     }
 
     private PagoRequest pago(String monto, List<DistribucionRequest> distribucion) {

@@ -73,6 +73,31 @@ public final class PostgresTestSupport {
         }
     }
 
+    public static void impedirAuditoriaFinanciera(HibernateTransactions tx) {
+        tx.ejecutar(sesion -> {
+            sesion.createNativeMutationQuery("""
+                    create or replace function fallar_auditoria_latch_prueba()
+                    returns trigger language plpgsql as
+                    'begin raise exception ''Fallo de auditoria de prueba''; end;'
+                    """).executeUpdate();
+            sesion.createNativeMutationQuery("""
+                    create trigger fallar_auditoria_latch_prueba
+                    before insert on auditoria for each row
+                    when (new.accion in ('TASA_AUTORIZADA', 'PAGO_REGISTRADO'))
+                    execute function fallar_auditoria_latch_prueba()
+                    """).executeUpdate();
+            return null;
+        });
+    }
+
+    public static void permitirAuditoriaFinanciera(HibernateTransactions tx) {
+        tx.ejecutar(sesion -> {
+            sesion.createNativeMutationQuery(
+                    "alter table auditoria disable trigger fallar_auditoria_latch_prueba").executeUpdate();
+            return null;
+        });
+    }
+
     static List<String> separarSentencias(String script) {
         List<String> sentencias = new ArrayList<>();
         StringBuilder actual = new StringBuilder();

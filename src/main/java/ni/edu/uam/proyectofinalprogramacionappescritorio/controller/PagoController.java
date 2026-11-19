@@ -1,5 +1,11 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
 
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoListaResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoDetalleResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.ReciboResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteCatalogos;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
+import javafx.scene.control.TextInputDialog;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
@@ -26,9 +32,6 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoReque
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClientePagos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Pago;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ContratoService;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PagoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AccionesTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
@@ -37,19 +40,14 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.util.DialogoFormulario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PanelEstadoTabla;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.util.SesionExpiradaUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TemaAplicacion;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
 /** Historial paginado y formulario de revisión para registrar pagos. */
 public class PagoController {
@@ -68,43 +66,25 @@ public class PagoController {
     @FXML private Label lblPaginacion;
     @FXML private Label lblTitulo;
     @FXML private TextField txtBuscar;
-    @FXML private TableView<Pago> tblPagos;
-    @FXML private TableColumn<Pago, String> colContrato;
-    @FXML private TableColumn<Pago, LocalDate> colFecha;
-    @FXML private TableColumn<Pago, String> colMonto;
-    @FXML private TableColumn<Pago, String> colMetodo;
-    @FXML private TableColumn<Pago, String> colReferencia;
-    @FXML private TableColumn<Pago, String> colEstado;
-    @FXML private TableColumn<Pago, Void> colAcciones;
+    @FXML private TableView<PagoListaResponse> tblPagos;
+    @FXML private TableColumn<PagoListaResponse, String> colContrato;
+    @FXML private TableColumn<PagoListaResponse, LocalDate> colFecha;
+    @FXML private TableColumn<PagoListaResponse, String> colMonto;
+    @FXML private TableColumn<PagoListaResponse, String> colMetodo;
+    @FXML private TableColumn<PagoListaResponse, String> colReferencia;
+    @FXML private TableColumn<PagoListaResponse, String> colEstado;
+    @FXML private TableColumn<PagoListaResponse, Void> colAcciones;
 
-    private final PagoService pagoService;
-    private final ContratoService contratoService;
-    private final ClientePagos clientePagos;
-    private final Map<PagoRequest, UUID> clavesPagosPendientes = new HashMap<>();
-    private final ObservableList<Pago> listaPagos = FXCollections.observableArrayList();
+    private final ClienteCatalogos catalogos = new ClienteCatalogos(ClienteLatch.api());
+    private final ClientePagos clientePagos = HelloApplication.instancia().getPagos();
+    private final ObservableList<PagoListaResponse> listaPagos = FXCollections.observableArrayList();
     private List<Contrato> contratosDisponibles = List.of();
-    private Pago pagoSeleccionado;
+    private PagoListaResponse pagoSeleccionado;
     private int paginaActual = 1;
     private long versionConsulta;
     private final boolean permisoAnular = SesionUsuario.esPropietario();
 
-    private record DatosTabla(List<Contrato> contratos, PaginaResponse<Pago> pagos) { }
-
-    public PagoController() {
-        this(HelloApplication.instancia().getComposicion().pagos(),
-                HelloApplication.instancia().getComposicion().contratos(), new ClientePagos());
-    }
-
-    public PagoController(PagoService pagoService, ContratoService contratoService) {
-        this(pagoService, contratoService, new ClientePagos());
-    }
-
-    public PagoController(PagoService pagoService, ContratoService contratoService,
-                          ClientePagos clientePagos) {
-        this.pagoService = pagoService;
-        this.contratoService = contratoService;
-        this.clientePagos = clientePagos;
-    }
+    private record DatosTabla(List<Contrato> contratos, PaginaResponse<PagoListaResponse> pagos) { }
 
     @FXML public void initialize() {
         lblTitulo.setGraphic(Iconos.crear(Iconos.Nombre.PAGO, 20));
@@ -119,20 +99,20 @@ public class PagoController {
         tblPagos.setItems(listaPagos);
         tblPagos.setPlaceholder(PanelEstadoTabla.crear("Cargando pagos",
                 "El historial aparecerá al terminar la consulta.", null, null));
-        colContrato.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getContratoInfo()));
-        colFecha.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyObjectWrapper<>(c.getValue().getFechaPago()));
+        colContrato.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().contratoInfo()));
+        colFecha.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyObjectWrapper<>(LocalDate.parse(c.getValue().fechaPago())));
         colFecha.setCellFactory(FormatoTabla.fecha());
-        colMonto.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getMontoFormateado()));
+        colMonto.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().montoFormateado()));
         colMonto.setCellFactory(FormatoTabla.numerica());
-        colMetodo.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getMetodo()));
-        colReferencia.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getReferencia()));
-        colEstado.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getEstado()));
+        colMetodo.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().metodo()));
+        colReferencia.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().referencia()));
+        colEstado.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().estado()));
         colEstado.setCellFactory(FormatoTabla.estado());
         AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>(
                 "Ver pago", this::mostrarDetalle, Iconos.Nombre.VER)));
         tblPagos.getSelectionModel().selectedItemProperty().addListener((obs, anterior, actual) -> {
             pagoSeleccionado = actual;
-            btnAnular.setDisable(actual == null || !permisoAnular || "Anulado".equalsIgnoreCase(actual.getEstado()));
+            btnAnular.setDisable(actual == null || !permisoAnular || "Anulado".equalsIgnoreCase(actual.estado()));
         });
         txtBuscar.textProperty().addListener((obs, anterior, nuevo) -> {
             paginaActual = 1;
@@ -147,9 +127,9 @@ public class PagoController {
         String filtro = txtBuscar.getText();
         long version = ++versionConsulta;
         Task<DatosTabla> tarea = new Task<>() {
-            @Override protected DatosTabla call() throws SQLException {
-                return new DatosTabla(contratoService.listarVigentes(),
-                        pagoService.listarTodos(pagina, PagoService.TAMANO_PAGINA_MAXIMO, filtro));
+            @Override protected DatosTabla call() {
+                return new DatosTabla(catalogos.contratos(true),
+                        clientePagos.listarPagos(pagina, filtro));
             }
         };
         TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
@@ -172,9 +152,9 @@ public class PagoController {
         int pagina = paginaActual;
         String filtro = txtBuscar.getText();
         long version = ++versionConsulta;
-        Task<PaginaResponse<Pago>> tarea = new Task<>() {
-            @Override protected PaginaResponse<Pago> call() {
-                return pagoService.listarTodos(pagina, PagoService.TAMANO_PAGINA_MAXIMO, filtro);
+        Task<PaginaResponse<PagoListaResponse>> tarea = new Task<>() {
+            @Override protected PaginaResponse<PagoListaResponse> call() {
+                return clientePagos.listarPagos(pagina, filtro);
             }
         };
         TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, resultado -> {
@@ -186,7 +166,7 @@ public class PagoController {
         });
     }
 
-    private void mostrarPagina(PaginaResponse<Pago> pagina) {
+    private void mostrarPagina(PaginaResponse<PagoListaResponse> pagina) {
         int paginas = (int) Math.max(1, (pagina.total() + pagina.tamano() - 1) / pagina.tamano());
         if (paginaActual > paginas) {
             paginaActual = paginas;
@@ -232,7 +212,7 @@ public class PagoController {
                         botonAccion.setText("Confirmar pago");
                     }
                 } else {
-                    registrarPago(dialogo, botonAccion, formulario, propietario);
+                    registrarPago(dialogo, botonAccion, formulario);
                 }
             });
             dialogo.showAndWait();
@@ -242,19 +222,18 @@ public class PagoController {
     }
 
     private void registrarPago(Dialog<ButtonType> dialogo, Button botonAccion,
-                               PagoFormController formulario, Window propietario) {
+                               PagoFormController formulario) {
         PagoFormController.Datos datos = formulario.datos();
         PagoRequest solicitud = new PagoRequest(datos.contrato().getId().toString(),
                 datos.fecha().toString(), datos.moneda(), datos.monto().toPlainString(), datos.metodo(),
                 datos.referencia(), List.of(), datos.notas());
-        UUID clave = clavesPagosPendientes.computeIfAbsent(solicitud, ignorada -> UUID.randomUUID());
+        long usuarioId = SesionUsuario.getActual().getUsuarioId();
         botonAccion.setDisable(true);
         botonAccion.setText("Registrando pago…");
         Task<PagoRegistroResponse> tarea = new Task<>() {
-            @Override protected PagoRegistroResponse call() { return clientePagos.registrar(solicitud, clave); }
+            @Override protected PagoRegistroResponse call() { return clientePagos.registrarReintentable(usuarioId, solicitud); }
         };
         TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, registro -> {
-            clavesPagosPendientes.remove(solicitud, clave);
             formulario.marcarLimpio();
             DialogoFormulario.cerrar(dialogo);
             AlertaUtil.mostrarExito("Pago registrado", "Pago de "
@@ -267,7 +246,6 @@ public class PagoController {
             botonAccion.setText("Confirmar pago");
             if (error instanceof ErrorClienteException clienteError && clienteError.esNoAutenticado()) {
                 formulario.mostrarError("Tu sesión expiró.");
-                SesionExpiradaUtil.mostrar(propietario, dialogo);
                 return;
             }
             formulario.mostrarError(mensajeErrorPago(error));
@@ -280,9 +258,9 @@ public class PagoController {
         String filtro = txtBuscar.getText();
         long version = ++versionConsulta;
         Task<DatosTabla> tarea = new Task<>() {
-            @Override protected DatosTabla call() throws SQLException {
-                return new DatosTabla(contratoService.listarVigentes(),
-                        pagoService.listarTodos(pagina, PagoService.TAMANO_PAGINA_MAXIMO, filtro));
+            @Override protected DatosTabla call() {
+                return new DatosTabla(catalogos.contratos(true),
+                        clientePagos.listarPagos(pagina, filtro));
             }
         };
         TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
@@ -314,18 +292,24 @@ public class PagoController {
     }
 
     @FXML public void handleAnular() {
-        Pago pago = pagoSeleccionado;
-        if (pago == null || !permisoAnular || "Anulado".equalsIgnoreCase(pago.getEstado())) return;
-        String registro = "Pago: " + pago.getMontoFormateado() + " · "
-                + pago.getFechaPago().format(FECHA_VISIBLE) + " · " + pago.getContratoInfo();
-        if (!AlertaUtil.mostrarConfirmacionDestructiva("Anular pago", registro,
-                "El pago quedará marcado como anulado y ya no se contará en el saldo del cargo.",
-                "Anular pago")) return;
-        UUID pagoId = pago.getId();
+        PagoListaResponse pago = pagoSeleccionado;
+        if (pago == null || !permisoAnular || "Anulado".equalsIgnoreCase(pago.estado())) return;
+        TextInputDialog confirmacion = new TextInputDialog();
+        confirmacion.initOwner(tblPagos.getScene().getWindow());
+        confirmacion.setTitle("Anular pago");
+        confirmacion.setHeaderText(pago.montoFormateado() + " · " + pago.contratoInfo());
+        confirmacion.setContentText("Motivo de la anulación");
+        TemaAplicacion.aplicar(confirmacion.getDialogPane());
+        String motivo = confirmacion.showAndWait().map(String::strip).orElse(null);
+        if (motivo == null) return;
+        if (motivo.isEmpty()) {
+            AlertaUtil.mostrarAdvertencia("Motivo requerido", "Indica por qué se debe anular el pago.");
+            return;
+        }
         btnAnular.setDisable(true);
         Task<Void> tarea = new Task<>() {
-            @Override protected Void call() throws SQLException {
-                pagoService.anular(pagoId);
+            @Override protected Void call() {
+                clientePagos.anular(pago.id(), motivo);
                 return null;
             }
         };
@@ -335,20 +319,38 @@ public class PagoController {
             cargarDatos();
         }, error -> {
             btnAnular.setDisable(pagoSeleccionado == null || !permisoAnular);
+            if (error instanceof ErrorClienteException api && api.getEstado() == 409) cargarDatos();
             AlertaUtil.mostrarError("No se pudo anular el pago", mensajeErrorPago(error));
         });
     }
 
-    private void mostrarDetalle(Pago pago) {
-        Alert alerta = new Alert(Alert.AlertType.INFORMATION);
-        alerta.setTitle("Detalle del pago");
-        alerta.setHeaderText(pago.getMontoFormateado());
-        alerta.setContentText(pago.getContratoInfo() + "\nFecha: "
-                + pago.getFechaPago().format(FECHA_VISIBLE) + "\nMétodo: " + pago.getMetodo()
-                + "\nReferencia: " + (pago.getReferencia() == null ? "—" : pago.getReferencia())
-                + "\nEstado: " + pago.getEstado());
-        TemaAplicacion.aplicar(alerta.getDialogPane());
-        alerta.showAndWait();
+    private record Detalle(PagoDetalleResponse pago, ReciboResponse recibo) { }
+
+    private void mostrarDetalle(PagoListaResponse pago) {
+        Task<Detalle> tarea = new Task<>() {
+            @Override protected Detalle call() {
+                PagoDetalleResponse detalle = clientePagos.detalle(pago.id());
+                ReciboResponse recibo = detalle.numeroRecibo() == null ? null
+                        : clientePagos.recibo(detalle.numeroRecibo());
+                return new Detalle(detalle, recibo);
+            }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, detalle -> {
+            PagoDetalleResponse datos = detalle.pago();
+            ReciboResponse recibo = detalle.recibo();
+            Alert alerta = new Alert(Alert.AlertType.INFORMATION);
+            alerta.initOwner(tblPagos.getScene().getWindow());
+            alerta.setTitle("Detalle del pago");
+            alerta.setHeaderText(recibo == null ? pago.montoFormateado()
+                    : "Recibo N.º " + recibo.numero() + " · " + pago.montoFormateado());
+            alerta.setContentText(datos.contratoInfo()
+                    + "\nFecha: " + LocalDate.parse(datos.fechaPago()).format(FECHA_VISIBLE)
+                    + "\nMétodo: " + datos.metodo()
+                    + "\nReferencia: " + (datos.referencia() == null ? "—" : datos.referencia())
+                    + "\nEstado: " + datos.estado());
+            TemaAplicacion.aplicar(alerta.getDialogPane());
+            alerta.showAndWait();
+        }, error -> AlertaUtil.mostrarError("No se pudo consultar el pago", mensajeErrorPago(error)));
     }
 
     private void mostrarErrorConsulta(Throwable error) {
@@ -359,7 +361,10 @@ public class PagoController {
 
     private String mensajeErrorPago(Throwable error) {
         if (error instanceof ErrorClienteException clienteError) {
-            return clienteError.getMessage() + " Si el resultado es incierto, reintenta sin cambiar los datos.";
+            if (clienteError.esSinConexion() || clienteError.getEstado() >= 500) {
+                return clienteError.getMessage() + " Si el resultado es incierto, reintenta sin cambiar los datos.";
+            }
+            return clienteError.getMessage();
         }
         if (error instanceof IllegalArgumentException || error instanceof IllegalStateException
                 || error instanceof SecurityException) return error.getMessage();

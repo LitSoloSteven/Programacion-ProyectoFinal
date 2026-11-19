@@ -37,7 +37,6 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoTasa;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.InsigniaEstado;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PanelEstadoTabla;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.util.SesionExpiradaUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TemaAplicacion;
 
 import java.io.IOException;
@@ -144,9 +143,6 @@ public class TasaController {
         }, error -> {
             if (version == versionConsulta) {
                 mostrarErrorConsulta(error);
-                if (error instanceof ErrorClienteException clienteError && clienteError.esNoAutenticado()) {
-                    SesionExpiradaUtil.mostrar(tblTasas.getScene() == null ? null : tblTasas.getScene().getWindow(), null);
-                }
                 tblTasas.setPlaceholder(PanelEstadoTabla.crear("No se pudieron cargar las tasas",
                         "Revisa la conexión e inténtalo de nuevo.", "Reintentar", this::cargarTasas));
             }
@@ -210,7 +206,7 @@ public class TasaController {
                             + FormatoTasa.formatear(new BigDecimal(registro.nioPorUsd())) + " NIO/USD."
                             + " Fuente: " + registro.fuente() + ". Pendiente de autorización.");
                     cargarTasas();
-                }, error -> manejarErrorFormulario(error, propietario, dialogo, formulario, accion,
+                }, error -> manejarErrorFormulario(error, formulario, accion,
                         "Registrar tasa"));
             });
             dialogo.showAndWait();
@@ -273,7 +269,7 @@ public class TasaController {
                             + fechaVisible(autorizada.fecha()) + " quedó autorizada con valor "
                             + FormatoTasa.formatear(new BigDecimal(autorizada.nioPorUsd())) + " NIO/USD.");
                     cargarTasas();
-                }, error -> manejarErrorFormulario(error, propietario, dialogo, formulario, accion,
+                }, error -> manejarErrorFormulario(error, formulario, accion,
                         "Autorizar tasa"));
             });
             dialogo.showAndWait();
@@ -338,14 +334,13 @@ public class TasaController {
         }
     }
 
-    private void manejarErrorFormulario(Throwable error, Window propietario, Dialog<?> dialogo,
+    private void manejarErrorFormulario(Throwable error,
                                         TasaFormController formulario, Button accion,
                                         String textoAccion) {
         accion.setDisable(false);
         accion.setText(textoAccion);
         if (error instanceof ErrorClienteException clienteError && clienteError.esNoAutenticado()) {
             formulario.mostrarError("Tu sesión expiró.");
-            SesionExpiradaUtil.mostrar(propietario, dialogo);
             return;
         }
         formulario.mostrarError(mensajeError(error));

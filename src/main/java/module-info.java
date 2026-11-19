@@ -10,6 +10,17 @@ module ni.edu.uam.proyectofinalprogramacionappescritorio {
     requires java.net.http;
     requires java.prefs;
     requires com.google.gson;
+    requires static lombok;
+    requires spring.boot;
+    requires spring.boot.autoconfigure;
+    requires spring.boot.tomcat;
+    requires spring.boot.web.server;
+    requires spring.beans;
+    requires spring.context;
+    requires spring.core;
+    requires spring.web;
+    requires spring.webmvc;
+    requires org.apache.tomcat.embed.core;
 
 
     opens ni.edu.uam.proyectofinalprogramacionappescritorio to javafx.fxml;
@@ -29,4 +40,6 @@ module ni.edu.uam.proyectofinalprogramacionappescritorio {
     opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto to com.google.gson;
     opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.indicadores.dto to com.google.gson;
     opens ni.edu.uam.proyectofinalprogramacionappescritorio.dto to com.google.gson;
+    opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.piloto
+            to spring.core, spring.beans, spring.context, spring.web, org.apache.tomcat.embed.core;
 }

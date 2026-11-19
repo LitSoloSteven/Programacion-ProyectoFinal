@@ -1,11 +1,7 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.api.validaciones;
 
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ContextoPeticion;
+import lombok.RequiredArgsConstructor;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ExcepcionApi;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.Json;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.LectorCuerpo;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.RespuestaJson;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.Router;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.validaciones.dto.ValidacionRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.validaciones.dto.ValidacionResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
@@ -17,45 +13,24 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ValidadorEntrada;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.Locale;
-import java.util.Objects;
 
-/**
- * API 6: validación puntual de entradas reutilizando {@link ValidadorEntrada}.
- * Exige token Bearer y comprueba que el usuario siga activo, pero no requiere
- * un permiso de negocio adicional.
- */
-public final class RutasValidaciones {
+@RequiredArgsConstructor
+public final class ServicioValidaciones {
     private final HibernateTransactions tx;
     private final PermisoService permisos = new PermisoService();
 
-    public RutasValidaciones(HibernateTransactions tx) {
-        this.tx = Objects.requireNonNull(tx);
-    }
-
-    public void registrar(Router router) {
-        router.registrar("POST", "/api/v1/validaciones", false, this::validar);
-    }
-
-    private RespuestaJson validar(ContextoPeticion contexto) throws Exception {
-        ValidacionRequest solicitud = Json.leer(
-                LectorCuerpo.leerJson(contexto.intercambio()), ValidacionRequest.class);
-        String tipo = solicitud.tipo() == null
-                ? "" : solicitud.tipo().strip().toLowerCase(Locale.ROOT);
-
-        exigirUsuarioActivo(contexto);
+    public ValidacionResponse validar(ValidacionRequest solicitud, SesionUsuario identidad) {
+        SesionUsuario.ejecutarComo(identidad, () -> tx.ejecutar(sesion -> {
+            permisos.exigir(sesion, SesionUsuario.getActual(), Permiso.OPERAR_ALQUILERES);
+            return null;
+        }));
         if (ValidadorEntrada.excedeLongitudValor(solicitud.valor())) {
             throw ExcepcionApi.solicitudInvalida("El valor no puede superar "
                     + ValidadorEntrada.LONGITUD_MAXIMA_VALOR + " caracteres.");
         }
-        return RespuestaJson.ok(resultado(tipo, solicitud));
-    }
-
-    private void exigirUsuarioActivo(ContextoPeticion contexto) {
-        SesionUsuario identidad = contexto.sesion().comoUsuario();
-        SesionUsuario.ejecutarComo(identidad, () -> tx.ejecutar(s -> {
-            permisos.exigir(s, SesionUsuario.getActual(), Permiso.OPERAR_ALQUILERES);
-            return null;
-        }));
+        String tipo = solicitud.tipo() == null
+                ? "" : solicitud.tipo().strip().toLowerCase(Locale.ROOT);
+        return resultado(tipo, solicitud);
     }
 
     private static ValidacionResponse resultado(String tipo, ValidacionRequest solicitud) {

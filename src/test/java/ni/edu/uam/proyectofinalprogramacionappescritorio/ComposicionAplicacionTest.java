@@ -1,6 +1,9 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio;
 
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ApiConfig;
+import org.springframework.web.bind.annotation.RequestMethod;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.piloto.ServidorSpringPrueba;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,7 +12,6 @@ import org.junit.jupiter.api.Test;
 import java.util.Properties;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 class ComposicionAplicacionTest {
@@ -33,7 +35,7 @@ class ComposicionAplicacionTest {
 
     @AfterEach
     void cerrar() {
-        if (factory != null) factory.close();
+        if (factory != null && !factory.isClosed()) factory.close();
     }
 
     @Test
@@ -48,13 +50,11 @@ class ComposicionAplicacionTest {
 
     @Test
     void construyeElServidorConLasRutasDeAmbasEntradas() {
-        var servidor = composicion.crearServidorApi(ApiConfig.paraPruebas(0));
-        try {
-            assertNotNull(servidor.router().resolver("GET", "/api/v1/pagos"));
-            assertNotNull(servidor.router().resolver("GET", "/api/v1/propiedades"));
-            assertNotNull(servidor.router().resolver("POST", "/api/v1/auth/login"));
-        } finally {
-            servidor.close();
+        try (var servidor = new ServidorSpringPrueba(factory)) {
+            assertTrue(servidor.tieneRuta(RequestMethod.GET, "/api/v1/pagos"));
+            assertTrue(servidor.tieneRuta(RequestMethod.GET, "/api/v1/propiedades"));
+            assertTrue(servidor.tieneRuta(RequestMethod.POST, "/api/v1/auth/login"));
+            assertEquals(36, servidor.operacionesApi());
         }
     }
 }

@@ -1,5 +1,7 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
 
+import lombok.RequiredArgsConstructor;
+
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
@@ -20,9 +22,12 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.UnidadRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteCatalogos;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propiedad;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Unidad;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PropiedadService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.UnidadService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AccionesTabla;
@@ -41,6 +46,7 @@ import java.util.List;
 import java.util.Locale;
 
 /** Inventario de unidades con filtros locales y operaciones fuera del hilo FX. */
+@RequiredArgsConstructor
 public class UnidadController {
     @FXML private VBox rootView;
     @FXML private HBox eliminarTooltipHost;
@@ -61,8 +67,8 @@ public class UnidadController {
     @FXML private TableColumn<Unidad, String> colDescripcion;
     @FXML private TableColumn<Unidad, Void> colAcciones;
 
+    private final ClienteCatalogos catalogos = new ClienteCatalogos(ClienteLatch.api());
     private final UnidadService unidadService;
-    private final PropiedadService propiedadService;
     private final ObservableList<Unidad> registros = FXCollections.observableArrayList();
     private final FilteredList<Unidad> filtrados = new FilteredList<>(registros, item -> true);
     private List<Propiedad> propiedadesDisponibles = List.of();
@@ -73,18 +79,13 @@ public class UnidadController {
     private record DatosTabla(List<Propiedad> propiedades, List<Unidad> unidades) { }
 
     public UnidadController() {
-        this(HelloApplication.instancia().getComposicion().unidades(),
-                HelloApplication.instancia().getComposicion().propiedades());
+        this(HelloApplication.instancia().getComposicion().unidades());
     }
-    public UnidadController(UnidadService unidadService, PropiedadService propiedadService) {
-        this.unidadService = unidadService;
-        this.propiedadService = propiedadService;
-    }
-
     @FXML public void initialize() {
         lblTitulo.setGraphic(Iconos.crear(Iconos.Nombre.UNIDAD, 20));
         Iconos.asignar(btnRefrescar, Iconos.Nombre.ACTUALIZAR, 16);
         Iconos.asignar(btnNuevo, Iconos.Nombre.MAS, 16);
+        btnNuevo.disableProperty().bind(btnRefrescar.disableProperty());
         Iconos.asignar(btnLimpiar, Iconos.Nombre.CERRAR, 14);
         Iconos.asignar(btnEliminar, Iconos.Nombre.ELIMINAR, 16);
         Tooltip.install(eliminarTooltipHost, new Tooltip(permisoEliminar
@@ -129,7 +130,7 @@ public class UnidadController {
         long version = ++versionConsulta;
         Task<DatosTabla> tarea = new Task<>() {
             @Override protected DatosTabla call() throws SQLException {
-                return new DatosTabla(propiedadService.listarActivas(), unidadService.listarTodas());
+                return new DatosTabla(catalogos.propiedades(true), catalogos.unidades());
             }
         };
         TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
@@ -151,7 +152,9 @@ public class UnidadController {
     }
 
     @FXML public void refrescarTabla() { cargarDatos(); }
-    @FXML public void handleNuevo() { abrirFormulario(null); }
+    @FXML public void handleNuevo() {
+        if (!btnNuevo.isDisabled()) abrirFormulario(null);
+    }
     private void abrirEdicion(Unidad unidad) { abrirFormulario(unidad); }
 
     private void abrirFormulario(Unidad existente) {
@@ -175,20 +178,11 @@ public class UnidadController {
                 accion.setDisable(true); accion.setText("Guardando unidad…");
                 Task<Void> tarea = new Task<>() {
                     @Override protected Void call() throws SQLException {
-                        if (nueva) {
-                            Unidad nuevaUnidad = new Unidad();
-                            nuevaUnidad.setPropiedadId(datos.propiedad().getId());
-                            nuevaUnidad.setCodigo(datos.codigo());
-                            nuevaUnidad.setDescripcion(datos.descripcion());
-                            nuevaUnidad.setTipo(datos.tipo());
-                            nuevaUnidad.setEstado(datos.estado());
-                            nuevaUnidad.setCanonReferencia(datos.canon());
-                            nuevaUnidad.setMoneda(datos.moneda());
-                            unidadService.guardar(nuevaUnidad);
-                        } else {
-                            unidadService.actualizar(existente.getId(), existente.getVersion(), datos.propiedad().getId(),
-                                    datos.codigo(), datos.descripcion(), datos.tipo(), datos.estado(), datos.canon(), datos.moneda());
-                        }
+                        catalogos.guardarUnidad(nueva ? null : existente.getId(),
+                                new UnidadRequest(datos.propiedad().getId().toString(), datos.codigo(),
+                            datos.descripcion(), datos.tipo(), datos.estado(),
+                            datos.canon() == null ? null : datos.canon().toPlainString(),
+                            datos.moneda(), nueva ? null : existente.getVersion()));
                         return null;
                     }
                 };
@@ -199,6 +193,13 @@ public class UnidadController {
                     cargarDatos();
                 }, error -> {
                     accion.setDisable(false); accion.setText(nueva ? "Guardar unidad" : "Guardar cambios");
+                    if (!nueva && error instanceof ErrorClienteException api && api.getEstado() == 409) {
+                        DialogoFormulario.cerrar(dialogo);
+                        cargarDatos();
+                        AlertaUtil.mostrarAdvertencia("No se guardaron los cambios",
+                                api.getMessage() + " Abre el registro actualizado para volver a editarlo.");
+                        return;
+                    }
                     formulario.mostrarError(mensajeError(error));
                 });
             });
@@ -241,6 +242,7 @@ public class UnidadController {
         return texto != null && texto.toLowerCase(Locale.ROOT).contains(filtro);
     }
     private static String mensajeError(Throwable error) {
+        if (error instanceof ErrorClienteException) return error.getMessage();
         if (error instanceof IllegalArgumentException || error instanceof SecurityException
                 || error instanceof IllegalStateException) return error.getMessage();
         return "No se pudo guardar la unidad. Revisa los datos e inténtalo de nuevo.";
