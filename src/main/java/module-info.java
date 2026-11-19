@@ -21,6 +21,8 @@ module ni.edu.uam.proyectofinalprogramacionappescritorio {
     requires spring.web;
     requires spring.webmvc;
     requires org.apache.tomcat.embed.core;
+    requires net.sf.jasperreports.core;
+    requires java.desktop;
 
 
     opens ni.edu.uam.proyectofinalprogramacionappescritorio to javafx.fxml;

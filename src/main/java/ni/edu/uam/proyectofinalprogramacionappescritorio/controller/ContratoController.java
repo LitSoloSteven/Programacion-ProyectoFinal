@@ -1,5 +1,6 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
 
+import javafx.stage.FileChooser;
 import lombok.RequiredArgsConstructor;
 
 import javafx.collections.FXCollections;
@@ -33,6 +34,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Inquilino;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Unidad;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ContratoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.GarantiaService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ReporteService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AccionesTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
@@ -44,8 +46,11 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PanelEstadoTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TemaAplicacion;
 
+import java.awt.*;
+import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
@@ -58,6 +63,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ContratoController {
     @FXML private VBox rootView;
+    @FXML private Button btnGenerarReporte;
     @FXML private HBox eliminarTooltipHost;
     @FXML private HBox garantiaTooltipHost;
     @FXML private Button btnNuevo;
@@ -82,6 +88,7 @@ public class ContratoController {
     @FXML private TableColumn<Contrato, String> colEstado;
     @FXML private TableColumn<Contrato, Void> colAcciones;
 
+    private final ReporteService reporteService = new ReporteService();
     private final ClienteCatalogos clienteCatalogos = new ClienteCatalogos(ClienteLatch.api());
     private final ContratoService contratoService;
     private final GarantiaService garantiaService;
@@ -408,4 +415,77 @@ public class ContratoController {
         }
         return "Revisa los datos e inténtalo de nuevo.";
     }
+
+    @FXML
+    public void handleGenerarReporte() {
+        List<Contrato> contratosActuales = tblContratos == null
+                ? List.of()
+                : List.copyOf(tblContratos.getItems());
+
+        if (contratosActuales.isEmpty()) {
+            AlertaUtil.mostrarAdvertencia("Sin datos",
+                    "No hay contratos en la tabla para generar el reporte.");
+            return;
+        }
+
+        if (btnGenerarReporte != null) {
+            btnGenerarReporte.setDisable(true);
+        }
+
+        Task<byte[]> tareaGenerarPdf = new Task<>() {
+            @Override
+            protected byte[] call() {
+                return reporteService.generarReporteContratosOcupacionPdf(contratosActuales);
+            }
+        };
+
+        TareasJavaFx.ejecutar(
+                HelloApplication.instancia().getTareas(),
+                tareaGenerarPdf,
+                pdfBytes -> {
+                    if (btnGenerarReporte != null) {
+                        btnGenerarReporte.setDisable(false);
+                    }
+                    if (pdfBytes == null || pdfBytes.length == 0) {
+                        AlertaUtil.mostrarError("Error de reporte",
+                                "El reporte de contratos y ocupación está vacío.");
+                        return;
+                    }
+
+                    FileChooser fileChooser = new FileChooser();
+                    fileChooser.setTitle("Guardar resumen de contratos y ocupación");
+                    fileChooser.setInitialFileName("Resumen-Contratos-Ocupacion.pdf");
+                    fileChooser.getExtensionFilters().add(
+                            new FileChooser.ExtensionFilter("Documento PDF (*.pdf)", "*.pdf")
+                    );
+
+                    Window ventana = tblContratos.getScene() == null
+                            ? null
+                            : tblContratos.getScene().getWindow();
+                    File archivoDestino = fileChooser.showSaveDialog(ventana);
+
+                    if (archivoDestino != null) {
+                        try {
+                            Files.write(archivoDestino.toPath(), pdfBytes);
+                            AlertaUtil.mostrarExito("Reporte listo",
+                                    "El resumen de contratos y ocupación se guardó correctamente.");
+
+                            if (Desktop.isDesktopSupported()) {
+                                Desktop.getDesktop().open(archivoDestino);
+                            }
+                        } catch (Exception ex) {
+                            AlertaUtil.mostrarError("Error al guardar",
+                                    "No se pudo guardar el archivo PDF en disco.");
+                        }
+                    }
+                },
+                error -> {
+                    if (btnGenerarReporte != null) {
+                        btnGenerarReporte.setDisable(false);
+                    }
+                    AlertaUtil.mostrarError("Error al generar reporte", mensajeError(error));
+                }
+        );
+    }
+
 }

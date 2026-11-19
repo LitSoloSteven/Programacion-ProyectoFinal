@@ -1,11 +1,5 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
 
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoListaResponse;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoDetalleResponse;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.ReciboResponse;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteCatalogos;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
-import javafx.scene.control.TextInputDialog;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
@@ -21,17 +15,26 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
 import javafx.stage.Window;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PaginaResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoDetalleResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoListaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoRegistroResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.ReciboResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteCatalogos;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClientePagos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Pago;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ReporteService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AccionesTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
@@ -40,20 +43,25 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.util.DialogoFormulario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PanelEstadoTabla;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TemaAplicacion;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TemaAplicacion;
 
+import java.awt.Desktop;
+import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.UUID;
 
 /** Historial paginado y formulario de revisión para registrar pagos. */
 public class PagoController {
     private static final DateTimeFormatter FECHA_VISIBLE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     @FXML private VBox rootView;
+    @FXML private Button btnGenerarReporte;
     @FXML private HBox anularTooltipHost;
     @FXML private Button btnAnular;
     @FXML private Button btnNuevo;
@@ -75,6 +83,7 @@ public class PagoController {
     @FXML private TableColumn<PagoListaResponse, String> colEstado;
     @FXML private TableColumn<PagoListaResponse, Void> colAcciones;
 
+    private final ReporteService reporteService = new ReporteService();
     private final ClienteCatalogos catalogos = new ClienteCatalogos(ClienteLatch.api());
     private final ClientePagos clientePagos = HelloApplication.instancia().getPagos();
     private final ObservableList<PagoListaResponse> listaPagos = FXCollections.observableArrayList();
@@ -322,6 +331,118 @@ public class PagoController {
             if (error instanceof ErrorClienteException api && api.getEstado() == 409) cargarDatos();
             AlertaUtil.mostrarError("No se pudo anular el pago", mensajeErrorPago(error));
         });
+    }
+
+    @FXML
+    public void handleGenerarReporte() {
+        List<PagoListaResponse> filasActuales = tblPagos == null
+                ? List.of()
+                : List.copyOf(tblPagos.getItems());
+
+        if (filasActuales.isEmpty()) {
+            AlertaUtil.mostrarAdvertencia("Sin datos",
+                    "No hay pagos en la tabla para generar el reporte.");
+            return;
+        }
+
+        List<Pago> pagosParaReporte = filasActuales.stream()
+                .map(this::mapearPagoDesdeLista)
+                .toList();
+
+        if (btnGenerarReporte != null) {
+            btnGenerarReporte.setDisable(true);
+        }
+
+        Task<byte[]> tareaGenerarPdf = new Task<>() {
+            @Override
+            protected byte[] call() {
+                return reporteService.generarReportePagosPdf(pagosParaReporte);
+            }
+        };
+
+        TareasJavaFx.ejecutar(
+                HelloApplication.instancia().getTareas(),
+                tareaGenerarPdf,
+                pdfBytes -> {
+                    if (btnGenerarReporte != null) {
+                        btnGenerarReporte.setDisable(false);
+                    }
+                    if (pdfBytes == null || pdfBytes.length == 0) {
+                        AlertaUtil.mostrarError("Error de reporte",
+                                "El reporte generado está vacío.");
+                        return;
+                    }
+
+                    FileChooser fileChooser = new FileChooser();
+                    fileChooser.setTitle("Guardar reporte de pagos");
+                    fileChooser.setInitialFileName("Reporte-Pagos.pdf");
+                    fileChooser.getExtensionFilters().add(
+                            new FileChooser.ExtensionFilter("Documento PDF (*.pdf)", "*.pdf")
+                    );
+
+                    Window ventana = tblPagos.getScene() == null
+                            ? null
+                            : tblPagos.getScene().getWindow();
+                    File archivoDestino = fileChooser.showSaveDialog(ventana);
+
+                    if (archivoDestino != null) {
+                        try {
+                            Files.write(archivoDestino.toPath(), pdfBytes);
+                            AlertaUtil.mostrarExito("Reporte listo",
+                                    "El reporte de pagos se guardó correctamente.");
+
+                            if (Desktop.isDesktopSupported()) {
+                                Desktop.getDesktop().open(archivoDestino);
+                            }
+                        } catch (Exception ex) {
+                            AlertaUtil.mostrarError("Error al guardar",
+                                    "No se pudo guardar el archivo PDF en disco.");
+                        }
+                    }
+                },
+                error -> {
+                    if (btnGenerarReporte != null) {
+                        btnGenerarReporte.setDisable(false);
+                    }
+                    AlertaUtil.mostrarError("Error al generar reporte", mensajeErrorPago(error));
+                }
+        );
+    }
+
+    private Pago mapearPagoDesdeLista(PagoListaResponse item) {
+        Pago pago = new Pago();
+        if (item.id() != null) {
+            try {
+                pago.setId(UUID.fromString(item.id()));
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        pago.setContratoInfo(item.contratoInfo());
+        if (item.fechaPago() != null && !item.fechaPago().isBlank()) {
+            try {
+                pago.setFechaPago(LocalDate.parse(item.fechaPago()));
+            } catch (Exception ignored) {
+            }
+        }
+        String formateado = item.montoFormateado();
+        if (formateado != null && !formateado.isBlank()) {
+            String[] partes = formateado.strip().split("\\s+");
+            if (partes.length >= 1) {
+                try {
+                    BigDecimal monto = new BigDecimal(partes[0].replace(",", ""));
+                    pago.setMontoOriginal(monto);
+                    pago.setMontoContrato(monto);
+                } catch (NumberFormatException ignored) {
+                }
+            }
+            if (partes.length >= 2) {
+                pago.setMonedaOriginal(partes[1]);
+            }
+        }
+        pago.setMetodo(item.metodo());
+        pago.setReferencia(item.referencia());
+        pago.setEstado(item.estado());
+        return pago;
     }
 
     private record Detalle(PagoDetalleResponse pago, ReciboResponse recibo) { }
