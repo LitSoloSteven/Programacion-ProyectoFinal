@@ -134,7 +134,8 @@ ambos lados del umbral de cinco minutos y el bloqueo. `ApiValidacionesTest`
 comprueba el rechazo de `valor` por encima de 255 caracteres y el manejo de un
 `mesesMinimos` extremo sin propagar `DateTimeException`.
 
-Resultado de la suite completa: **163 pruebas, 0 fallos, 0 errores, 0 omitidas**.
+La evidencia de regresión de Spring MVC y PostgreSQL se registra en
+[el cierre técnico de la fase 5](migracion-spring-fase-5.md).
 
 ## Riesgos residuales aceptados
 
@@ -146,7 +147,7 @@ Resultado de la suite completa: **163 pruebas, 0 fallos, 0 errores, 0 omitidas**
 | Credenciales de BD en `.env` | Configuración local del equipo | `.env` ignorado por Git; permisos del sistema operativo |
 | Huecos en la numeración de recibos | `GenerationType.IDENTITY` con rollback | Documentado; no afecta la unicidad |
 | Un solo nodo | Aplicación de escritorio | La tabla de idempotencia es compartida si se agregara otro nodo |
-| Clientes HTTP no usados en todas las pantallas | Trabajo de integración pendiente | La API y sus pruebas ya están disponibles |
+| Operaciones de escritorio sin ruta HTTP | Alcance de 36 operaciones | Los servicios locales aplican permisos dentro de sus transacciones |
 
 ## Recomendaciones futuras
 

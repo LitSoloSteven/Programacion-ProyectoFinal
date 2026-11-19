@@ -2,13 +2,12 @@
 
 Aplicación de escritorio para administrar alquileres: propiedades, unidades,
 inquilinos, contratos, cargos, tasas de cambio, pagos, recibos, estado de cuenta
-y métricas. La interfaz JavaFX consume una **API REST local propia** levantada
-con `com.sun.net.httpserver.HttpServer`; no se usan servicios externos.
+y métricas. La interfaz JavaFX consume la **API REST local de Spring Boot**,
+que también puede ejecutarse de forma independiente.
 
 - JavaFX 21 + Hibernate 7.4.6.Final + PostgreSQL 18.
 - JSON con Gson 2.13.2.
 - Paquete raíz: `ni.edu.uam.proyectofinalprogramacionappescritorio`.
-- **163 pruebas automatizadas**, todas en verde.
 
 ## Requisitos
 
@@ -112,7 +111,7 @@ la operación si ya existen usuarios.
 ./mvnw.cmd javafx:run
 ```
 
-La aplicación levanta la API, inicia el cliente local y abre la interfaz. Si la
+La aplicación levanta Spring Boot en loopback, inicia el cliente local cuando la API está lista y abre la interfaz. Si la
 API no puede arrancar, muestra un diálogo de error y detiene el arranque.
 
 Para ejecutar solo el servicio HTTP (útil para pruebas con `curl` o
@@ -122,10 +121,40 @@ PowerShell):
 ./mvnw.cmd compile exec:java '-Dexec.mainClass=ni.edu.uam.proyectofinalprogramacionappescritorio.herramientas.IniciarApi'
 ```
 
+### JAR y demostración en Windows
+
+Desde la raíz del repositorio, después de empaquetar con `verify -Ppostgres`,
+genera el classpath de ejecución y elige uno de los dos puntos de entrada.
+Ambos necesitan la configuración local descrita arriba y un puerto libre.
+
+```powershell
+$runtimeFile = Join-Path (Get-Location) 'target\latch-runtime.txt'
+./mvnw.cmd org.apache.maven.plugins:maven-dependency-plugin:3.7.0:build-classpath '-DincludeScope=runtime' "-Dmdep.outputFile=$runtimeFile"
+$jar = (Resolve-Path 'target\ProyectoFInal-ProgramacionAppEscritorio-1.0-SNAPSHOT.jar').Path
+$cp = "$jar;$((Get-Content -Raw -LiteralPath $runtimeFile).Trim())"
+$paquete = 'ni.edu.uam.proyectofinalprogramacionappescritorio'
+
+# Escritorio con Spring Boot integrado
+java -cp $cp "$paquete.Launcher"
+
+# Solo API REST, en una ejecución aparte
+java -cp $cp "$paquete.herramientas.IniciarApi"
+```
+
+Si JavaFX se cierra con un fallo nativo en `glass.dll` al abrir el recibo,
+reinicia el escritorio con renderizado por software. Para la demo en el equipo
+donde se observó ese fallo, inicia directamente con esta variante.
+
+```powershell
+java '-Dprism.order=sw' -cp $cp "$paquete.Launcher"
+```
+
+Consulta la [guía de demostración con datos sintéticos](docs/demo-docente.md).
+
 ## Pruebas
 
 ```powershell
-./mvnw.cmd test
+./mvnw.cmd clean test
 ```
 
 Las pruebas normales usan H2 en memoria con `MODE=PostgreSQL` y datos
@@ -165,7 +194,7 @@ Para ejecutar solo las pruebas H2:
 ## Arquitectura
 
 ```text
-JavaFX/FXML → Controller → ClienteApi (HTTP) → Router → Service de API
+JavaFX/FXML → Controller → ClienteApi (HTTP) → Spring MVC → Service de API
             → Services de negocio → Hibernate → PostgreSQL
 ```
 
@@ -176,7 +205,8 @@ JavaFX/FXML → Controller → ClienteApi (HTTP) → Router → Service de API
 | `dto/` | Copias inmutables para presentación y reportes |
 | `dao/` | Acceso a datos reutilizable |
 | `service/` | Autenticación, permisos, auditoría y operaciones de negocio |
-| `api/comun/` | Servidor, router, tokens, JSON, errores y lectura acotada |
+| `api/comun/` | Tokens, JSON, errores y lectura acotada |
+| `api/piloto/` | Arranque de Spring Boot, filtros HTTP y controladores MVC |
 | `api/auth/` | Inicio y cierre de sesión HTTP |
 | `api/tasas/` | Consulta, registro y autorización de tasas |
 | `api/catalogos/` | Propiedades, unidades, inquilinos y contratos |
@@ -275,8 +305,9 @@ El detalle de controles, verificación y riesgos aceptados está en
 - Si dos peticiones simultáneas usan la misma `Idempotency-Key`, una puede
   recibir `409` mientras la otra termina; reintentar con la misma clave
   devuelve la respuesta original.
-- La interfaz aún no usa todos los clientes HTTP (catálogos, pagos y métricas);
-  esas pantallas siguen apoyándose en los Services locales.
+- Las eliminaciones físicas de catálogos, el ajuste de garantías y las
+  escrituras de cargos se ejecutan localmente. El detalle está en
+  [el cierre técnico de la fase 5](docs/migracion-spring-fase-5.md).
 - El pool de conexiones de Hibernate es el básico; suficiente para la demo
   académica, no para producción.
 
