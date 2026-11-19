@@ -1,5 +1,7 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.dto;
 
+import lombok.Getter;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -11,6 +13,7 @@ import java.util.UUID;
  * El Service debe obtener el numero de una transaccion de pago confirmada;
  * construir este DTO no registra pagos ni genera consecutivos.
  */
+@Getter
 public final class ReciboDTO {
     private final long numero;
     private final UUID pagoId;
@@ -67,16 +70,4 @@ public final class ReciboDTO {
         return resultado;
     }
 
-    public long getNumero() { return numero; }
-    public UUID getPagoId() { return pagoId; }
-    public UUID getContratoId() { return contratoId; }
-    public LocalDate getFechaPago() { return fechaPago; }
-    public String getContratoInfo() { return contratoInfo; }
-    public BigDecimal getMontoOriginal() { return montoOriginal; }
-    public String getMonedaOriginal() { return monedaOriginal; }
-    public BigDecimal getMontoContrato() { return montoContrato; }
-    public String getMonedaContrato() { return monedaContrato; }
-    public String getMetodo() { return metodo; }
-    public String getReferencia() { return referencia; }
-    public boolean isAnulado() { return anulado; }
 }

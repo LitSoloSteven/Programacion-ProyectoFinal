@@ -1,30 +1,35 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio;
 
+import lombok.Getter;
+
+import javafx.stage.Window;
+import java.util.List;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClientePagos;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ApiConfig;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ServidorApi;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.piloto.PilotoLoginApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
+import org.springframework.boot.web.server.servlet.context.ServletWebServerApplicationContext;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TemaAplicacion;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasSegundoPlano;
 
 import java.io.IOException;
-import java.net.BindException;
-import java.nio.file.Path;
 import java.time.Duration;
 
 public class HelloApplication extends Application {
+    @Getter
     private final TareasSegundoPlano tareas = new TareasSegundoPlano();
     private static volatile HelloApplication instancia;
     private ComposicionAplicacion composicion;
-    private ServidorApi servidor;
-
-    public TareasSegundoPlano getTareas() { return tareas; }
+    private ServletWebServerApplicationContext servidor;
+    private String problemaArranque;
+    @Getter
+    private final ClientePagos pagos = new ClientePagos();
 
     public static HelloApplication instancia() {
         HelloApplication actual = instancia;
@@ -42,24 +47,34 @@ public class HelloApplication extends Application {
     }
 
     @Override
+    public void init() {
+        try {
+            servidor = PilotoLoginApplication.iniciarLocal();
+            composicion = servidor.getBean(ComposicionAplicacion.class);
+            ClienteLatch.iniciar(servidor.getWebServer().getPort());
+        } catch (RuntimeException error) {
+            if (servidor != null) servidor.close();
+            servidor = null;
+            problemaArranque = PilotoLoginApplication.puertoOcupado(error)
+                    ? "El puerto configurado está ocupado. Cierra la otra instancia o cambia LATCH_API_PORT."
+                    : "Revisa LATCH_API_PORT, la conexión y el esquema de la base de datos.";
+        }
+    }
+
+    @Override
     public void stop() {
         ClienteLatch.cerrar();
-        if (servidor != null) {
-            servidor.detener();
-            servidor = null;
-        }
-        composicion = null;
         instancia = null;
         tareas.cerrar();
         Thread cierre = new Thread(() -> {
             try {
                 if (!tareas.esperarCierre(Duration.ofSeconds(10))) {
-                    System.err.println("Hay tareas que no finalizaron a tiempo. Revisa su cancelación cooperativa.");
+                    System.err.println("Hay tareas de Latch que no finalizaron a tiempo.");
                 }
-            } catch (InterruptedException e) {
+            } catch (InterruptedException error) {
                 Thread.currentThread().interrupt();
             } finally {
-                HibernateUtil.shutdown();
+                if (servidor != null) servidor.close();
             }
         }, "latch-cierre");
         cierre.start();
@@ -68,14 +83,45 @@ public class HelloApplication extends Application {
     @Override
     public void start(Stage stage) throws IOException {
         TemaAplicacion.inicializar();
-        instancia = this;
-        String problema = iniciarServicioLocal();
-        if (problema != null) {
-            AlertaUtil.mostrarError("No se pudo iniciar Latch", problema);
+        if (problemaArranque != null) {
+            AlertaUtil.mostrarError("No se pudo iniciar Latch", problemaArranque);
             Platform.exit();
             return;
         }
 
+        instancia = this;
+        ClienteLatch.alExpirar(() -> Platform.runLater(() -> {
+            if (instancia != this || ClienteLatch.api().sesionActiva()) return;
+            SesionUsuario.cerrarSesion();
+            for (Window ventana : List.copyOf(Window.getWindows()).reversed()) {
+                if (perteneceA(ventana, stage)) ventana.hide();
+            }
+            try {
+                mostrarLogin(stage);
+            } catch (IOException error) {
+                AlertaUtil.mostrarError("Sesión expirada", "Vuelve a abrir Latch para iniciar sesión.");
+                Platform.exit();
+                return;
+            }
+            AlertaUtil.mostrarError("Sesión expirada", "Vuelve a iniciar sesión para continuar.");
+        }));
+        try {
+            mostrarLogin(stage);
+        } catch (IOException | RuntimeException error) {
+            stop();
+            throw error;
+        }
+    }
+
+    private static boolean perteneceA(Window ventana, Stage principal) {
+        while (ventana instanceof Stage dialogo && dialogo.getOwner() != null) {
+            ventana = dialogo.getOwner();
+            if (ventana == principal) return true;
+        }
+        return false;
+    }
+
+    private void mostrarLogin(Stage stage) throws IOException {
         FXMLLoader fxmlLoader = new FXMLLoader(HelloApplication.class.getResource("login-view.fxml"));
         Scene scene = new Scene(fxmlLoader.load(), 440, 520);
         TemaAplicacion.aplicar(scene);
@@ -84,40 +130,9 @@ public class HelloApplication extends Application {
         stage.setResizable(false);
         stage.setMinWidth(440);
         stage.setMinHeight(520);
+        stage.setWidth(440);
+        stage.setHeight(520);
+        stage.centerOnScreen();
         stage.show();
-    }
-
-    /**
-     * Levanta la API antes de mostrar el login: la interfaz ya no accede
-     * directamente a los servicios de negocio para autenticarse.
-     */
-    private String iniciarServicioLocal() {
-        try {
-            ApiConfig config = ApiConfig.desdeArchivo(Path.of(".env"), System.getenv());
-            composicion = new ComposicionAplicacion(HibernateUtil.getSessionFactory());
-            servidor = composicion.crearServidorApi(config);
-            servidor.iniciar();
-            ClienteLatch.iniciar(servidor.puerto());
-            return null;
-        } catch (BindException e) {
-            return "El puerto configurado ya está en uso. Cierre la otra instancia "
-                    + "o cambie LATCH_API_PORT en el archivo .env.";
-        } catch (IOException e) {
-            return "No se pudo abrir el puerto local de la API. Revisa LATCH_API_PORT.";
-        } catch (RuntimeException e) {
-            detenerServicioLocal();
-            return e.getMessage() == null
-                    ? "No se pudo iniciar el servicio local de Latch."
-                    : e.getMessage();
-        }
-    }
-
-    private void detenerServicioLocal() {
-        ClienteLatch.cerrar();
-        if (servidor != null) {
-            servidor.detener();
-            servidor = null;
-        }
-        composicion = null;
     }
 }

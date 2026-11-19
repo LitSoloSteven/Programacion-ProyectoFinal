@@ -1,5 +1,9 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.modelo;
 
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.Objects;
@@ -8,6 +12,8 @@ import java.util.UUID;
 @Entity
 @org.hibernate.annotations.Immutable
 @Table(name = "auditoria", indexes = @Index(name = "ix_auditoria_actor_instante", columnList = "usuario_id,instante"))
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Auditoria {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -22,8 +28,6 @@ public class Auditoria {
     private String accion;
     @Column(nullable = false, length = 160, updatable = false)
     private String referencia;
-
-    protected Auditoria() {}
 
     public Auditoria(Usuario actor, UUID correlacion, String accion, String referencia) {
         this(actor, Instant.now(), correlacion, accion, referencia);
@@ -58,11 +62,4 @@ public class Auditoria {
         }
         return valor;
     }
-
-    public Long getId() { return id; }
-    public Usuario getActor() { return actor; }
-    public Instant getInstante() { return instante; }
-    public UUID getCorrelacion() { return correlacion; }
-    public String getAccion() { return accion; }
-    public String getReferencia() { return referencia; }
 }

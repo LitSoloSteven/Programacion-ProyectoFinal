@@ -1,5 +1,8 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.config;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+
 import jakarta.persistence.OptimisticLockException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ExcepcionApi;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ConflictoDatosException;
@@ -90,13 +93,11 @@ public final class HibernateTransactions {
         throw (Error) error;
     }
 
+    @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
     private static final class ContextoTransaccion {
         private final Session session;
         private boolean rollbackOnly;
         private Throwable error;
 
-        private ContextoTransaccion(Session session) {
-            this.session = session;
-        }
     }
 }

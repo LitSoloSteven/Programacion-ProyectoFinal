@@ -1,5 +1,7 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.util;
 
+import lombok.Getter;
+
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Parent;
@@ -22,7 +24,9 @@ public final class TemaAplicacion {
     private static final Preferences PREFERENCIAS = Preferences.userNodeForPackage(TemaAplicacion.class);
     private static final Map<Scene, Boolean> ESCENAS = Collections.synchronizedMap(new WeakHashMap<>());
     private static final Map<DialogPane, Boolean> DIALOGOS = Collections.synchronizedMap(new WeakHashMap<>());
+    @Getter
     private static volatile Tema tema = leerTema();
+    @Getter
     private static volatile boolean movimientoReducido =
             PREFERENCIAS.getBoolean("movimientoReducido", false);
 
@@ -81,8 +85,6 @@ public final class TemaAplicacion {
         if (movimientoReducido) clases.add("reduced-motion");
     }
 
-    public static Tema getTema() { return tema; }
-
     public static void establecerTema(Tema nuevoTema) {
         if (nuevoTema == null) return;
         tema = nuevoTema;
@@ -96,8 +98,6 @@ public final class TemaAplicacion {
             }
         });
     }
-
-    public static boolean isMovimientoReducido() { return movimientoReducido; }
 
     public static void establecerMovimientoReducido(boolean reducido) {
         movimientoReducido = reducido;

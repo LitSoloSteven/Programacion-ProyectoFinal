@@ -1,14 +1,23 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.service;
 
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Rol;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public final class SesionUsuario implements AutoCloseable {
+    @Getter
     private final Long usuarioId;
+    @Getter
     private final String nombre;
+    @Getter
     private final String rol;
+    @Getter
     private final long version;
     private static volatile SesionUsuario actual;
     private static final ThreadLocal<SesionUsuario> contextoHilo = new ThreadLocal<>();
@@ -23,16 +32,6 @@ public final class SesionUsuario implements AutoCloseable {
         this(usuarioId, nombre, rol, 0L);
     }
 
-    SesionUsuario(Long usuarioId, String nombre, String rol, long version) {
-        this.usuarioId = usuarioId;
-        this.nombre = nombre;
-        this.rol = rol;
-        this.version = version;
-    }
-    public Long getUsuarioId() { return usuarioId; }
-    public String getNombre() { return nombre; }
-    public String getRol() { return rol; }
-    public long getVersion() { return version; }
     public boolean isVigente() { return vigente.get(); }
 
     /**

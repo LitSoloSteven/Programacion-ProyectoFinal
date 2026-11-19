@@ -1,9 +1,15 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.modelo;
 
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import jakarta.persistence.*;
 
 @Entity
 @Table(name = "configuracion")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Configuracion {
     @Id @Column(length = 80)
     private String clave;
@@ -11,8 +17,6 @@ public class Configuracion {
     private String valor;
     @Version
     private long version;
-
-    protected Configuracion() {}
 
     public Configuracion(String clave, String valor) {
         if (clave == null || clave.isBlank() || clave.length() > 80) {
@@ -28,7 +32,4 @@ public class Configuracion {
         }
         this.valor = valor;
     }
-    public String getClave() { return clave; }
-    public String getValor() { return valor; }
-    public long getVersion() { return version; }
 }

@@ -1,11 +1,9 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas;
 
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ContextoPeticion;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.PeticionApi;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ExcepcionApi;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.Json;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.LectorCuerpo;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.RespuestaJson;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.Router;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.AutorizarTasaRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.ListaTasasResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.TasaRequest;
@@ -37,15 +35,7 @@ public final class RutasTasas {
         this.servicio = Objects.requireNonNull(servicio);
     }
 
-    public void registrar(Router router) {
-        router.registrar("GET", "/api/v1/tasas", false, this::listar);
-        router.registrar("GET", "/api/v1/tasas/vigente", false, this::vigente);
-        router.registrar("GET", "/api/v1/tasas/{id}", false, this::obtener);
-        router.registrar("POST", "/api/v1/tasas", false, this::registrarTasa);
-        router.registrar("POST", "/api/v1/tasas/{id}/autorizar", false, this::autorizar);
-    }
-
-    private RespuestaJson listar(ContextoPeticion contexto) {
+    public RespuestaJson listar(PeticionApi contexto) {
         LocalDate fecha = fechaOpcional(contexto.consulta("fecha"));
         Boolean autorizada = booleano(contexto.consulta("autorizada"));
         int limite = limite(contexto.consulta("limite"));
@@ -58,7 +48,7 @@ public final class RutasTasas {
         return RespuestaJson.ok(respuesta);
     }
 
-    private RespuestaJson vigente(ContextoPeticion contexto) {
+    public RespuestaJson vigente(PeticionApi contexto) {
         String valor = contexto.consulta("fecha");
         LocalDate fecha = valor == null || valor.isBlank()
                 ? servicio.fechaOperativa() : fecha(valor);
@@ -68,14 +58,14 @@ public final class RutasTasas {
                 "No hay una tasa autorizada para la fecha indicada."))));
     }
 
-    private RespuestaJson obtener(ContextoPeticion contexto) {
+    public RespuestaJson obtener(PeticionApi contexto) {
         UUID id = identificador(contexto.parametro("id"));
         Optional<TipoCambio> tasa = enSesion(contexto, () -> servicio.obtener(id));
         return RespuestaJson.ok(respuesta(tasa.orElseThrow(ExcepcionApi::noEncontrado)));
     }
 
-    private RespuestaJson registrarTasa(ContextoPeticion contexto) throws Exception {
-        TasaRequest solicitud = Json.leer(LectorCuerpo.leerJson(contexto.intercambio()),
+    public RespuestaJson registrarTasa(PeticionApi contexto) throws Exception {
+        TasaRequest solicitud = Json.leer(contexto.leerCuerpo(),
                 TasaRequest.class);
         LocalDate fecha = fechaRequerida(solicitud.fecha());
         BigDecimal tasa = decimal(solicitud.tasa());
@@ -93,10 +83,10 @@ public final class RutasTasas {
         }
     }
 
-    private RespuestaJson autorizar(ContextoPeticion contexto) throws Exception {
+    public RespuestaJson autorizar(PeticionApi contexto) throws Exception {
         UUID id = identificador(contexto.parametro("id"));
         AutorizarTasaRequest solicitud = Json.leer(
-                LectorCuerpo.leerJson(contexto.intercambio()), AutorizarTasaRequest.class);
+                contexto.leerCuerpo(), AutorizarTasaRequest.class);
         if (solicitud.motivo() == null || solicitud.motivo().isBlank()) {
             throw ExcepcionApi.entidadNoProcesable(
                     "El motivo de autorización es obligatorio.");
@@ -114,7 +104,7 @@ public final class RutasTasas {
         }
     }
 
-    private static <T> T enSesion(ContextoPeticion contexto, Supplier<T> operacion) {
+    private static <T> T enSesion(PeticionApi contexto, Supplier<T> operacion) {
         return SesionUsuario.ejecutarComo(contexto.sesion().comoUsuario(), operacion);
     }
 

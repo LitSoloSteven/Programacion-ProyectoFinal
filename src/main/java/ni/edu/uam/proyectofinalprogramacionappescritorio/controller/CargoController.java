@@ -1,5 +1,12 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
 
+import lombok.RequiredArgsConstructor;
+
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteCatalogos;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClientePagos;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.CargoListaResponse;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
@@ -25,7 +32,6 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.Pagin
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Cargo;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.CargoService;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ContratoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AccionesTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
@@ -44,6 +50,7 @@ import java.util.List;
 import java.util.UUID;
 
 /** Lista paginada de cargos y responsable de las llamadas del diálogo financiero. */
+@RequiredArgsConstructor
 public class CargoController {
     @FXML private VBox rootView;
     @FXML private HBox anularTooltipHost;
@@ -58,34 +65,29 @@ public class CargoController {
     @FXML private Label lblPaginacion;
     @FXML private Label lblTitulo;
     @FXML private TextField txtBuscar;
-    @FXML private TableView<Cargo> tblCargos;
-    @FXML private TableColumn<Cargo, String> colContrato;
-    @FXML private TableColumn<Cargo, String> colTipo;
-    @FXML private TableColumn<Cargo, String> colConcepto;
-    @FXML private TableColumn<Cargo, String> colImporte;
-    @FXML private TableColumn<Cargo, LocalDate> colVence;
-    @FXML private TableColumn<Cargo, String> colEstado;
-    @FXML private TableColumn<Cargo, Void> colAcciones;
+    @FXML private TableView<CargoListaResponse> tblCargos;
+    @FXML private TableColumn<CargoListaResponse, String> colContrato;
+    @FXML private TableColumn<CargoListaResponse, String> colTipo;
+    @FXML private TableColumn<CargoListaResponse, String> colConcepto;
+    @FXML private TableColumn<CargoListaResponse, String> colImporte;
+    @FXML private TableColumn<CargoListaResponse, LocalDate> colVence;
+    @FXML private TableColumn<CargoListaResponse, String> colEstado;
+    @FXML private TableColumn<CargoListaResponse, Void> colAcciones;
 
     private final CargoService cargoService;
-    private final ContratoService contratoService;
-    private final ObservableList<Cargo> listaCargos = FXCollections.observableArrayList();
+    private final ClienteCatalogos catalogos = new ClienteCatalogos(ClienteLatch.api());
+    private final ClientePagos cobranza = new ClientePagos();
+    private final ObservableList<CargoListaResponse> listaCargos = FXCollections.observableArrayList();
     private List<Contrato> contratosDisponibles = List.of();
-    private Cargo cargoSeleccionado;
+    private CargoListaResponse cargoSeleccionado;
     private int paginaActual = 1;
     private long versionConsulta;
     private boolean permisoAnular;
 
-    private record DatosTabla(List<Contrato> contratos, PaginaResponse<Cargo> cargos) { }
+    private record DatosTabla(List<Contrato> contratos, PaginaResponse<CargoListaResponse> cargos) { }
 
     public CargoController() {
-        this(HelloApplication.instancia().getComposicion().cargos(),
-                HelloApplication.instancia().getComposicion().contratos());
-    }
-
-    public CargoController(CargoService cargoService, ContratoService contratoService) {
-        this.cargoService = cargoService;
-        this.contratoService = contratoService;
+        this(HelloApplication.instancia().getComposicion().cargos());
     }
 
     @FXML
@@ -103,14 +105,14 @@ public class CargoController {
         tblCargos.setItems(listaCargos);
         tblCargos.setPlaceholder(PanelEstadoTabla.crear("Cargando cargos", "La lista se actualizará al terminar la consulta.", null, null));
         colContrato.setCellValueFactory(cell -> new javafx.beans.property.ReadOnlyStringWrapper(
-                cell.getValue().getContratoInfo()));
-        colTipo.setCellValueFactory(cell -> new javafx.beans.property.ReadOnlyStringWrapper(cell.getValue().getTipo()));
-        colConcepto.setCellValueFactory(cell -> new javafx.beans.property.ReadOnlyStringWrapper(cell.getValue().getConcepto()));
-        colImporte.setCellValueFactory(cell -> new javafx.beans.property.ReadOnlyStringWrapper(cell.getValue().getImporteFormateado()));
+                cell.getValue().contratoInfo()));
+        colTipo.setCellValueFactory(cell -> new javafx.beans.property.ReadOnlyStringWrapper(cell.getValue().tipo()));
+        colConcepto.setCellValueFactory(cell -> new javafx.beans.property.ReadOnlyStringWrapper(cell.getValue().concepto()));
+        colImporte.setCellValueFactory(cell -> new javafx.beans.property.ReadOnlyStringWrapper(cell.getValue().importeFormateado()));
         colImporte.setCellFactory(FormatoTabla.numerica());
-        colVence.setCellValueFactory(cell -> new javafx.beans.property.ReadOnlyObjectWrapper<>(cell.getValue().getVenceEl()));
+        colVence.setCellValueFactory(cell -> new javafx.beans.property.ReadOnlyObjectWrapper<>(LocalDate.parse(cell.getValue().venceEl())));
         colVence.setCellFactory(FormatoTabla.fecha());
-        colEstado.setCellValueFactory(cell -> new javafx.beans.property.ReadOnlyStringWrapper(cell.getValue().getEstado()));
+        colEstado.setCellValueFactory(cell -> new javafx.beans.property.ReadOnlyStringWrapper(cell.getValue().estado()));
         colEstado.setCellFactory(FormatoTabla.estado());
         AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>(
                 "Editar cargo", this::abrirEdicion, Iconos.Nombre.EDITAR)));
@@ -134,8 +136,8 @@ public class CargoController {
         String filtro = txtBuscar.getText();
         Task<DatosTabla> tarea = new Task<>() {
             @Override protected DatosTabla call() throws SQLException {
-                return new DatosTabla(contratoService.listarVigentes(),
-                        cargoService.listarTodos(pagina, CargoService.TAMANO_PAGINA_MAXIMO, filtro));
+                return new DatosTabla(catalogos.contratos(true),
+                        cobranza.listarCargos(pagina, filtro));
             }
         };
         TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, resultado -> {
@@ -162,9 +164,9 @@ public class CargoController {
         int pagina = paginaActual;
         String filtro = txtBuscar.getText();
         long version = ++versionConsulta;
-        Task<PaginaResponse<Cargo>> tarea = new Task<>() {
-            @Override protected PaginaResponse<Cargo> call() {
-                return cargoService.listarTodos(pagina, CargoService.TAMANO_PAGINA_MAXIMO, filtro);
+        Task<PaginaResponse<CargoListaResponse>> tarea = new Task<>() {
+            @Override protected PaginaResponse<CargoListaResponse> call() {
+                return cobranza.listarCargos(pagina, filtro);
             }
         };
         TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, resultado -> {
@@ -174,7 +176,7 @@ public class CargoController {
         });
     }
 
-    private void mostrarPagina(PaginaResponse<Cargo> resultado) {
+    private void mostrarPagina(PaginaResponse<CargoListaResponse> resultado) {
         int paginas = (int) Math.max(1, (resultado.total() + resultado.tamano() - 1) / resultado.tamano());
         if (paginaActual > paginas) {
             paginaActual = paginas;
@@ -200,7 +202,15 @@ public class CargoController {
 
     @FXML public void handleNuevo() { abrirFormulario(null); }
 
-    private void abrirEdicion(Cargo cargo) { abrirFormulario(cargo); }
+    private void abrirEdicion(CargoListaResponse fila) {
+        Task<Cargo> tarea = new Task<>() {
+            @Override protected Cargo call() {
+                return cargoService.obtenerParaEdicion(UUID.fromString(fila.id()));
+            }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, this::abrirFormulario,
+                error -> AlertaUtil.mostrarError("No se pudo abrir el cargo", mensajeError(error)));
+    }
 
     private void abrirFormulario(Cargo cargo) {
         try {
@@ -281,13 +291,13 @@ public class CargoController {
     }
 
     @FXML public void handleAnular() {
-        Cargo cargo = cargoSeleccionado;
+        CargoListaResponse cargo = cargoSeleccionado;
         if (cargo == null || !permisoAnular) return;
-        String registro = "Cargo: " + cargo.getConcepto() + " · " + cargo.getImporteFormateado()
-                + " · vencimiento " + cargo.getVenceEl() + " · " + cargo.getContratoInfo();
+        String registro = "Cargo: " + cargo.concepto() + " · " + cargo.importeFormateado()
+                + " · vencimiento " + cargo.venceEl() + " · " + cargo.contratoInfo();
         if (!AlertaUtil.mostrarConfirmacionDestructiva("Anular cargo", registro,
                 "El cargo quedará cancelado y dejará de estar pendiente.", "Anular cargo")) return;
-        UUID cargoId = cargo.getId();
+        UUID cargoId = UUID.fromString(cargo.id());
         btnAnular.setDisable(true);
         Task<Void> tarea = new Task<>() {
             @Override protected Void call() throws SQLException {
@@ -312,6 +322,7 @@ public class CargoController {
     }
 
     private static String mensajeError(Throwable error) {
+        if (error instanceof ErrorClienteException) return error.getMessage();
         if (error instanceof IllegalArgumentException || error instanceof IllegalStateException
                 || error instanceof SecurityException) return error.getMessage();
         return "Revisa los datos y vuelve a intentarlo.";

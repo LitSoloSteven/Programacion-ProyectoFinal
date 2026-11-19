@@ -4,8 +4,6 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.dto.LoginRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.dto.LoginResponse;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.RutasCatalogos;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.ServicioCatalogos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.ContratoRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.ContratoResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.InquilinoRequest;
@@ -15,16 +13,12 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.Propi
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PropiedadResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.UnidadRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.UnidadResponse;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ApiConfig;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ErrorApi;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.Router;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ServidorApi;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.TokenService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.piloto.ServidorSpringPrueba;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Rol;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.AutenticacionService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PasswordHasher;
 import org.hibernate.SessionFactory;
@@ -55,7 +49,7 @@ class ApiCatalogosTest {
     private static final String CORREO_PROPIETARIO = "propietario@latch.test";
 
     private static SessionFactory factory;
-    private static ServidorApi servidor;
+    private static ServidorSpringPrueba servidor;
     private static HttpClient cliente;
     private static String base;
     private static String nombrePropietario;
@@ -85,19 +79,16 @@ class ApiCatalogosTest {
         });
         SesionUsuario.cerrarSesion();
 
-        Router router = new Router();
-        new RutasCatalogos(new ServicioCatalogos(tx)).registrar(router);
-        servidor = new ServidorApi(ApiConfig.paraPruebas(0),
-                new AutenticacionService(tx), new TokenService(), router);
-        servidor.iniciar();
+        servidor = new ServidorSpringPrueba(factory);
         base = servidor.urlBase();
         cliente = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     }
 
     @AfterAll
     static void cerrar() {
-        if (servidor != null) servidor.detener();
-        if (factory != null) factory.close();
+        if (cliente != null) cliente.close();
+        if (servidor != null) servidor.close();
+        if (factory != null && !factory.isClosed()) factory.close();
         SesionUsuario.cerrarSesion();
     }
 
@@ -174,11 +165,23 @@ class ApiCatalogosTest {
         assertEquals("A-01", unidad.codigo());
         assertEquals("Edificio Norte", unidad.propiedadNombre());
         assertEquals("850.00", unidad.canonReferencia());
+        var unidades = ApiCatalogosTest.<UnidadResponse>pagina(
+                "/api/v1/unidades?pagina=1&tamano=1&propiedadId=" + propiedad.id() + "&texto=A-01",
+                token, new TypeToken<PaginaResponse<UnidadResponse>>() { }.getType());
+        assertEquals(1, unidades.tamano());
+        assertEquals(1, unidades.total());
+        assertEquals(unidad.id(), unidades.elementos().getFirst().id());
+        verificarActualizacion("/api/v1/unidades/" + unidad.id(), token, unidad.version(),
+                new UnidadRequest(propiedad.id(), "A-01", "Descripción actualizada",
+                        "Apartamento", "Disponible", "850.00", "USD", unidad.version()));
 
         InquilinoResponse inquilino = crearInquilino(token,
                 new InquilinoRequest("Luis Inquilino", "001-010190-0001A",
                         "+505 7777-2222", "luis@latch.test", "Marta 8888-0000", true, null));
         assertTrue(inquilino.activo());
+        verificarActualizacion("/api/v1/inquilinos/" + inquilino.id(), token, inquilino.version(),
+                new InquilinoRequest("Luis Inquilino", "001-010190-0001A", "+505 7777-2233",
+                        "luis@latch.test", "Marta 8888-0000", true, inquilino.version()));
 
         ContratoResponse contrato = crearContrato(token,
                 new ContratoRequest(unidad.id(), inquilino.id(),
@@ -189,6 +192,10 @@ class ApiCatalogosTest {
         assertEquals("850.00", contrato.garantiaSaldo());
         assertEquals("Vigente", contrato.estado());
         assertEquals("Luis Inquilino", contrato.inquilinoNombre());
+        verificarActualizacion("/api/v1/contratos/" + contrato.id(), token, contrato.version(),
+                new ContratoRequest(unidad.id(), inquilino.id(), LocalDate.now().toString(),
+                        LocalDate.now().plusYears(1).plusDays(1).toString(),
+                        "850.00", "USD", 5, "850.00", "Vigente", contrato.version()));
 
         PaginaResponse<ContratoResponse> vigentes = pagina(
                 "/api/v1/contratos?estado=Vigente&inquilinoId=" + inquilino.id(), token,
@@ -463,6 +470,20 @@ class ApiCatalogosTest {
         HttpResponse<String> respuesta = get(ruta, token);
         assertEquals(200, respuesta.statusCode(), respuesta.body());
         return GSON.fromJson(respuesta.body(), tipo);
+    }
+
+    private static void verificarActualizacion(String ruta, String token, long version, Object solicitud)
+            throws Exception {
+        String cuerpo = GSON.toJson(solicitud);
+        var actualizada = putJson(ruta, cuerpo, token);
+        assertEquals(200, actualizada.statusCode(), actualizada.body());
+        var persistida = get(ruta, token);
+        assertEquals(200, persistida.statusCode(), persistida.body());
+        assertEquals(version + 1, com.google.gson.JsonParser.parseString(persistida.body())
+                .getAsJsonObject().get("version").getAsLong());
+        var obsoleta = putJson(ruta, cuerpo, token);
+        assertEquals(409, obsoleta.statusCode(), obsoleta.body());
+        assertEquals("CONFLICTO", error(obsoleta).error().codigo());
     }
 
     private static String login(String nombre) throws Exception {

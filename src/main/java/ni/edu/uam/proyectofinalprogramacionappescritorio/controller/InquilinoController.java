@@ -1,5 +1,7 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
 
+import lombok.RequiredArgsConstructor;
+
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
@@ -20,6 +22,10 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.InquilinoRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteCatalogos;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Inquilino;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.InquilinoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
@@ -38,6 +44,7 @@ import java.util.List;
 import java.util.Locale;
 
 /** Directorio local de inquilinos y responsable de las operaciones del servicio. */
+@RequiredArgsConstructor
 public class InquilinoController {
     @FXML private VBox rootView;
     @FXML private HBox eliminarTooltipHost;
@@ -59,6 +66,7 @@ public class InquilinoController {
     @FXML private TableColumn<Inquilino, String> colEstado;
     @FXML private TableColumn<Inquilino, Void> colAcciones;
 
+    private final ClienteCatalogos catalogos = new ClienteCatalogos(ClienteLatch.api());
     private final InquilinoService inquilinoService;
     private final ObservableList<Inquilino> registros = FXCollections.observableArrayList();
     private final FilteredList<Inquilino> filtrados = new FilteredList<>(registros, item -> true);
@@ -67,8 +75,6 @@ public class InquilinoController {
     private long versionConsulta;
 
     public InquilinoController() { this(HelloApplication.instancia().getComposicion().inquilinos()); }
-    public InquilinoController(InquilinoService inquilinoService) { this.inquilinoService = inquilinoService; }
-
     @FXML public void initialize() {
         lblTitulo.setGraphic(Iconos.crear(Iconos.Nombre.PERSONAS, 20));
         Iconos.asignar(btnRefrescar, Iconos.Nombre.ACTUALIZAR, 16);
@@ -118,7 +124,7 @@ public class InquilinoController {
         btnRefrescar.setDisable(true);
         long version = ++versionConsulta;
         Task<List<Inquilino>> tarea = new Task<>() {
-            @Override protected List<Inquilino> call() throws SQLException { return inquilinoService.listarTodos(); }
+            @Override protected List<Inquilino> call() throws SQLException { return catalogos.inquilinos(false); }
         };
         TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
             if (version != versionConsulta) return;
@@ -161,19 +167,10 @@ public class InquilinoController {
                 accion.setDisable(true); accion.setText("Guardando inquilino…");
                 Task<Void> tarea = new Task<>() {
                     @Override protected Void call() throws SQLException {
-                        if (nuevo) {
-                            ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Inquilino inquilino = new ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Inquilino();
-                            inquilino.setNombre(datos.nombre());
-                            inquilino.setIdentificacion(datos.identificacion());
-                            inquilino.setTelefono(datos.telefono());
-                            inquilino.setCorreo(datos.correo());
-                            inquilino.setContactoEmergencia(datos.emergencia());
-                            inquilino.setActivo(datos.activo());
-                            inquilinoService.guardar(inquilino);
-                        } else {
-                            inquilinoService.actualizar(existente.getId(), existente.getVersion(), datos.nombre(),
-                                    datos.identificacion(), datos.telefono(), datos.correo(), datos.emergencia(), datos.activo());
-                        }
+                        catalogos.guardarInquilino(nuevo ? null : existente.getId(),
+                                new InquilinoRequest(datos.nombre(), datos.identificacion(), datos.telefono(),
+                            datos.correo(), datos.emergencia(), datos.activo(),
+                            nuevo ? null : existente.getVersion()));
                         return null;
                     }
                 };
@@ -184,6 +181,13 @@ public class InquilinoController {
                     cargarDatos();
                 }, error -> {
                     accion.setDisable(false); accion.setText(nuevo ? "Guardar inquilino" : "Guardar cambios");
+                    if (!nuevo && error instanceof ErrorClienteException api && api.getEstado() == 409) {
+                        DialogoFormulario.cerrar(dialogo);
+                        cargarDatos();
+                        AlertaUtil.mostrarAdvertencia("No se guardaron los cambios",
+                                api.getMessage() + " Abre el registro actualizado para volver a editarlo.");
+                        return;
+                    }
                     formulario.mostrarError(mensajeError(error));
                 });
             });
@@ -201,7 +205,7 @@ public class InquilinoController {
                 "El inquilino quedará inactivo; su historial se conservará.", "Deshabilitar")) return;
         btnDarBaja.setDisable(true);
         Task<Void> tarea = new Task<>() {
-            @Override protected Void call() throws SQLException { inquilinoService.darDeBaja(inquilino.getId()); return null; }
+            @Override protected Void call() throws SQLException { catalogos.darDeBajaInquilino(inquilino.getId()); return null; }
         };
         TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
             AlertaUtil.mostrarExito("Inquilino deshabilitado", "El inquilino quedó inactivo.");
@@ -241,6 +245,7 @@ public class InquilinoController {
     private void ocultarError() { lblErrorConsulta.setText(""); lblErrorConsulta.setVisible(false); lblErrorConsulta.setManaged(false); }
     private static boolean contiene(String valor, String filtro) { return valor != null && valor.toLowerCase(Locale.ROOT).contains(filtro); }
     private static String mensajeError(Throwable error) {
+        if (error instanceof ErrorClienteException) return error.getMessage();
         if (error instanceof IllegalArgumentException || error instanceof SecurityException
                 || error instanceof IllegalStateException) return error.getMessage();
         return "No se pudo guardar el inquilino. Revisa los datos e inténtalo de nuevo.";

@@ -1,18 +1,15 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.api;
 
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.piloto.ServidorSpringPrueba;
 import com.google.gson.Gson;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.dto.LoginRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.dto.LoginResponse;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ApiConfig;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ErrorApi;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.LectorCuerpo;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ServidorApi;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.TokenService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Rol;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.AutenticacionService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PasswordHasher;
 import org.hibernate.SessionFactory;
@@ -42,7 +39,7 @@ class ApiFase1Test {
 
     private static SessionFactory factory;
     private static HibernateTransactions tx;
-    private static ServidorApi servidor;
+    private static ServidorSpringPrueba servidor;
     private static HttpClient cliente;
     private static String base;
     private static String hash;
@@ -64,9 +61,7 @@ class ApiFase1Test {
         hash = new PasswordHasher().crear(PASSWORD);
         SesionUsuario.cerrarSesion();
 
-        servidor = new ServidorApi(ApiConfig.paraPruebas(0),
-                new AutenticacionService(tx), new TokenService());
-        servidor.iniciar();
+        servidor = new ServidorSpringPrueba(factory);
         base = servidor.urlBase();
         cliente = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
@@ -75,8 +70,8 @@ class ApiFase1Test {
 
     @AfterAll
     static void cerrar() {
-        if (servidor != null) servidor.detener();
-        if (factory != null) factory.close();
+        if (servidor != null) servidor.close();
+        if (factory != null && !factory.isClosed()) factory.close();
         SesionUsuario.cerrarSesion();
     }
 

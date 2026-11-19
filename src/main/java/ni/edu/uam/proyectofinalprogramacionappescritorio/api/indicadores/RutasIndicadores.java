@@ -1,8 +1,7 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.api.indicadores;
 
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ContextoPeticion;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.PeticionApi;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.RespuestaJson;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.Router;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.indicadores.dto.MetricasResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.indicadores.dto.TotalMonedaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.MetricasDashboardDTO;
@@ -26,11 +25,7 @@ public final class RutasIndicadores {
         this.dashboard = Objects.requireNonNull(dashboard);
     }
 
-    public void registrar(Router router) {
-        router.registrar("GET", "/api/v1/dashboard/metricas", false, this::metricas);
-    }
-
-    private RespuestaJson metricas(ContextoPeticion contexto) {
+    public RespuestaJson metricas(PeticionApi contexto) {
         MetricasDashboardDTO datos = SesionUsuario.ejecutarComo(
                 contexto.sesion().comoUsuario(), dashboard::obtenerMetricas);
         return RespuestaJson.ok(new MetricasResponse(

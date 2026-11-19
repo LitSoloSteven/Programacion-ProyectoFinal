@@ -11,6 +11,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.lang.reflect.Type;
 import java.util.Objects;
 
 /**
@@ -25,6 +26,21 @@ public final class ClienteApi {
     private final HttpClient http;
     private final Gson gson = new Gson();
     private volatile String token;
+    private volatile Runnable alExpirar = () -> {};
+
+    void alExpirar(Runnable accion) {
+        alExpirar = Objects.requireNonNull(accion);
+    }
+
+    public boolean sesionActiva() {
+        return token != null;
+    }
+
+    private synchronized boolean descartarToken(String usado) {
+        if (!Objects.equals(token, usado)) return false;
+        token = null;
+        return true;
+    }
 
     public ClienteApi(String baseUrl) {
         Objects.requireNonNull(baseUrl, "Falta la dirección del servicio local.");
@@ -50,6 +66,10 @@ public final class ClienteApi {
     }
 
     public <T> T get(String ruta, Class<T> tipo) {
+        return get(ruta, (Type) tipo);
+    }
+
+    public <T> T get(String ruta, Type tipo) {
         return enviar(construir(ruta).GET().build(), tipo);
     }
 
@@ -127,7 +147,7 @@ public final class ClienteApi {
         return constructor;
     }
 
-    private <T> T enviar(HttpRequest peticion, Class<T> tipo) {
+    private <T> T enviar(HttpRequest peticion, Type tipo) {
         try {
             HttpResponse<String> respuesta = http.send(peticion,
                     HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
@@ -137,6 +157,12 @@ public final class ClienteApi {
                     return null;
                 }
                 return gson.fromJson(respuesta.body(), tipo);
+            }
+            if (estado == 401 && !peticion.uri().getPath().equals("/api/v1/auth/login")) {
+                peticion.headers().firstValue("Authorization")
+                        .map(valor -> valor.substring("Bearer ".length()))
+                        .filter(this::descartarToken)
+                        .ifPresent(usado -> alExpirar.run());
             }
             throw error(respuesta);
         } catch (InterruptedException e) {

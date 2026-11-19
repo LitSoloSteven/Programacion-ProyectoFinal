@@ -1,6 +1,9 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.indicadores.dto.MetricasResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.indicadores.dto.TotalMonedaResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
 import javafx.concurrent.Task;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -21,11 +24,8 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteApi;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteAuth;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
 
-import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.MetricasDashboardDTO;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.TotalMonedaDTO;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.DashboardService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoMoneda;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
@@ -126,16 +126,6 @@ public class DashboardController {
     @FXML private Label lblPagosMontoUsd;
     @FXML private Label lblPagosMontoNio;
 
-    private final DashboardService dashboardService;
-
-    public DashboardController() {
-        this(HelloApplication.instancia().getComposicion().dashboard());
-    }
-
-    public DashboardController(DashboardService dashboardService) {
-        this.dashboardService = dashboardService;
-    }
-
     @FXML
     public void initialize() {
         SesionUsuario usuario = SesionUsuario.getActual();
@@ -194,10 +184,10 @@ public class DashboardController {
             btnActualizar.setDisable(true);
             btnActualizar.setText("Actualizando…");
         }
-        Task<MetricasDashboardDTO> tarea = new Task<>() {
+        Task<MetricasResponse> tarea = new Task<>() {
             @Override
-            protected MetricasDashboardDTO call() {
-                return dashboardService.obtenerMetricas();
+            protected MetricasResponse call() {
+                return ClienteLatch.api().get("/api/v1/dashboard/metricas", MetricasResponse.class);
             }
         };
         TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, metricas -> {
@@ -206,10 +196,10 @@ public class DashboardController {
             lblTotalInquilinos.setText(String.valueOf(metricas.inquilinos()));
             lblTotalContratos.setText(String.valueOf(metricas.contratosVigentes()));
 
-            lblCargosPendientes.setText(String.valueOf(metricas.cantidadCargosPendientes()));
+            lblCargosPendientes.setText(String.valueOf(metricas.cargosPendientes().stream().mapToLong(TotalMonedaResponse::cantidad).sum()));
             actualizarImportesPorMoneda(metricas.cargosPendientes(), lblCargosMontoUsd, lblCargosMontoNio);
 
-            lblPagosRegistrados.setText(String.valueOf(metricas.cantidadPagosRegistrados()));
+            lblPagosRegistrados.setText(String.valueOf(metricas.pagosRegistrados().stream().mapToLong(TotalMonedaResponse::cantidad).sum()));
             actualizarImportesPorMoneda(metricas.pagosRegistrados(), lblPagosMontoUsd, lblPagosMontoNio);
             lblActualizado.setText("Actualizado a las "
                     + HORA_VISIBLE.format(LocalTime.now(RelojService.ZONA_OPERATIVA)));
@@ -222,7 +212,7 @@ public class DashboardController {
                 btnActualizar.setDisable(false);
                 btnActualizar.setText("Actualizar");
             }
-            if (error instanceof SecurityException permiso) {
+            if (error instanceof ErrorClienteException api && api.getEstado() == 403) {
                 AlertaUtil.mostrarAdvertencia("Permiso denegado",
                         "Esta cuenta no puede consultar estas métricas.");
             } else {
@@ -232,16 +222,16 @@ public class DashboardController {
         });
     }
 
-    private void actualizarImportesPorMoneda(List<TotalMonedaDTO> importes, Label usd, Label nio) {
+    private void actualizarImportesPorMoneda(List<TotalMonedaResponse> importes, Label usd, Label nio) {
         usd.setText(formatearImporte(importes, "USD"));
         nio.setText(formatearImporte(importes, "NIO"));
     }
 
-    private String formatearImporte(List<TotalMonedaDTO> importes, String moneda) {
+    private String formatearImporte(List<TotalMonedaResponse> importes, String moneda) {
         return importes.stream()
                 .filter(total -> moneda.equals(total.moneda()))
                 .findFirst()
-                .map(total -> FormatoMoneda.formatear(total.moneda(), total.total()))
+                .map(total -> FormatoMoneda.formatear(total.moneda(), new BigDecimal(total.total())))
                 .orElseGet(() -> FormatoMoneda.formatear(moneda, BigDecimal.ZERO));
     }
 

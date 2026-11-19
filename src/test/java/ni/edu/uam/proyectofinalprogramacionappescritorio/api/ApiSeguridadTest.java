@@ -1,26 +1,20 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.api;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.hibernate.resource.jdbc.spi.StatementInspector;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.piloto.ServidorSpringPrueba;
 import com.google.gson.Gson;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.dto.LoginRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.dto.LoginResponse;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ApiConfig;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ErrorApi;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.Router;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ServidorApi;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.TokenService;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.indicadores.RutasIndicadores;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.RutasTasas;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.TasaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Rol;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.AutenticacionService;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.DashboardService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojDesfasadoException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.TipoCambioService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PasswordHasher;
 import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.AfterAll;
@@ -54,9 +48,10 @@ class ApiSeguridadTest {
     private static final char[] PASSWORD = "ClaveSintetica-2026".toCharArray();
     private static final Gson GSON = new Gson();
 
+    private static final AtomicBoolean DESFASAR_RELOJ = new AtomicBoolean();
     private static SessionFactory factory;
     private static HibernateTransactions tx;
-    private static ServidorApi servidor;
+    private static ServidorSpringPrueba servidor;
     private static HttpClient cliente;
     private static String base;
     private static String nombrePropietario;
@@ -76,6 +71,10 @@ class ApiSeguridadTest {
         p.setProperty("hibernate.jdbc.time_zone", "UTC");
         p.setProperty("hibernate.show_sql", "false");
 
+        p.put("hibernate.session_factory.statement_inspector", (StatementInspector) sql ->
+                DESFASAR_RELOJ.get() && sql.strip().equalsIgnoreCase("select current_timestamp")
+                        ? "select dateadd('MINUTE', -10, current_timestamp)"
+                        : sql);
         factory = HibernateUtil.construir(p);
         tx = new HibernateTransactions(factory);
         String hash = new PasswordHasher().crear(PASSWORD);
@@ -93,22 +92,15 @@ class ApiSeguridadTest {
         });
         SesionUsuario.cerrarSesion();
 
-        Router router = new Router();
-        new RutasTasas(new TipoCambioService(tx)).registrar(router);
-        new RutasIndicadores(new DashboardService(tx)).registrar(router);
-        router.registrar("GET", "/api/v1/pruebas/reloj-desfasado", false,
-                contexto -> { throw new RelojDesfasadoException(); });
-        servidor = new ServidorApi(ApiConfig.paraPruebas(0),
-                new AutenticacionService(tx), new TokenService(), router);
-        servidor.iniciar();
+        servidor = new ServidorSpringPrueba(factory);
         base = servidor.urlBase();
         cliente = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     }
 
     @AfterAll
     static void cerrar() {
-        if (servidor != null) servidor.detener();
-        if (factory != null) factory.close();
+        if (servidor != null) servidor.close();
+        if (factory != null && !factory.isClosed()) factory.close();
         SesionUsuario.cerrarSesion();
     }
 
@@ -132,8 +124,16 @@ class ApiSeguridadTest {
 
     @Test
     void traduceElDesfaseDelRelojAlCodigoErr057() throws Exception {
-        HttpResponse<String> respuesta = get(
-                "/api/v1/pruebas/reloj-desfasado", login(nombrePropietario));
+        String token = login(nombrePropietario);
+        HttpResponse<String> respuesta;
+        DESFASAR_RELOJ.set(true);
+        try {
+            String cuerpo = "{\"fecha\":\"" + LocalDate.now(RelojService.ZONA_OPERATIVA)
+                    + "\",\"tasa\":\"36.65\",\"fuente\":\"BCN\"}";
+            respuesta = postJson("/api/v1/tasas", cuerpo, token, null);
+        } finally {
+            DESFASAR_RELOJ.set(false);
+        }
 
         assertEquals(503, respuesta.statusCode());
         assertEquals("ERR-057", error(respuesta).error().codigo());
@@ -248,7 +248,7 @@ class ApiSeguridadTest {
 
     @Test
     void configuraUnLimiteDeTreintaSegundosParaLeerLaPeticion() {
-        assertEquals("30", System.getProperty("sun.net.httpserver.maxReqTime"));
+        assertEquals(30_000, servidor.plazoConexionMillis());
     }
 
     @Test

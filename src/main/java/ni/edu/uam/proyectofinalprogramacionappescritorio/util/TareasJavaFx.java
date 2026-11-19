@@ -1,5 +1,6 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.util;
 
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
 import javafx.concurrent.Task;
 
 import java.util.Objects;
@@ -25,7 +26,12 @@ public final class TareasJavaFx {
                 alFallar.accept(error);
             }
         });
-        tarea.setOnFailed(evento -> alFallar.accept(tarea.getException()));
+        tarea.setOnFailed(evento -> {
+            Throwable error = tarea.getException();
+            if (!(error instanceof ErrorClienteException api) || !api.esNoAutenticado()) {
+                alFallar.accept(error);
+            }
+        });
         try {
             ejecutor.ejecutar(tarea);
         } catch (RuntimeException error) {

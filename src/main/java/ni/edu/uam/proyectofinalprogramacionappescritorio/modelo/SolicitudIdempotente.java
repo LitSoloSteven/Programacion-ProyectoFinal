@@ -1,5 +1,9 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.modelo;
 
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -15,6 +19,8 @@ import java.util.UUID;
 @Table(name = "solicitud_idempotente",
         uniqueConstraints = @UniqueConstraint(name = "uk_solicitud_idempotente_clave",
                 columnNames = "clave"))
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SolicitudIdempotente {
 
     public static final String EN_PROCESO = "EN_PROCESO";
@@ -52,8 +58,6 @@ public class SolicitudIdempotente {
     @Column(name = "completado_en")
     private Instant completadoEn;
 
-    protected SolicitudIdempotente() { }
-
     public SolicitudIdempotente(String clave, Long usuarioId, String recurso,
                                 String hashPeticion, Instant creadoEn) {
         this.clave = Objects.requireNonNull(clave, "Falta la Idempotency-Key.");
@@ -69,46 +73,6 @@ public class SolicitudIdempotente {
         this.codigoEstado = codigoEstado;
         this.respuestaJson = Objects.requireNonNull(respuestaJson);
         this.completadoEn = Objects.requireNonNull(completadoEn);
-    }
-
-    public UUID getId() {
-        return id;
-    }
-
-    public String getClave() {
-        return clave;
-    }
-
-    public Long getUsuarioId() {
-        return usuarioId;
-    }
-
-    public String getRecurso() {
-        return recurso;
-    }
-
-    public String getHashPeticion() {
-        return hashPeticion;
-    }
-
-    public Instant getCreadoEn() {
-        return creadoEn;
-    }
-
-    public String getEstado() {
-        return estado;
-    }
-
-    public Integer getCodigoEstado() {
-        return codigoEstado;
-    }
-
-    public String getRespuestaJson() {
-        return respuestaJson;
-    }
-
-    public Instant getCompletadoEn() {
-        return completadoEn;
     }
 
     public boolean isCompletada() {

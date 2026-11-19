@@ -1,8 +1,7 @@
 # API local de Latch
 
-Servicio HTTP propio de la aplicación, construido sobre
-`com.sun.net.httpserver.HttpServer`, sin frameworks externos. La interfaz JavaFX
-lo consume con `java.net.http.HttpClient`. El servidor escucha **solo** en
+Servicio HTTP local de Spring Boot con Spring MVC. La interfaz JavaFX lo
+consume con `java.net.http.HttpClient`. El servidor escucha **solo** en
 `127.0.0.1` y el puerto se toma de `LATCH_API_PORT`.
 
 - Base: `http://127.0.0.1:<LATCH_API_PORT>`
@@ -133,11 +132,11 @@ lo modificó, responden `409` y el cliente debe recargar.
 
 ## Catálogos
 
-Listados paginados con `pagina` (1..N), `tamano` (1..100) y filtros propios:
+Listados paginados con `pagina` (1..N), `tamano` (1..50) y filtros propios:
 
 | Recurso | Filtros |
 | --- | --- |
-| `propiedades` | `texto`, `propietarioId` |
+| `propiedades` | `texto`, `activa` |
 | `unidades` | `propiedadId`, `estado`, `tipo`, `texto` |
 | `inquilinos` | `texto`, `activo` |
 | `contratos` | `estado`, `unidadId`, `inquilinoId`, `texto` |
@@ -146,11 +145,10 @@ Respuesta:
 
 ```json
 {
-  "contenido": [ { "…": "…" } ],
+  "elementos": [ { "…": "…" } ],
   "pagina": 1,
   "tamano": 20,
-  "total": 3,
-  "totalPaginas": 1
+  "total": 3
 }
 ```
 
@@ -278,13 +276,18 @@ El cliente está en `cliente/`:
 | `ClienteLatch` | Inicia/cierra el cliente con el puerto local |
 | `ClienteApi` | GET/POST/PUT/PATCH, token en memoria, timeouts 5 s / 10 s |
 | `ClienteAuth` | Login y logout |
+| `ClienteCatalogos` | Paginación, altas, edición y cambios de estado de catálogos |
+| `ClientePagos` | Cargos, historial, registro de pago, detalle, recibo y anulación |
 | `ClienteTasas` | Consulta y registro de tasas |
 | `ClienteValidaciones` | Validaciones |
 | `ErrorClienteException` | Error controlado con código y mensaje del servidor |
 
 Las llamadas se ejecutan en `javafx.concurrent.Task` mediante
 `util.TareasSegundoPlano`, nunca en el hilo de JavaFX. El token no se registra
-en logs ni se guarda en disco.
+en logs ni se guarda en disco. Ante un `401` del token activo, JavaFX vuelve
+al login. Tras un PUT de inquilino, JavaFX recarga la lista para leer la
+versión persistida. Ante un conflicto de edición `409`, recarga el registro y
+pide abrirlo de nuevo.
 
 ## Seguridad
 

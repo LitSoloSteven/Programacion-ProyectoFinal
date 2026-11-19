@@ -104,6 +104,15 @@ public final class CargoService {
         });
     }
 
+    public Cargo obtenerParaEdicion(UUID id) {
+        return tx.ejecutar(session -> {
+            permisos.exigir(session, SesionUsuario.getActual(), Permiso.OPERAR_ALQUILERES);
+            Cargo cargo = session.find(Cargo.class, id);
+            if (cargo == null) throw new IllegalArgumentException("El cargo ya no existe.");
+            return cargo;
+        });
+    }
+
     private static void validarPaginacion(int pagina, int tamano) {
         if (pagina < 1 || pagina > PAGINA_MAXIMA) {
             throw new IllegalArgumentException("La página debe estar entre 1 y " + PAGINA_MAXIMA + ".");

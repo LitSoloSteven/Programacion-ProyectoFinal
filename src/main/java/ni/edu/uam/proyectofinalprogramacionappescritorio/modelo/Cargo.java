@@ -1,5 +1,8 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.modelo;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import jakarta.persistence.*;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoMoneda;
 
@@ -19,26 +22,45 @@ public class Cargo {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @Getter
+    @Setter
     private UUID id;
     @Column(name = "contrato_id", nullable = false)
+    @Getter
+    @Setter
     private UUID contratoId;
     @Transient
+    @Setter
     private String contratoInfo;
     @Column(length = 24, nullable = false)
+    @Getter
+    @Setter
     private String tipo;
     @Column(nullable = false)
+    @Getter
+    @Setter
     private LocalDate periodo;
     @Column(name = "fecha_emision", nullable = false)
+    @Getter
+    @Setter
     private LocalDate fechaEmision;
     @Column(name = "vence_el", nullable = false)
+    @Getter
+    @Setter
     private LocalDate venceEl;
     @Column(precision = 19, scale = 2, nullable = false)
+    @Getter
+    @Setter
     private BigDecimal importe;
     @Column(length = 300, nullable = false)
+    @Getter
+    @Setter
     private String concepto;
     @Column(length = 24, nullable = false)
     private String estado;
     @Version
+    @Getter
+    @Setter
     private long version;
     @Transient
     private String estadoDerivado;
@@ -74,76 +96,8 @@ public class Cargo {
         this.version = version;
     }
 
-    public UUID getId() {
-        return id;
-    }
-
-    public void setId(UUID id) {
-        this.id = id;
-    }
-
-    public UUID getContratoId() {
-        return contratoId;
-    }
-
-    public void setContratoId(UUID contratoId) {
-        this.contratoId = contratoId;
-    }
-
     public String getContratoInfo() {
         return contrato == null ? contratoInfo : contrato.toString();
-    }
-
-    public void setContratoInfo(String contratoInfo) {
-        this.contratoInfo = contratoInfo;
-    }
-
-    public String getTipo() {
-        return tipo;
-    }
-
-    public void setTipo(String tipo) {
-        this.tipo = tipo;
-    }
-
-    public LocalDate getPeriodo() {
-        return periodo;
-    }
-
-    public void setPeriodo(LocalDate periodo) {
-        this.periodo = periodo;
-    }
-
-    public LocalDate getFechaEmision() {
-        return fechaEmision;
-    }
-
-    public void setFechaEmision(LocalDate fechaEmision) {
-        this.fechaEmision = fechaEmision;
-    }
-
-    public LocalDate getVenceEl() {
-        return venceEl;
-    }
-
-    public void setVenceEl(LocalDate venceEl) {
-        this.venceEl = venceEl;
-    }
-
-    public BigDecimal getImporte() {
-        return importe;
-    }
-
-    public void setImporte(BigDecimal importe) {
-        this.importe = importe;
-    }
-
-    public String getConcepto() {
-        return concepto;
-    }
-
-    public void setConcepto(String concepto) {
-        this.concepto = concepto;
     }
 
     public String getEstado() {
@@ -187,14 +141,6 @@ public class Cargo {
         return saldo.signum() <= 0
                 ? BigDecimal.ZERO.setScale(2)
                 : saldo.setScale(2, RoundingMode.HALF_EVEN);
-    }
-
-    public long getVersion() {
-        return version;
-    }
-
-    public void setVersion(long version) {
-        this.version = version;
     }
 
     public String getImporteFormateado() {

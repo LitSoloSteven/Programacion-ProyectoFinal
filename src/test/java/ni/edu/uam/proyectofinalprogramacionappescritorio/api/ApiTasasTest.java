@@ -3,12 +3,8 @@ package ni.edu.uam.proyectofinalprogramacionappescritorio.api;
 import com.google.gson.Gson;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.dto.LoginRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.dto.LoginResponse;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ApiConfig;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ErrorApi;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.Router;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ServidorApi;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.TokenService;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.RutasTasas;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.piloto.ServidorSpringPrueba;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.ListaTasasResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.TasaRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.TasaResponse;
@@ -16,7 +12,8 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransac
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Rol;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.AutenticacionService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.config.PostgresTestSupport;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.TipoCambioService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PasswordHasher;
@@ -33,6 +30,8 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
@@ -50,7 +49,7 @@ class ApiTasasTest {
     private static final LocalDate FECHA = LocalDate.now().minusDays(1);
 
     private static SessionFactory factory;
-    private static ServidorApi servidor;
+    private static ServidorSpringPrueba servidor;
     private static HttpClient cliente;
     private static String base;
     private static String nombrePropietario;
@@ -59,16 +58,21 @@ class ApiTasasTest {
     @BeforeAll
     static void iniciar() throws Exception {
         Properties p = new Properties();
-        p.setProperty("hibernate.connection.driver_class", "org.h2.Driver");
-        p.setProperty("hibernate.connection.url",
+        if (Boolean.getBoolean("latch.test.postgres")) {
+            p = PostgresTestSupport.propiedadesHibernate();
+        } else {
+            p.setProperty("hibernate.connection.driver_class", "org.h2.Driver");
+            p.setProperty("hibernate.connection.url",
                 "jdbc:h2:mem:latch_api_tasas_" + UUID.randomUUID() + ";MODE=PostgreSQL");
-        p.setProperty("hibernate.connection.username", "sa");
-        p.setProperty("hibernate.connection.password", "");
-        p.setProperty("hibernate.hbm2ddl.auto", "create-drop");
-        p.setProperty("hibernate.jdbc.time_zone", "UTC");
-        p.setProperty("hibernate.show_sql", "false");
+            p.setProperty("hibernate.connection.username", "sa");
+            p.setProperty("hibernate.connection.password", "");
+            p.setProperty("hibernate.hbm2ddl.auto", "create-drop");
+            p.setProperty("hibernate.jdbc.time_zone", "UTC");
+            p.setProperty("hibernate.show_sql", "false");
+        }
 
         factory = HibernateUtil.construir(p);
+        if (Boolean.getBoolean("latch.test.postgres")) PostgresTestSupport.aplicarMigraciones(p);
         HibernateTransactions tx = new HibernateTransactions(factory);
         String hash = new PasswordHasher().crear(PASSWORD);
         nombrePropietario = "prop-" + UUID.randomUUID().toString().substring(0, 8);
@@ -80,19 +84,17 @@ class ApiTasasTest {
         });
         SesionUsuario.cerrarSesion();
 
-        Router router = new Router();
-        new RutasTasas(new TipoCambioService(tx)).registrar(router);
-        servidor = new ServidorApi(ApiConfig.paraPruebas(0),
-                new AutenticacionService(tx), new TokenService(), router);
-        servidor.iniciar();
+        servidor = new ServidorSpringPrueba(factory);
         base = servidor.urlBase();
         cliente = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     }
 
     @AfterAll
     static void cerrar() {
-        if (servidor != null) servidor.detener();
-        if (factory != null) factory.close();
+        if (cliente != null) cliente.close();
+        if (servidor != null) servidor.close();
+        if (factory != null && !factory.isClosed()) factory.close();
+        if (Boolean.getBoolean("latch.test.postgres")) PostgresTestSupport.eliminarFuncionRecibo();
         SesionUsuario.cerrarSesion();
     }
 
@@ -131,6 +133,9 @@ class ApiTasasTest {
         assertFalse(creada.autorizada());
         assertNull(creada.autorizadoPor());
         assertNull(creada.motivo());
+        var detalle = get("/api/v1/tasas/" + creada.id(), token);
+        assertEquals(200, detalle.statusCode());
+        assertEquals(creada, GSON.fromJson(detalle.body(), TasaResponse.class));
 
         ListaTasasResponse lista = GSON.fromJson(
                 get("/api/v1/tasas?fecha=" + FECHA, token).body(),
@@ -155,11 +160,24 @@ class ApiTasasTest {
     @Test
     void propietarioAutorizaYLaTasaQuedaVigente() throws Exception {
         String token = login(nombrePropietario);
+        var tx = new HibernateTransactions(factory);
+        Instant antes = instanteBd(tx);
         TasaResponse informativa = registrar(token, FECHA, "36.75", "BCN");
-
-        HttpResponse<String> respuesta = postJson(
-                "/api/v1/tasas/" + informativa.id() + "/autorizar",
-                "{\"motivo\":\"Tasa oficial verificada\"}", token);
+        String ruta = "/api/v1/tasas/" + informativa.id() + "/autorizar";
+        String solicitud = "{\"motivo\":\"Tasa oficial verificada\"}";
+        if (Boolean.getBoolean("latch.test.postgres")) {
+            PostgresTestSupport.impedirAuditoriaFinanciera(tx);
+            try {
+                var fallida = postJson(ruta, solicitud, token);
+                assertEquals(500, fallida.statusCode(), fallida.body());
+                assertEquals("ERROR_INTERNO", error(fallida).error().codigo());
+                assertEquals(0L, contar(tx, "select count(t) from TipoCambio t where t.autorizadoPor is not null"));
+            } finally {
+                PostgresTestSupport.permitirAuditoriaFinanciera(tx);
+            }
+        }
+        HttpResponse<String> respuesta = postJson(ruta, solicitud, token);
+        Instant despues = instanteBd(tx);
 
         assertEquals(200, respuesta.statusCode());
         TasaResponse autorizada = GSON.fromJson(respuesta.body(), TasaResponse.class);
@@ -172,6 +190,20 @@ class ApiTasasTest {
                 get("/api/v1/tasas/vigente?fecha=" + FECHA, token).body(),
                 TasaResponse.class);
         assertEquals(autorizada.id(), vigente.id());
+        for (TasaResponse tasa : List.of(informativa, autorizada)) {
+            var instante = OffsetDateTime.parse(tasa.registradoEn());
+            assertEquals(RelojService.ZONA_OPERATIVA.getRules().getOffset(instante.toInstant()),
+                    instante.getOffset());
+            assertFalse(instante.toInstant().isBefore(antes));
+            assertFalse(instante.toInstant().isAfter(despues));
+            String accion = tasa.autorizada() ? "TASA_AUTORIZADA" : "TASA_REGISTRADA";
+            assertEquals(1L, tx.ejecutar(sesion -> sesion.createQuery("""
+                    select count(a) from Auditoria a
+                    where a.accion = :accion and a.referencia = :referencia and a.actor.nombre = :actor
+                    """, Long.class).setParameter("accion", accion)
+                    .setParameter("referencia", "tasa:" + tasa.id())
+                    .setParameter("actor", nombrePropietario).getSingleResult()).longValue());
+        }
     }
 
     @Test
@@ -256,6 +288,7 @@ class ApiTasasTest {
         assertEquals(404, postJson("/api/v1/tasas/" + UUID.randomUUID() + "/autorizar",
                 "{\"motivo\":\"No existe\"}", token).statusCode());
         assertEquals(400, get("/api/v1/tasas/no-es-uuid", token).statusCode());
+        assertEquals(400, get("/api/v1/tasas/vigente;dato=valor", token).statusCode());
         assertEquals(404, get("/api/v1/tasas/vigente?fecha=" + FECHA, token).statusCode());
     }
 
@@ -279,11 +312,21 @@ class ApiTasasTest {
         assertEquals(ayer.fecha(), autorizadas.get(0).fecha());
     }
 
+    private static Instant instanteBd(HibernateTransactions tx) {
+        return tx.ejecutar(sesion -> new RelojService().leer(sesion).instante());
+    }
+
+    private static long contar(HibernateTransactions tx, String hql) {
+        return tx.ejecutar(sesion -> sesion.createQuery(hql, Long.class).getSingleResult());
+    }
+
     private static TasaResponse registrar(String token, LocalDate fecha, String tasa,
                                           String fuente) throws Exception {
         HttpResponse<String> respuesta = postJson("/api/v1/tasas",
                 GSON.toJson(new TasaRequest(fecha.toString(), tasa, fuente)), token);
         assertEquals(201, respuesta.statusCode(), respuesta.body());
+        assertTrue(com.google.gson.JsonParser.parseString(respuesta.body()).getAsJsonObject()
+                .get("nioPorUsd").getAsJsonPrimitive().isString());
         return GSON.fromJson(respuesta.body(), TasaResponse.class);
     }
 

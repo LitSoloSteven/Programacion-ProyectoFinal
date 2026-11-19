@@ -1,5 +1,8 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.service;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.AplicacionPago;
@@ -306,11 +309,9 @@ class CargoServiceTest {
         T get() throws SQLException;
     }
 
+    @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
     private static final class WrappedSqlException extends RuntimeException {
         private final SQLException sqlException;
 
-        private WrappedSqlException(SQLException sqlException) {
-            this.sqlException = sqlException;
-        }
     }
 }

@@ -1,6 +1,5 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun;
 
-import com.sun.net.httpserver.HttpExchange;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -16,11 +15,9 @@ public final class LectorCuerpo {
 
     private LectorCuerpo() { }
 
-    public static String leerJson(HttpExchange intercambio) throws IOException {
-        String tipo = intercambio.getRequestHeaders().getFirst("Content-Type");
+    public static String leerJson(String tipo, String longitud, InputStream cuerpo) throws IOException {
         if (!esJson(tipo)) throw ExcepcionApi.contenidoNoSoportado();
 
-        String longitud = intercambio.getRequestHeaders().getFirst("Content-Length");
         if (longitud != null && !longitud.isBlank()) {
             try {
                 if (Long.parseLong(longitud.strip()) > LIMITE_BYTES) {
@@ -34,7 +31,7 @@ public final class LectorCuerpo {
         ByteArrayOutputStream salida = new ByteArrayOutputStream();
         byte[] buffer = new byte[8192];
         long total = 0;
-        try (InputStream entrada = intercambio.getRequestBody()) {
+        try (InputStream entrada = cuerpo) {
             int leidos;
             while ((leidos = entrada.read(buffer)) != -1) {
                 total += leidos;

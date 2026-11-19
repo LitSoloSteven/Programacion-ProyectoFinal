@@ -8,12 +8,10 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.Propi
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PropiedadRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.UnidadEstadoRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.UnidadRequest;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ContextoPeticion;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.PeticionApi;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ExcepcionApi;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.Json;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.LectorCuerpo;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.RespuestaJson;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.Router;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 
 import java.util.Objects;
@@ -32,37 +30,11 @@ public final class RutasCatalogos {
         this.servicio = Objects.requireNonNull(servicio);
     }
 
-    public void registrar(Router router) {
-        router.registrar("GET", "/api/v1/propiedades", false, this::listarPropiedades);
-        router.registrar("GET", "/api/v1/propiedades/{id}", false, this::obtenerPropiedad);
-        router.registrar("POST", "/api/v1/propiedades", false, this::crearPropiedad);
-        router.registrar("PUT", "/api/v1/propiedades/{id}", false, this::actualizarPropiedad);
-        router.registrar("PATCH", "/api/v1/propiedades/{id}", false, this::cambiarEstadoPropiedad);
-
-        router.registrar("GET", "/api/v1/unidades", false, this::listarUnidades);
-        router.registrar("GET", "/api/v1/unidades/{id}", false, this::obtenerUnidad);
-        router.registrar("POST", "/api/v1/unidades", false, this::crearUnidad);
-        router.registrar("PUT", "/api/v1/unidades/{id}", false, this::actualizarUnidad);
-        router.registrar("PATCH", "/api/v1/unidades/{id}", false, this::cambiarEstadoUnidad);
-
-        router.registrar("GET", "/api/v1/inquilinos", false, this::listarInquilinos);
-        router.registrar("GET", "/api/v1/inquilinos/{id}", false, this::obtenerInquilino);
-        router.registrar("POST", "/api/v1/inquilinos", false, this::crearInquilino);
-        router.registrar("PUT", "/api/v1/inquilinos/{id}", false, this::actualizarInquilino);
-        router.registrar("PATCH", "/api/v1/inquilinos/{id}", false, this::cambiarEstadoInquilino);
-
-        router.registrar("GET", "/api/v1/contratos", false, this::listarContratos);
-        router.registrar("GET", "/api/v1/contratos/{id}", false, this::obtenerContrato);
-        router.registrar("POST", "/api/v1/contratos", false, this::crearContrato);
-        router.registrar("PUT", "/api/v1/contratos/{id}", false, this::actualizarContrato);
-        router.registrar("PATCH", "/api/v1/contratos/{id}", false, this::cambiarEstadoContrato);
-    }
-
     // ------------------------------------------------------------------
     // Propiedades
     // ------------------------------------------------------------------
 
-    private RespuestaJson listarPropiedades(ContextoPeticion contexto) {
+    public RespuestaJson listarPropiedades(PeticionApi contexto) {
         int pagina = pagina(contexto.consulta("pagina"));
         int tamano = tamano(contexto.consulta("tamano"));
         Boolean activa = booleano(contexto.consulta("activa"), "activa");
@@ -71,17 +43,17 @@ public final class RutasCatalogos {
                 () -> servicio.listarPropiedades(pagina, tamano, texto, activa)));
     }
 
-    private RespuestaJson obtenerPropiedad(ContextoPeticion contexto) {
+    public RespuestaJson obtenerPropiedad(PeticionApi contexto) {
         UUID id = identificador(contexto.parametro("id"));
         return RespuestaJson.ok(enSesion(contexto, () -> servicio.obtenerPropiedad(id)));
     }
 
-    private RespuestaJson crearPropiedad(ContextoPeticion contexto) throws Exception {
+    public RespuestaJson crearPropiedad(PeticionApi contexto) throws Exception {
         PropiedadRequest solicitud = leer(contexto, PropiedadRequest.class);
         return RespuestaJson.creado(enSesion(contexto, () -> servicio.crearPropiedad(solicitud)));
     }
 
-    private RespuestaJson actualizarPropiedad(ContextoPeticion contexto) throws Exception {
+    public RespuestaJson actualizarPropiedad(PeticionApi contexto) throws Exception {
         UUID id = identificador(contexto.parametro("id"));
         PropiedadRequest solicitud = leer(contexto, PropiedadRequest.class);
         long version = version(solicitud.version());
@@ -89,7 +61,7 @@ public final class RutasCatalogos {
                 () -> servicio.actualizarPropiedad(id, version, solicitud)));
     }
 
-    private RespuestaJson cambiarEstadoPropiedad(ContextoPeticion contexto) throws Exception {
+    public RespuestaJson cambiarEstadoPropiedad(PeticionApi contexto) throws Exception {
         UUID id = identificador(contexto.parametro("id"));
         PropiedadEstadoRequest solicitud = leer(contexto, PropiedadEstadoRequest.class);
         return RespuestaJson.ok(enSesion(contexto,
@@ -101,7 +73,7 @@ public final class RutasCatalogos {
     // Unidades
     // ------------------------------------------------------------------
 
-    private RespuestaJson listarUnidades(ContextoPeticion contexto) {
+    public RespuestaJson listarUnidades(PeticionApi contexto) {
         int pagina = pagina(contexto.consulta("pagina"));
         int tamano = tamano(contexto.consulta("tamano"));
         UUID propiedadId = uuidOpcional(contexto.consulta("propiedadId"), "propiedadId");
@@ -112,17 +84,17 @@ public final class RutasCatalogos {
                 () -> servicio.listarUnidades(pagina, tamano, propiedadId, estado, tipo, texto)));
     }
 
-    private RespuestaJson obtenerUnidad(ContextoPeticion contexto) {
+    public RespuestaJson obtenerUnidad(PeticionApi contexto) {
         UUID id = identificador(contexto.parametro("id"));
         return RespuestaJson.ok(enSesion(contexto, () -> servicio.obtenerUnidad(id)));
     }
 
-    private RespuestaJson crearUnidad(ContextoPeticion contexto) throws Exception {
+    public RespuestaJson crearUnidad(PeticionApi contexto) throws Exception {
         UnidadRequest solicitud = leer(contexto, UnidadRequest.class);
         return RespuestaJson.creado(enSesion(contexto, () -> servicio.crearUnidad(solicitud)));
     }
 
-    private RespuestaJson actualizarUnidad(ContextoPeticion contexto) throws Exception {
+    public RespuestaJson actualizarUnidad(PeticionApi contexto) throws Exception {
         UUID id = identificador(contexto.parametro("id"));
         UnidadRequest solicitud = leer(contexto, UnidadRequest.class);
         long version = version(solicitud.version());
@@ -130,7 +102,7 @@ public final class RutasCatalogos {
                 () -> servicio.actualizarUnidad(id, version, solicitud)));
     }
 
-    private RespuestaJson cambiarEstadoUnidad(ContextoPeticion contexto) throws Exception {
+    public RespuestaJson cambiarEstadoUnidad(PeticionApi contexto) throws Exception {
         UUID id = identificador(contexto.parametro("id"));
         UnidadEstadoRequest solicitud = leer(contexto, UnidadEstadoRequest.class);
         return RespuestaJson.ok(enSesion(contexto,
@@ -141,7 +113,7 @@ public final class RutasCatalogos {
     // Inquilinos
     // ------------------------------------------------------------------
 
-    private RespuestaJson listarInquilinos(ContextoPeticion contexto) {
+    public RespuestaJson listarInquilinos(PeticionApi contexto) {
         int pagina = pagina(contexto.consulta("pagina"));
         int tamano = tamano(contexto.consulta("tamano"));
         Boolean activo = booleano(contexto.consulta("activo"), "activo");
@@ -150,17 +122,17 @@ public final class RutasCatalogos {
                 () -> servicio.listarInquilinos(pagina, tamano, activo, texto)));
     }
 
-    private RespuestaJson obtenerInquilino(ContextoPeticion contexto) {
+    public RespuestaJson obtenerInquilino(PeticionApi contexto) {
         UUID id = identificador(contexto.parametro("id"));
         return RespuestaJson.ok(enSesion(contexto, () -> servicio.obtenerInquilino(id)));
     }
 
-    private RespuestaJson crearInquilino(ContextoPeticion contexto) throws Exception {
+    public RespuestaJson crearInquilino(PeticionApi contexto) throws Exception {
         InquilinoRequest solicitud = leer(contexto, InquilinoRequest.class);
         return RespuestaJson.creado(enSesion(contexto, () -> servicio.crearInquilino(solicitud)));
     }
 
-    private RespuestaJson actualizarInquilino(ContextoPeticion contexto) throws Exception {
+    public RespuestaJson actualizarInquilino(PeticionApi contexto) throws Exception {
         UUID id = identificador(contexto.parametro("id"));
         InquilinoRequest solicitud = leer(contexto, InquilinoRequest.class);
         long version = version(solicitud.version());
@@ -168,7 +140,7 @@ public final class RutasCatalogos {
                 () -> servicio.actualizarInquilino(id, version, solicitud)));
     }
 
-    private RespuestaJson cambiarEstadoInquilino(ContextoPeticion contexto) throws Exception {
+    public RespuestaJson cambiarEstadoInquilino(PeticionApi contexto) throws Exception {
         UUID id = identificador(contexto.parametro("id"));
         InquilinoEstadoRequest solicitud = leer(contexto, InquilinoEstadoRequest.class);
         return RespuestaJson.ok(enSesion(contexto,
@@ -180,7 +152,7 @@ public final class RutasCatalogos {
     // Contratos
     // ------------------------------------------------------------------
 
-    private RespuestaJson listarContratos(ContextoPeticion contexto) {
+    public RespuestaJson listarContratos(PeticionApi contexto) {
         int pagina = pagina(contexto.consulta("pagina"));
         int tamano = tamano(contexto.consulta("tamano"));
         String estado = contexto.consulta("estado");
@@ -190,17 +162,17 @@ public final class RutasCatalogos {
                 () -> servicio.listarContratos(pagina, tamano, estado, unidadId, inquilinoId)));
     }
 
-    private RespuestaJson obtenerContrato(ContextoPeticion contexto) {
+    public RespuestaJson obtenerContrato(PeticionApi contexto) {
         UUID id = identificador(contexto.parametro("id"));
         return RespuestaJson.ok(enSesion(contexto, () -> servicio.obtenerContrato(id)));
     }
 
-    private RespuestaJson crearContrato(ContextoPeticion contexto) throws Exception {
+    public RespuestaJson crearContrato(PeticionApi contexto) throws Exception {
         ContratoRequest solicitud = leer(contexto, ContratoRequest.class);
         return RespuestaJson.creado(enSesion(contexto, () -> servicio.crearContrato(solicitud)));
     }
 
-    private RespuestaJson actualizarContrato(ContextoPeticion contexto) throws Exception {
+    public RespuestaJson actualizarContrato(PeticionApi contexto) throws Exception {
         UUID id = identificador(contexto.parametro("id"));
         ContratoRequest solicitud = leer(contexto, ContratoRequest.class);
         long version = version(solicitud.version());
@@ -208,7 +180,7 @@ public final class RutasCatalogos {
                 () -> servicio.actualizarContrato(id, version, solicitud)));
     }
 
-    private RespuestaJson cambiarEstadoContrato(ContextoPeticion contexto) throws Exception {
+    public RespuestaJson cambiarEstadoContrato(PeticionApi contexto) throws Exception {
         UUID id = identificador(contexto.parametro("id"));
         ContratoEstadoRequest solicitud = leer(contexto, ContratoEstadoRequest.class);
         return RespuestaJson.ok(enSesion(contexto,
@@ -219,11 +191,11 @@ public final class RutasCatalogos {
     // Utilidades de frontera
     // ------------------------------------------------------------------
 
-    private static <T> T leer(ContextoPeticion contexto, Class<T> tipo) throws Exception {
-        return Json.leer(LectorCuerpo.leerJson(contexto.intercambio()), tipo);
+    private static <T> T leer(PeticionApi contexto, Class<T> tipo) throws Exception {
+        return Json.leer(contexto.leerCuerpo(), tipo);
     }
 
-    private <T> T enSesion(ContextoPeticion contexto, Supplier<T> operacion) {
+    private <T> T enSesion(PeticionApi contexto, Supplier<T> operacion) {
         return SesionUsuario.ejecutarComo(contexto.sesion().comoUsuario(),
                 () -> servicio.enTransaccion(operacion));
     }
