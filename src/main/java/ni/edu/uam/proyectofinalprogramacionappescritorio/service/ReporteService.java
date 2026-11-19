@@ -6,6 +6,7 @@ import net.sf.jasperreports.engine.JasperExportManager;
 import net.sf.jasperreports.engine.JasperFillManager;
 import net.sf.jasperreports.engine.JasperPrint;
 import net.sf.jasperreports.engine.JasperReport;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propiedad;
 import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
@@ -29,6 +30,7 @@ public final class ReporteService {
     private static final String PLANTILLA_RECIBO = "/reportes/recibo.jrxml";
     private static final String PLANTILLA_PAGOS_TABLA = "/reportes/pagos_tabla.jrxml";
     private static final String PLANTILLA_CONTRATOS_OCUPACION = "/reportes/contratos_ocupacion.jrxml";
+    private static final String PLANTILLA_PROPIEDADES_UNIDADES = "/reportes/propiedades_unidades.jrxml";
 
     private final HibernateTransactions tx;
     private final PermisoService permisos = new PermisoService();
@@ -352,4 +354,128 @@ public final class ReporteService {
         public BigDecimal getCanon() { return canon; }
         public String getMoneda() { return moneda; }
     }
+
+    public static final class FilaPropiedadUnidadReporte {
+        private final String propiedad;
+        private final String direccion;
+        private final String estadoPropiedad;
+        private final String codigoUnidad;
+        private final String tipoUnidad;
+        private final String estadoUnidad;
+        private final BigDecimal canonReferencia;
+        private final String moneda;
+
+        public FilaPropiedadUnidadReporte(String propiedad,
+                                          String direccion,
+                                          String estadoPropiedad,
+                                          String codigoUnidad,
+                                          String tipoUnidad,
+                                          String estadoUnidad,
+                                          BigDecimal canonReferencia,
+                                          String moneda) {
+            this.propiedad = propiedad;
+            this.direccion = direccion;
+            this.estadoPropiedad = estadoPropiedad;
+            this.codigoUnidad = codigoUnidad;
+            this.tipoUnidad = tipoUnidad;
+            this.estadoUnidad = estadoUnidad;
+            this.canonReferencia = canonReferencia;
+            this.moneda = moneda;
+        }
+
+        public String getPropiedad() { return propiedad; }
+        public String getDireccion() { return direccion; }
+        public String getEstadoPropiedad() { return estadoPropiedad; }
+        public String getCodigoUnidad() { return codigoUnidad; }
+        public String getTipoUnidad() { return tipoUnidad; }
+        public String getEstadoUnidad() { return estadoUnidad; }
+        public BigDecimal getCanonReferencia() { return canonReferencia; }
+        public String getMoneda() { return moneda; }
+    }
+
+
+    /**
+     * Genera el PDF del inventario de propiedades y sus unidades registrado en la base de datos.
+     */
+    public byte[] generarReportePropiedadesPdf() {
+        List<FilaPropiedadUnidadReporte> filas = tx.ejecutar(session -> {
+            permisos.exigir(session, SesionUsuario.getActual(), Permiso.CONSULTAR_REPORTES);
+
+            List<Propiedad> propiedades = session
+                    .createQuery("select distinct p from Propiedad p left join fetch p.unidades order by p.nombre", Propiedad.class)
+                    .getResultList();
+
+            List<FilaPropiedadUnidadReporte> resultado = new java.util.ArrayList<>();
+            for (Propiedad propiedad : propiedades) {
+                if (propiedad == null) continue;
+
+                String nombrePropiedad = propiedad.getNombre() != null && !propiedad.getNombre().isBlank()
+                        ? propiedad.getNombre() : "—";
+                String direccion = propiedad.getDireccion() != null && !propiedad.getDireccion().isBlank()
+                        ? propiedad.getDireccion() : "—";
+                String estadoPropiedad = propiedad.getEstadoTexto();
+
+                List<Unidad> unidadesDePropiedad = propiedad.getUnidades();
+                if (unidadesDePropiedad == null || unidadesDePropiedad.isEmpty()) {
+                    resultado.add(new FilaPropiedadUnidadReporte(
+                            nombrePropiedad,
+                            direccion,
+                            estadoPropiedad,
+                            "—",
+                            "Sin unidades",
+                            "—",
+                            BigDecimal.ZERO,
+                            ""
+                    ));
+                } else {
+                    for (Unidad u : unidadesDePropiedad) {
+                        if (u == null) continue;
+                        String codigo = u.getCodigo() != null && !u.getCodigo().isBlank() ? u.getCodigo() : "—";
+                        String tipo = u.getTipo() != null && !u.getTipo().isBlank() ? u.getTipo() : "—";
+                        String estadoUnidad = u.getEstado() != null && !u.getEstado().isBlank() ? u.getEstado() : "—";
+                        String moneda = u.getMoneda() != null && !u.getMoneda().isBlank() ? u.getMoneda() : "";
+
+                        resultado.add(new FilaPropiedadUnidadReporte(
+                                nombrePropiedad,
+                                direccion,
+                                estadoPropiedad,
+                                codigo,
+                                tipo,
+                                estadoUnidad,
+                                u.getCanonReferencia(),
+                                moneda
+                        ));
+                    }
+                }
+            }
+            return resultado;
+        });
+
+        if (filas.isEmpty()) {
+            throw new IllegalArgumentException("No hay propiedades registradas para generar el reporte.");
+        }
+
+        int totalUnidades = (int) filas.stream()
+                .filter(f -> !"Sin unidades".equals(f.getTipoUnidad()))
+                .count();
+        int ocupadas = (int) filas.stream()
+                .map(FilaPropiedadUnidadReporte::getEstadoUnidad)
+                .filter(Objects::nonNull)
+                .map(s -> s.strip().toLowerCase(Locale.ROOT))
+                .filter(s -> s.equals("ocupada") || s.equals("ocupado"))
+                .count();
+
+        SesionUsuario usuarioActual = SesionUsuario.getActual();
+        Map<String, Object> parametros = new HashMap<>();
+        parametros.put("TITULO_SISTEMA", "LATCH — Inventario de Propiedades y Unidades");
+        parametros.put("GENERADO_POR", usuarioActual != null ? usuarioActual.getNombre() : "Sistema");
+        parametros.put("TOTAL_FILAS", filas.size());
+        parametros.put("TOTAL_UNIDADES", totalUnidades);
+        parametros.put("UNIDADES_OCUPADAS", ocupadas);
+
+        return exportarPdf(PLANTILLA_PROPIEDADES_UNIDADES, parametros, filas);
+    }
+
+
+
 }

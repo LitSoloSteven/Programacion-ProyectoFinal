@@ -1,5 +1,6 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
 
+import javafx.stage.FileChooser;
 import lombok.RequiredArgsConstructor;
 
 import javafx.collections.FXCollections;
@@ -29,6 +30,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteExc
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propiedad;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ConflictoDatosException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PropiedadService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ReporteService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AccionesTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
@@ -39,7 +41,10 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PanelEstadoTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
 
+import java.awt.*;
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.List;
@@ -49,6 +54,7 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class PropiedadController {
     @FXML private VBox rootView;
+    @FXML private Button btnGenerarReportePropiedades;
     @FXML private HBox eliminarTooltipHost;
     @FXML private Button btnNuevo;
     @FXML private Button btnRefrescar;
@@ -66,6 +72,7 @@ public class PropiedadController {
     @FXML private TableColumn<Propiedad, Void> colAcciones;
 
     private final ClienteCatalogos catalogos = new ClienteCatalogos(ClienteLatch.api());
+    private final ReporteService reporteService = new ReporteService();
     private final PropiedadService propiedadService;
     private final ObservableList<Propiedad> registros = FXCollections.observableArrayList();
     private final FilteredList<Propiedad> filtrados = new FilteredList<>(registros, item -> true);
@@ -231,4 +238,79 @@ public class PropiedadController {
                 || error instanceof IllegalStateException) return error.getMessage();
         return "No se pudo guardar la propiedad. Revisa los datos e inténtalo de nuevo.";
     }
+
+    @FXML
+    public void handleGenerarReportePropiedades() {
+        if (btnGenerarReportePropiedades != null) {
+            btnGenerarReportePropiedades.setDisable(true);
+        }
+
+        Task<byte[]> tareaGenerarPdf = new Task<>() {
+            @Override
+            protected byte[] call() {
+                return reporteService.generarReportePropiedadesPdf();
+            }
+        };
+
+        TareasJavaFx.ejecutar(
+                HelloApplication.instancia().getTareas(),
+                tareaGenerarPdf,
+                pdfBytes -> {
+                    if (btnGenerarReportePropiedades != null) {
+                        btnGenerarReportePropiedades.setDisable(false);
+                    }
+                    if (pdfBytes == null || pdfBytes.length == 0) {
+                        AlertaUtil.mostrarError("Error de reporte",
+                                "El reporte de propiedades generado está vacío.");
+                        return;
+                    }
+
+                    FileChooser fileChooser = new FileChooser();
+                    fileChooser.setTitle("Guardar reporte de propiedades y unidades");
+                    fileChooser.setInitialFileName("Reporte-Propiedades-Unidades.pdf");
+                    fileChooser.getExtensionFilters().add(
+                            new FileChooser.ExtensionFilter("Documento PDF (*.pdf)", "*.pdf")
+                    );
+
+                    Window ventana = (tblPropiedades != null && tblPropiedades.getScene() != null)
+                            ? tblPropiedades.getScene().getWindow()
+                            : null;
+                    File archivoDestino = fileChooser.showSaveDialog(ventana);
+
+                    if (archivoDestino != null) {
+                        try {
+                            Files.write(archivoDestino.toPath(), pdfBytes);
+                        } catch (Exception ex) {
+                            AlertaUtil.mostrarError("Error al guardar",
+                                    "No se pudo guardar el archivo PDF en disco.");
+                            return;
+                        }
+
+                        AlertaUtil.mostrarExito("Reporte listo",
+                                "El reporte de propiedades y unidades se guardó correctamente.");
+
+                        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
+                            try {
+                                Desktop.getDesktop().open(archivoDestino);
+                            } catch (Exception ex) {
+                                AlertaUtil.mostrarAdvertencia("No se pudo abrir automáticamente",
+                                        "El PDF se guardó bien, pero no se pudo abrir el visor automáticamente.");
+                            }
+                        }
+                    }
+                },
+                error -> {
+                    if (btnGenerarReportePropiedades != null) {
+                        btnGenerarReportePropiedades.setDisable(false);
+                    }
+                    String mensaje = (error != null && error.getMessage() != null && !error.getMessage().isBlank())
+                            ? error.getMessage()
+                            : "No se pudo generar el reporte de propiedades.";
+                    AlertaUtil.mostrarError("Error al generar reporte", mensaje);
+                }
+        );
+    }
+
+
+
 }

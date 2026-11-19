@@ -27,6 +27,9 @@
             <Button fx:id="btnEliminar" disable="true" onAction="#handleEliminar"
                     styleClass="button-destructive" text="Eliminar propiedad" />
         </HBox>
+        <Button fx:id="btnGenerarReportePropiedades"
+                text="Reporte Propiedades"
+                onAction="#handleGenerarReportePropiedades"/>
     </HBox>
     <Label fx:id="lblErrorConsulta" managed="false" minHeight="18.0" styleClass="field-error"
            text="" visible="false" wrapText="true" />

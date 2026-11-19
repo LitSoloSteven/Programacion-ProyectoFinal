@@ -33,6 +33,7 @@ public class Propiedad {
     @Setter
     private Propietario propietario;
     @OneToMany(mappedBy = "propiedad")
+    @Getter
     private java.util.List<Unidad> unidades = new java.util.ArrayList<>();
     @Column(nullable = false)
     @Getter
