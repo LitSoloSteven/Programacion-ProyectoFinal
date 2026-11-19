@@ -1,5 +1,10 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.modelo;
 
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
@@ -15,6 +20,8 @@ import java.util.UUID;
 @Table(name = "aplicacion_pago",
         uniqueConstraints = @UniqueConstraint(name = "uk_aplicacion_pago_pago_cargo",
                 columnNames = {"pago_id", "cargo_id"}))
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class AplicacionPago {
 
     @Id
@@ -22,6 +29,7 @@ public class AplicacionPago {
     private UUID id;
 
     @Column(name = "pago_id", nullable = false, updatable = false)
+    @Setter
     private UUID pagoId;
 
     @Column(name = "cargo_id", nullable = false, updatable = false)
@@ -29,8 +37,6 @@ public class AplicacionPago {
 
     @Column(nullable = false, precision = 19, scale = 2, updatable = false)
     private BigDecimal monto;
-
-    protected AplicacionPago() { }
 
     public AplicacionPago(UUID pagoId, UUID cargoId, BigDecimal monto) {
         this.pagoId = pagoId;
@@ -43,23 +49,4 @@ public class AplicacionPago {
         this.monto = normalizado;
     }
 
-    public UUID getId() {
-        return id;
-    }
-
-    public UUID getPagoId() {
-        return pagoId;
-    }
-
-    public void setPagoId(UUID pagoId) {
-        this.pagoId = pagoId;
-    }
-
-    public UUID getCargoId() {
-        return cargoId;
-    }
-
-    public BigDecimal getMonto() {
-        return monto;
-    }
 }

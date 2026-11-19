@@ -1,5 +1,9 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.modelo;
 
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import jakarta.persistence.*;
 import java.util.Locale;
 import java.util.Objects;
@@ -7,6 +11,8 @@ import java.util.Objects;
 @Entity
 @org.hibernate.annotations.Check(constraints = "rol in ('PROPIETARIO', 'ASISTENTE')")
 @Table(name = "usuario", uniqueConstraints = @UniqueConstraint(name = "uk_usuario_nombre", columnNames = "nombre"))
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Usuario {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -20,8 +26,6 @@ public class Usuario {
     private boolean activo = true;
     @Version
     private long version;
-
-    protected Usuario() {}
 
     public Usuario(String nombre, String passwordHash, String rol) {
         this.nombre = normalizarNombre(nombre);
@@ -37,12 +41,6 @@ public class Usuario {
         return nombre.strip().toLowerCase(Locale.ROOT);
     }
 
-    public Long getId() { return id; }
-    public String getNombre() { return nombre; }
-    public String getPasswordHash() { return passwordHash; }
-    public String getRol() { return rol; }
-    public boolean isActivo() { return activo; }
-    public long getVersion() { return version; }
     public void desactivar() { activo = false; }
     public void cambiarRol(String rol) {
         if (!Rol.esValido(rol)) throw new IllegalArgumentException("Rol inválido.");

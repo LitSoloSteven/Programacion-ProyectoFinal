@@ -1,5 +1,8 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.modelo;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -30,45 +33,68 @@ public class Contrato {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @Getter
+    @Setter
     private UUID id;
 
     @Column(name = "unidad_id", nullable = false)
+    @Getter
+    @Setter
     private UUID unidadId;
 
     @Transient
+    @Setter
     private String unidadInfo;
 
     @Column(name = "inquilino_id", nullable = false)
+    @Getter
+    @Setter
     private UUID inquilinoId;
 
     @Transient
+    @Setter
     private String inquilinoNombre;
 
     @Column(nullable = false)
+    @Getter
+    @Setter
     private LocalDate inicio;
 
     @Column(nullable = false)
+    @Getter
+    @Setter
     private LocalDate fin;
 
     @Column(precision = 19, scale = 2, nullable = false)
+    @Getter
+    @Setter
     private BigDecimal canon;
 
     @Column(length = 3, nullable = false)
+    @Getter
+    @Setter
     private String moneda;
 
     @Column(name = "dia_pago", nullable = false)
+    @Getter
+    @Setter
     private int diaPago;
 
     @OneToOne(mappedBy = "contrato", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Getter
     private Garantia garantiaSeguimiento;
 
     @Column(name = "deposito_pactado", nullable = false, precision = 19, scale = 2)
+    @Getter
     private BigDecimal depositoPactado = BigDecimal.ZERO;
 
     @Column(length = 24, nullable = false)
+    @Getter
     private String estado;
 
     @Version
+    @Getter
+    @Setter
     private long version;
 
     @ManyToOne(optional = false)
@@ -108,22 +134,6 @@ public class Contrato {
         this.version = version;
     }
 
-    public UUID getId() {
-        return id;
-    }
-
-    public void setId(UUID id) {
-        this.id = id;
-    }
-
-    public UUID getUnidadId() {
-        return unidadId;
-    }
-
-    public void setUnidadId(UUID unidadId) {
-        this.unidadId = unidadId;
-    }
-
     public void setUnidad(Unidad unidad) {
         this.unidad = unidad;
         this.unidadId = unidad == null ? null : unidad.getId();
@@ -133,18 +143,6 @@ public class Contrato {
         return unidad == null ? unidadInfo : unidad.toString();
     }
 
-    public void setUnidadInfo(String unidadInfo) {
-        this.unidadInfo = unidadInfo;
-    }
-
-    public UUID getInquilinoId() {
-        return inquilinoId;
-    }
-
-    public void setInquilinoId(UUID inquilinoId) {
-        this.inquilinoId = inquilinoId;
-    }
-
     public void setInquilino(Inquilino inquilino) {
         this.inquilino = inquilino;
         this.inquilinoId = inquilino == null ? null : inquilino.getId();
@@ -152,54 +150,6 @@ public class Contrato {
 
     public String getInquilinoNombre() {
         return inquilino == null ? inquilinoNombre : inquilino.getNombre();
-    }
-
-    public void setInquilinoNombre(String inquilinoNombre) {
-        this.inquilinoNombre = inquilinoNombre;
-    }
-
-    public LocalDate getInicio() {
-        return inicio;
-    }
-
-    public void setInicio(LocalDate inicio) {
-        this.inicio = inicio;
-    }
-
-    public LocalDate getFin() {
-        return fin;
-    }
-
-    public void setFin(LocalDate fin) {
-        this.fin = fin;
-    }
-
-    public BigDecimal getCanon() {
-        return canon;
-    }
-
-    public void setCanon(BigDecimal canon) {
-        this.canon = canon;
-    }
-
-    public String getMoneda() {
-        return moneda;
-    }
-
-    public void setMoneda(String moneda) {
-        this.moneda = moneda;
-    }
-
-    public int getDiaPago() {
-        return diaPago;
-    }
-
-    public void setDiaPago(int diaPago) {
-        this.diaPago = diaPago;
-    }
-
-    public Garantia getGarantiaSeguimiento() {
-        return garantiaSeguimiento;
     }
 
     public String getGarantiaSaldoFormateado() {
@@ -214,10 +164,6 @@ public class Contrato {
         }
     }
 
-    public BigDecimal getDepositoPactado() {
-        return this.depositoPactado;
-    }
-
     public void setDepositoPactado(BigDecimal depositoPactado) {
         DepositoPactado nuevoDeposito = new DepositoPactado(depositoPactado);
         BigDecimal montoPactado = nuevoDeposito.getMontoPactado();
@@ -225,10 +171,6 @@ public class Contrato {
             garantiaSeguimiento.actualizarMontoInicial(montoPactado);
         }
         this.depositoPactado = montoPactado;
-    }
-
-    public String getEstado() {
-        return estado;
     }
 
     public void setEstado(String estado) {
@@ -265,14 +207,6 @@ public class Contrato {
             terminadoEl = null;
         }
         estado = nuevoEstado;
-    }
-
-    public long getVersion() {
-        return version;
-    }
-
-    public void setVersion(long version) {
-        this.version = version;
     }
 
     public String getCanonFormateado() {

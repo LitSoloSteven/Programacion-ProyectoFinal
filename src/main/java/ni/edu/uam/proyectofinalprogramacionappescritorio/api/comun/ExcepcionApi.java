@@ -1,5 +1,7 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun;
 
+import lombok.Getter;
+
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojDesfasadoException;
 
 /**
@@ -7,6 +9,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojDesfasadoE
  * existentes: solo traduce una respuesta concreta a un código y un mensaje
  * seguro para el cliente.
  */
+@Getter
 public final class ExcepcionApi extends RuntimeException {
     private final int estado;
     private final String codigo;
@@ -16,9 +19,6 @@ public final class ExcepcionApi extends RuntimeException {
         this.estado = estado;
         this.codigo = codigo;
     }
-
-    public int getEstado() { return estado; }
-    public String getCodigo() { return codigo; }
 
     public static ExcepcionApi solicitudInvalida(String mensaje) {
         return new ExcepcionApi(400, "SOLICITUD_INVALIDA", mensaje);

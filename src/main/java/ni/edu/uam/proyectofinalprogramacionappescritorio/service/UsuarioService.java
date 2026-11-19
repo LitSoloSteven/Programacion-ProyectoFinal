@@ -1,19 +1,20 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.service;
 
+import lombok.RequiredArgsConstructor;
+
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.dao.UsuarioDao;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.*;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PasswordHasher;
 import java.util.UUID;
 
+@RequiredArgsConstructor
 public final class UsuarioService {
     private final HibernateTransactions transactions;
     private final PermisoService permisos = new PermisoService();
     private final AuditoriaService auditoria = new AuditoriaService();
     private final PasswordHasher passwords = new PasswordHasher();
     private final UsuarioDao usuarios = new UsuarioDao();
-
-    public UsuarioService(HibernateTransactions transactions) { this.transactions = transactions; }
 
     public Long crear(SesionUsuario identidad, String nombre, char[] password, String rol) {
         return transactions.ejecutar(session -> {

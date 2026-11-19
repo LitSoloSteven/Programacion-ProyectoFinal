@@ -1,5 +1,7 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.service;
 
+import lombok.RequiredArgsConstructor;
+
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.SesionApi;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.dao.UsuarioDao;
@@ -7,14 +9,13 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PasswordHasher;
 import java.util.UUID;
 
+@RequiredArgsConstructor
 public final class AutenticacionService {
     private final HibernateTransactions transactions;
     private final UsuarioDao usuarios = new UsuarioDao();
     private final PasswordHasher passwords = new PasswordHasher();
     private final AuditoriaService auditoria = new AuditoriaService();
     private final String hashInexistente = passwords.crear(UUID.randomUUID().toString().toCharArray());
-
-    public AutenticacionService(HibernateTransactions transactions) { this.transactions = transactions; }
 
     public SesionUsuario autenticar(String nombre, char[] password) {
         return autenticar(nombre, password, true, "desktop");
