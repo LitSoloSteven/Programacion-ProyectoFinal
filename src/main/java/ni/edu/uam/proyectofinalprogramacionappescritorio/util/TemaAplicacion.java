@@ -13,7 +13,9 @@ import javafx.scene.text.Font;
 import java.io.InputStream;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Optional;
 import java.util.WeakHashMap;
+import java.util.function.Consumer;
 import java.util.prefs.Preferences;
 
 /** Aplica de forma centralizada el tema y las preferencias de movimiento. */
@@ -21,14 +23,14 @@ public final class TemaAplicacion {
     public enum Tema { CLARO, OSCURO }
 
     private static final String CSS = "/ni/edu/uam/proyectofinalprogramacionappescritorio/estilos.css";
-    private static final Preferences PREFERENCIAS = Preferences.userNodeForPackage(TemaAplicacion.class);
+    private static final Optional<Preferences> PREFERENCIAS = cargarPreferencias();
     private static final Map<Scene, Boolean> ESCENAS = Collections.synchronizedMap(new WeakHashMap<>());
     private static final Map<DialogPane, Boolean> DIALOGOS = Collections.synchronizedMap(new WeakHashMap<>());
     @Getter
     private static volatile Tema tema = leerTema();
     @Getter
     private static volatile boolean movimientoReducido =
-            PREFERENCIAS.getBoolean("movimientoReducido", false);
+            PREFERENCIAS.map(p -> p.getBoolean("movimientoReducido", false)).orElse(false);
 
     private TemaAplicacion() { }
 
@@ -88,7 +90,7 @@ public final class TemaAplicacion {
     public static void establecerTema(Tema nuevoTema) {
         if (nuevoTema == null) return;
         tema = nuevoTema;
-        PREFERENCIAS.put("tema", nuevoTema.name());
+        guardarPreferencia(p -> p.put("tema", nuevoTema.name()));
         ejecutarFx(() -> {
             synchronized (ESCENAS) {
                 ESCENAS.keySet().forEach(scene -> aplicarClase(scene.getRoot()));
@@ -101,7 +103,7 @@ public final class TemaAplicacion {
 
     public static void establecerMovimientoReducido(boolean reducido) {
         movimientoReducido = reducido;
-        PREFERENCIAS.putBoolean("movimientoReducido", reducido);
+        guardarPreferencia(p -> p.putBoolean("movimientoReducido", reducido));
         ejecutarFx(() -> {
             if (reducido) TransicionesUI.finalizarActivas();
             synchronized (ESCENAS) {
@@ -115,9 +117,26 @@ public final class TemaAplicacion {
 
     private static Tema leerTema() {
         try {
-            return Tema.valueOf(PREFERENCIAS.get("tema", Tema.CLARO.name()));
+            return PREFERENCIAS.map(p -> Tema.valueOf(p.get("tema", Tema.CLARO.name())))
+                    .orElse(Tema.CLARO);
         } catch (IllegalArgumentException error) {
             return Tema.CLARO;
+        }
+    }
+
+    private static Optional<Preferences> cargarPreferencias() {
+        try {
+            return Optional.of(Preferences.userNodeForPackage(TemaAplicacion.class));
+        } catch (SecurityException error) {
+            return Optional.empty();
+        }
+    }
+
+    private static void guardarPreferencia(Consumer<Preferences> guardar) {
+        try {
+            PREFERENCIAS.ifPresent(guardar);
+        } catch (SecurityException error) {
+            // El cambio se conserva durante la sesión aunque el sistema impida guardarlo.
         }
     }
 
