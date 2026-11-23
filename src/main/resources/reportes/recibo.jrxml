@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport name="recibo" pageWidth="595" pageHeight="842"
+              columnWidth="499" leftMargin="48" rightMargin="48" topMargin="42" bottomMargin="42">
+    <parameter name="TITULO_SISTEMA" class="java.lang.String"/>
+    <parameter name="GENERADO_POR" class="java.lang.String"/>
+
+    <field name="numero" class="java.lang.Long"/>
+    <field name="fechaPago" class="java.time.LocalDate"/>
+    <field name="contratoInfo" class="java.lang.String"/>
+    <field name="montoOriginal" class="java.math.BigDecimal"/>
+    <field name="monedaOriginal" class="java.lang.String"/>
+    <field name="montoContrato" class="java.math.BigDecimal"/>
+    <field name="monedaContrato" class="java.lang.String"/>
+    <field name="metodo" class="java.lang.String"/>
+    <field name="referencia" class="java.lang.String"/>
+    <field name="anulado" class="java.lang.Boolean"/>
+
+    <title height="55">
+        <element kind="textField" x="0" y="0" width="499" height="22" fontSize="14.0" bold="true">
+            <expression><![CDATA[$P{TITULO_SISTEMA}]]></expression>
+        </element>
+        <element kind="staticText" x="0" y="24" width="499" height="25" fontSize="17.0" bold="true">
+            <text><![CDATA[Recibo de pago]]></text>
+        </element>
+    </title>
+    <detail>
+        <band height="150" splitType="Stretch">
+            <element kind="textField" x="0" y="0" width="250" height="19" bold="true">
+                <expression><![CDATA["Recibo n.º " + $F{numero}]]></expression>
+            </element>
+            <element kind="textField" x="250" y="0" width="249" height="19" hTextAlign="Right">
+                <expression><![CDATA["Fecha de pago: " + $F{fechaPago}]]></expression>
+            </element>
+            <element kind="textField" x="0" y="25" width="499" height="18" textAdjust="StretchHeight">
+                <expression><![CDATA["Contrato: " + $F{contratoInfo}]]></expression>
+            </element>
+            <element kind="textField" positionType="Float" x="0" y="48" width="499" height="18">
+                <expression><![CDATA["Monto recibido: " + $F{montoOriginal}.toPlainString() + " " + $F{monedaOriginal}]]></expression>
+            </element>
+            <element kind="textField" positionType="Float" x="0" y="70" width="499" height="18">
+                <expression><![CDATA["Monto en moneda del contrato: " + $F{montoContrato}.toPlainString()
+                        + ($F{monedaContrato} == null ? "" : " " + $F{monedaContrato})]]></expression>
+            </element>
+            <element kind="textField" positionType="Float" x="0" y="92" width="499" height="18" textAdjust="StretchHeight">
+                <expression><![CDATA["Método: " + $F{metodo}
+                        + ($F{referencia}.isBlank() ? "" : " | Referencia: " + $F{referencia})]]></expression>
+            </element>
+            <element kind="textField" positionType="Float" x="0" y="118" width="499" height="18" bold="true">
+                <expression><![CDATA["Estado: " + (Boolean.TRUE.equals($F{anulado}) ? "Anulado" : "Vigente")]]></expression>
+            </element>
+        </band>
+    </detail>
+    <pageFooter height="20">
+        <element kind="textField" x="0" y="0" width="499" height="18" forecolor="#475569" fontSize="9.0">
+            <expression><![CDATA["Generado por: " + $P{GENERADO_POR}]]></expression>
+        </element>
+    </pageFooter>
+</jasperReport>

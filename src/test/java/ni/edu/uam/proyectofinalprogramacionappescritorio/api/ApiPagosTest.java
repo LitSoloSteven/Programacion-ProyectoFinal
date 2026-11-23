@@ -31,6 +31,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.TipoCambio;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Unidad;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ReporteService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PasswordHasher;
 import org.hibernate.SessionFactory;
@@ -420,6 +421,14 @@ class ApiPagosTest {
         assertTrue(com.google.gson.JsonParser.parseString(reciboRespuesta.body()).getAsJsonObject()
                 .get("montoOriginal").getAsJsonPrimitive().isString());
         assertFalse(recibo.anulado());
+
+        try (var identidad = SesionUsuario.paraSesionAutenticada(
+                idPropietario, nombrePropietario, Rol.PROPIETARIO)) {
+            byte[] pdf = SesionUsuario.ejecutarComo(identidad, () ->
+                    new ReporteService(tx).generarPdfPago(UUID.fromString(registro.pagoId())));
+            assertTrue(pdf.length > 5);
+            assertEquals("%PDF-", new String(pdf, 0, 5, StandardCharsets.US_ASCII));
+        }
 
         assertEquals(404, get("/api/v1/pagos/" + UUID.randomUUID(), token).statusCode());
         assertEquals(404, get("/api/v1/recibos/999999", token).statusCode());
