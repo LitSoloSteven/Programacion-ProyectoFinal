@@ -6,6 +6,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ParserMonto;
 import org.hibernate.Session;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -82,6 +83,16 @@ public final class TipoCambioService {
 
     public LocalDate fechaOperativa() {
         return transactions.ejecutar(session -> reloj.leer(session).fecha());
+    }
+
+    public TipoCambio consultarInformativa(ClienteTipoCambio cliente)
+            throws IOException, InterruptedException {
+        Objects.requireNonNull(cliente, "Falta el cliente de tipo de cambio.");
+        transactions.ejecutar(session -> {
+            permisos.exigir(session, SesionUsuario.getActual(), Permiso.CONSULTAR_REPORTES);
+            return null;
+        });
+        return cliente.consultar();
     }
 
     public TipoCambio registrar(LocalDate fecha, BigDecimal tasa, String fuente) {

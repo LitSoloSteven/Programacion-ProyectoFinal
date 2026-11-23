@@ -1,5 +1,6 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.service;
 
+import com.google.gson.Strictness;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.TipoCambio;
@@ -98,7 +99,7 @@ public final class ClienteTipoCambio {
         BigDecimal nio = null;
         boolean vioResultado = false, vioBase = false, vioRates = false;
         try (JsonReader json = new JsonReader(new StringReader(cuerpo))) {
-            json.setLenient(false);
+            json.setStrictness(Strictness.STRICT);
             json.beginObject();
             while (json.hasNext()) {
                 String campo = json.nextName();
