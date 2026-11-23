@@ -1,76 +1,151 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
 
+import javafx.concurrent.Task;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.stage.Stage;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.AutenticacionService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.dto.LoginResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteAuth;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TemaAplicacion;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
 
 import java.io.IOException;
-import java.util.Arrays;
 
+/**
+ * Inicio de sesión contra la API local. La identidad resultante se establece
+ * como sesión de JavaFX para que los servicios existentes sigan funcionando.
+ */
 public class LoginController {
     @FXML private TextField txtUsuario;
     @FXML private PasswordField txtPassword;
-    @FXML private Label lblMensajeError;
+    @FXML private Label lblErrorUsuario;
+    @FXML private Label lblErrorPassword;
+    @FXML private Button btnIngresar;
 
     @FXML
     public void initialize() {
-        lblMensajeError.setVisible(false);
-        lblMensajeError.setManaged(false);
+        Iconos.asignar(btnIngresar, Iconos.Nombre.ENTRAR, 16);
+        ocultarError(lblErrorUsuario);
+        ocultarError(lblErrorPassword);
     }
 
     @FXML
     public void handleLogin(ActionEvent event) {
         String nombre = txtUsuario.getText();
-        char[] password = txtPassword.getText().toCharArray();
-        try {
-            SesionUsuario sesion = new AutenticacionService(
-                    new HibernateTransactions(HibernateUtil.getSessionFactory()))
-                    .autenticar(nombre, password);
-            abrirDashboard(event);
-        } catch (IllegalArgumentException e) {
-            mostrarError(e.getMessage());
-        } catch (IllegalStateException e) {
-            mostrarError("No se pudo conectar con la base de datos. Compruebe la configuración local.");
-        } finally {
-            Arrays.fill(password, '\0');
-            txtPassword.clear();
+        String password = txtPassword.getText();
+        ocultarError(lblErrorUsuario);
+        ocultarError(lblErrorPassword);
+        boolean invalido = false;
+        if (nombre == null || nombre.isBlank()) {
+            mostrarError(lblErrorUsuario, "Escribe tu nombre de usuario.");
+            invalido = true;
         }
+        if (password == null || password.isEmpty()) {
+            mostrarError(lblErrorPassword, "Escribe tu contraseña.");
+            invalido = true;
+        }
+        if (invalido) {
+            ni.edu.uam.proyectofinalprogramacionappescritorio.util.ValidacionFormulario.mostrar(
+                    lblErrorUsuario.isVisible() ? lblErrorUsuario : lblErrorPassword,
+                    lblErrorUsuario, lblErrorPassword);
+            return;
+        }
+
+        btnIngresar.setDisable(true);
+        btnIngresar.setText("Ingresando…");
+        Task<LoginResponse> tarea = new Task<>() {
+            @Override
+            protected LoginResponse call() {
+                return new ClienteAuth(ClienteLatch.api()).login(nombre, password);
+            }
+        };
+        tarea.setOnSucceeded(evento -> {
+            try {
+                LoginResponse respuesta = tarea.getValue();
+                SesionUsuario.establecer(SesionUsuario.paraSesionAutenticada(
+                        respuesta.usuarioId(), respuesta.nombre(), respuesta.rol()));
+                abrirDashboard(event);
+            } catch (RuntimeException e) {
+                SesionUsuario.cerrarSesion();
+                mostrarError(lblErrorPassword, "No fue posible validar la sesión. Inténtalo nuevamente.");
+            } finally {
+                finalizarIntento();
+            }
+        });
+        tarea.setOnFailed(evento -> {
+            mostrarError(lblErrorPassword, mensaje(tarea.getException()));
+            finalizarIntento();
+            txtPassword.requestFocus();
+        });
+        try {
+            HelloApplication.instancia().getTareas().ejecutar(tarea);
+        } catch (RuntimeException e) {
+            btnIngresar.setDisable(false);
+            btnIngresar.setText("Ingresar");
+            mostrarError(lblErrorPassword, "No se pudo iniciar sesión. Inténtalo nuevamente.");
+        }
+    }
+
+    private String mensaje(Throwable error) {
+        if (error instanceof ErrorClienteException cliente) {
+            if (cliente.esSinConexion()) {
+                return "No se pudo conectar con el servicio local de Latch. "
+                        + "Verifique que la aplicación siga iniciada.";
+            }
+            return cliente.getMessage();
+        }
+        if (error instanceof IllegalArgumentException e) {
+            return e.getMessage();
+        }
+        return "No se pudo iniciar sesión. Inténtelo nuevamente.";
     }
 
     private void abrirDashboard(ActionEvent event) {
         try {
             Parent root = new FXMLLoader(HelloApplication.class.getResource("dashboard-view.fxml")).load();
             Stage stage = (Stage) ((Node) event.getSource()).getScene().getWindow();
-            Scene scene = new Scene(root, 1100, 720);
-            var css = HelloApplication.class.getResource("estilos.css");
-            if (css != null) scene.getStylesheets().add(css.toExternalForm());
+            Scene scene = new Scene(root, 1366, 820);
+            TemaAplicacion.aplicar(scene);
             stage.setTitle("Latch — Sistema de Gestión Inmobiliaria");
             stage.setScene(scene);
-            stage.setMinWidth(960);
-            stage.setMinHeight(640);
+            stage.setResizable(true);
+            stage.setMinWidth(1100);
+            stage.setMinHeight(700);
             stage.centerOnScreen();
             stage.show();
         } catch (IOException e) {
             SesionUsuario.cerrarSesion();
-            mostrarError("No se pudo cargar la vista principal del sistema.");
+            mostrarError(lblErrorPassword, "No se pudo abrir el panel principal. Inténtalo nuevamente.");
         }
     }
 
-    private void mostrarError(String mensaje) {
-        lblMensajeError.setText(mensaje == null ? "No se pudo iniciar sesión." : mensaje);
-        lblMensajeError.setVisible(true);
-        lblMensajeError.setManaged(true);
+    private void mostrarError(Label campo, String mensaje) {
+        campo.setText(mensaje == null ? "No se pudo iniciar sesión." : mensaje);
+        campo.setVisible(true);
+        campo.setManaged(true);
+    }
+
+    private void ocultarError(Label campo) {
+        campo.setText("");
+        campo.setVisible(false);
+        campo.setManaged(false);
+    }
+
+    private void finalizarIntento() {
+        txtPassword.clear();
+        btnIngresar.setDisable(false);
+        btnIngresar.setText("Ingresar");
     }
 }

@@ -1,7 +1,13 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.modelo;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import jakarta.persistence.*;
+import org.hibernate.annotations.Generated;
+import org.hibernate.generator.EventType;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -14,29 +20,64 @@ public class Pago {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @Getter
+    @Setter
     private UUID id;
     @Column(name = "contrato_id", updatable = false, nullable = false)
+    @Getter
+    @Setter
     private UUID contratoId;
     @Transient
+    @Setter
     private String contratoInfo;
     @Column(name = "fecha_pago", updatable = false, nullable = false)
+    @Getter
+    @Setter
     private LocalDate fechaPago;
+    @Generated(event = EventType.INSERT)
+    @Column(name = "creado_en", insertable = false, updatable = false, nullable = false,
+            columnDefinition = "TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP")
+    @Getter
+    private Instant creadoEn;
     @Column(name = "moneda_original", length = 3, updatable = false, nullable = false)
+    @Getter
+    @Setter
     private String monedaOriginal;
     @Column(name = "monto_original", precision = 19, scale = 2, updatable = false, nullable = false)
+    @Getter
+    @Setter
     private BigDecimal montoOriginal;
     @Column(name = "monto_contrato", precision = 19, scale = 2, updatable = false, nullable = false)
+    @Getter
     private BigDecimal montoContrato;
-    @Column(name = "monto_contrato", insertable = false, updatable = false, precision = 19, scale = 2)
-    private BigDecimal montoContratoLegacy;
     @Column(length = 24, updatable = false, nullable = false)
+    @Getter
+    @Setter
     private String metodo;
     @Column(length = 100, updatable = false)
+    @Getter
+    @Setter
     private String referencia;
     @Column(length = 255, updatable = false)
+    @Getter
+    @Setter
     private String notas;
     @Column(length = 24, nullable = false)
+    @Getter
+    @Setter
     private String estado;
+
+    // Campos de anulación: se escriben cuando el pago cambia a "Anulado",
+    // por eso no pueden marcarse como updatable = false.
+    @Column(name = "motivo_anulacion", length = 500)
+    @Getter
+    private String motivoAnulacion;
+    @Column(name = "anulado_por")
+    @Getter
+    private Long anuladoPor;
+    @Column(name = "anulado_en")
+    @Getter
+    private Instant anuladoEn;
 
 
     @ManyToOne(optional = false)
@@ -44,12 +85,12 @@ public class Pago {
     private Contrato contrato;
 
     @Column(name = "moneda_contrato", length = 3, nullable = false, updatable = false)
+    @Getter
     private String monedaContrato;
-    @Column(name = "moneda_contrato", insertable = false, updatable = false, length = 3)
-    private String monedaContratoLegacy;
 
     @ManyToOne
     @JoinColumn(name = "tipo_cambio_id", updatable = false)
+    @Getter
     private TipoCambio tipoCambio;
 
     @Version
@@ -80,92 +121,24 @@ public class Pago {
         this.estado = estado;
     }
 
-    public UUID getId() {
-        return id;
-    }
-
-    public void setId(UUID id) {
-        this.id = id;
-    }
-
-    public UUID getContratoId() {
-        return contratoId;
-    }
-
-    public void setContratoId(UUID contratoId) {
-        this.contratoId = contratoId;
-    }
-
     public String getContratoInfo() {
         return contrato == null ? contratoInfo : contrato.toString();
     }
 
-    public void setContratoInfo(String contratoInfo) {
-        this.contratoInfo = contratoInfo;
-    }
-
-    public LocalDate getFechaPago() {
-        return fechaPago;
-    }
-
-    public void setFechaPago(LocalDate fechaPago) {
-        this.fechaPago = fechaPago;
-    }
-
-    public String getMonedaOriginal() {
-        return monedaOriginal;
-    }
-
-    public void setMonedaOriginal(String monedaOriginal) {
-        this.monedaOriginal = monedaOriginal;
-    }
-
-    public BigDecimal getMontoOriginal() {
-        return montoOriginal;
-    }
-
-    public void setMontoOriginal(BigDecimal montoOriginal) {
-        this.montoOriginal = montoOriginal;
-    }
-
-    public BigDecimal getMontoContrato() {
-        return montoContrato;
-    }
 
     public void setMontoContrato(BigDecimal montoContrato) {
         this.montoContrato = montoContrato;
     }
 
-    public String getMetodo() {
-        return metodo;
-    }
-
-    public void setMetodo(String metodo) {
-        this.metodo = metodo;
-    }
-
-    public String getReferencia() {
-        return referencia;
-    }
-
-    public void setReferencia(String referencia) {
-        this.referencia = referencia;
-    }
-
-    public String getNotas() {
-        return notas;
-    }
-
-    public void setNotas(String notas) {
-        this.notas = notas;
-    }
-
-    public String getEstado() {
-        return estado;
-    }
-
-    public void setEstado(String estado) {
-        this.estado = estado;
+    /**
+     * Anula el pago conservando el motivo y el actor. La comprobación de
+     * permisos y del estado previo corresponde al Service.
+     */
+    public void anular(String motivo, Long usuarioId, Instant instante) {
+        this.estado = "Anulado";
+        this.motivoAnulacion = motivo;
+        this.anuladoPor = usuarioId;
+        this.anuladoEn = instante;
     }
 
     public String getMontoFormateado() {
@@ -176,14 +149,6 @@ public class Pago {
     @Override
     public String toString() {
         return "Pago " + getMontoFormateado() + " (" + fechaPago + ")";
-    }
-
-    public String getMonedaContrato() {
-        return monedaContrato;
-    }
-
-    public TipoCambio getTipoCambio() {
-        return tipoCambio;
     }
 
     public void aplicarConversion(String monedaContrato, BigDecimal montoContrato, TipoCambio tipoCambio) {

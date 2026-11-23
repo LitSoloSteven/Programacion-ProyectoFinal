@@ -6,23 +6,42 @@ module ni.edu.uam.proyectofinalprogramacionappescritorio {
     requires java.sql;
     requires java.naming;
     requires org.postgresql.jdbc;
+    requires jdk.httpserver;
     requires java.net.http;
+    requires java.prefs;
     requires com.google.gson;
+    requires static lombok;
+    requires spring.boot;
+    requires spring.boot.autoconfigure;
+    requires spring.boot.tomcat;
+    requires spring.boot.web.server;
+    requires spring.beans;
+    requires spring.context;
+    requires spring.core;
+    requires spring.web;
+    requires spring.webmvc;
+    requires org.apache.tomcat.embed.core;
+    requires net.sf.jasperreports.core;
+    requires java.desktop;
+
 
     opens ni.edu.uam.proyectofinalprogramacionappescritorio to javafx.fxml;
     exports ni.edu.uam.proyectofinalprogramacionappescritorio;
-
-    opens ni.edu.uam.proyectofinalprogramacionappescritorio.entity
-            to org.hibernate.orm.core;
-    opens ni.edu.uam.proyectofinalprogramacionappescritorio.controller
-            to javafx.fxml;
-    opens ni.edu.uam.proyectofinalprogramacionappescritorio.modelo
-            to org.hibernate.orm.core, javafx.base;
-
+    opens ni.edu.uam.proyectofinalprogramacionappescritorio.controller to javafx.fxml;
+    opens ni.edu.uam.proyectofinalprogramacionappescritorio.modelo to org.hibernate.orm.core, javafx.base;
     exports ni.edu.uam.proyectofinalprogramacionappescritorio.modelo;
     exports ni.edu.uam.proyectofinalprogramacionappescritorio.dto;
     exports ni.edu.uam.proyectofinalprogramacionappescritorio.config;
-    exports ni.edu.uam.proyectofinalprogramacionappescritorio.entity;
     exports ni.edu.uam.proyectofinalprogramacionappescritorio.service;
     exports ni.edu.uam.proyectofinalprogramacionappescritorio.util;
+    opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun to com.google.gson;
+    opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.dto to com.google.gson;
+    opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto to com.google.gson;
+    opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto to com.google.gson;
+    opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.validaciones.dto to com.google.gson;
+    opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto to com.google.gson;
+    opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.indicadores.dto to com.google.gson;
+    opens ni.edu.uam.proyectofinalprogramacionappescritorio.dto to com.google.gson;
+    opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.piloto
+            to spring.core, spring.beans, spring.context, spring.web, org.apache.tomcat.embed.core;
 }

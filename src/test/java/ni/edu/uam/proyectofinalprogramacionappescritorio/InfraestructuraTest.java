@@ -1,13 +1,15 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio;
 
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.*;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.*;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.*;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.*;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PasswordHasher;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.*;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -22,8 +24,7 @@ class InfraestructuraTest {
     @BeforeAll static void iniciar() {
         Properties p;
         if (Boolean.getBoolean("latch.test.postgres")) {
-            // Usar exclusivamente una base desechable: las tablas se crean y eliminan en esta suite.
-            p = DatabaseConfig.desdeEntorno(System.getenv());
+            p = PostgresTestSupport.propiedadesHibernate();
         } else {
             p = new Properties();
             p.setProperty("hibernate.connection.driver_class", "org.h2.Driver");
@@ -34,11 +35,19 @@ class InfraestructuraTest {
         p.setProperty("hibernate.hbm2ddl.auto", "create-drop");
         p.setProperty("hibernate.jdbc.time_zone", "UTC");
         factory = HibernateUtil.construir(p);
+        if (Boolean.getBoolean("latch.test.postgres")) {
+            PostgresTestSupport.aplicarMigraciones(p);
+        }
         tx = new HibernateTransactions(factory);
         hash = new PasswordHasher().crear(PASSWORD);
     }
 
-    @AfterAll static void cerrar() { if (factory != null) factory.close(); }
+    @AfterAll static void cerrar() {
+        if (factory != null) factory.close();
+        if (Boolean.getBoolean("latch.test.postgres")) {
+            PostgresTestSupport.eliminarFuncionRecibo();
+        }
+    }
 
     private Usuario crearUsuario(String rol) {
         return tx.ejecutar(session -> {
@@ -91,11 +100,12 @@ class InfraestructuraTest {
     @Test void duplicadoRevierteTransaccionYPermiteReintentar() {
         Usuario existente = crearUsuario(Rol.ASISTENTE);
         String clave = UUID.randomUUID().toString();
-        assertThrows(IllegalStateException.class, () -> tx.ejecutar(session -> {
+        IllegalStateException error = assertThrows(IllegalStateException.class, () -> tx.ejecutar(session -> {
             session.persist(new Configuracion(clave, "no debe persistirse"));
             session.persist(new Usuario(existente.getNombre(), hash, Rol.ASISTENTE));
             return null;
         }));
+        assertEquals("Ya existe un registro con esos datos.", error.getMessage());
         assertNull(tx.ejecutar(session -> session.find(Configuracion.class, clave)));
         assertNotNull(crearUsuario(Rol.ASISTENTE).getId());
     }
@@ -156,6 +166,58 @@ class InfraestructuraTest {
                 Contrato.class).getResultList()));
     }
 
+    @Test void persisteContratoConDepositoPactadoYGarantia() {
+        verificarPersistenciaContratoConDeposito(new BigDecimal("500.00"));
+    }
+
+    @Test void persisteContratoConDepositoCeroCuandoFormularioVacio() {
+        verificarPersistenciaContratoConDeposito(BigDecimal.ZERO);
+    }
+
+    private void verificarPersistenciaContratoConDeposito(BigDecimal depositoEsperado) {
+        tx.ejecutar(session -> {
+            String identificador = UUID.randomUUID().toString();
+
+            Propiedad propiedad = new Propiedad();
+            propiedad.setNombre("Propiedad " + identificador);
+            propiedad.setDireccion("Dirección de prueba");
+            session.persist(propiedad);
+            session.flush();
+
+            Unidad unidad = new Unidad();
+            unidad.setPropiedadId(propiedad.getId());
+            unidad.setCodigo("unidad-" + identificador.substring(0, 12));
+            unidad.setCanonReferencia(new BigDecimal("450.00"));
+            session.persist(unidad);
+
+            Inquilino inquilino = new Inquilino();
+            inquilino.setNombre("Inquilino " + identificador);
+            session.persist(inquilino);
+            session.flush();
+
+            Contrato contrato = new Contrato();
+            contrato.setUnidadId(unidad.getId());
+            contrato.setInquilinoId(inquilino.getId());
+            contrato.setInicio(LocalDate.of(2026, 1, 1));
+            contrato.setFin(LocalDate.of(2027, 1, 1));
+            contrato.setCanon(new BigDecimal("450.00"));
+            contrato.setDepositoPactado(depositoEsperado);
+            contrato.inicializarGarantiaSeguimiento();
+            session.persist(contrato);
+            session.flush();
+
+            UUID contratoId = contrato.getId();
+            session.clear();
+
+            Contrato recargado = session.find(Contrato.class, contratoId);
+            assertNotNull(recargado);
+            assertEquals(0, depositoEsperado.compareTo(recargado.getDepositoPactado()));
+            assertNotNull(recargado.getGarantiaSeguimiento());
+            assertEquals(0, depositoEsperado.compareTo(recargado.getGarantiaSeguimiento().getMontoInicial()));
+            return null;
+        });
+    }
+
     @Test void versionImpideSobrescribirConfiguracionObsoleta() {
         try (SesionUsuario propietario = login(crearUsuario(Rol.PROPIETARIO))) {
             ConfiguracionService service = new ConfiguracionService(tx);
@@ -163,8 +225,31 @@ class InfraestructuraTest {
             service.guardar(propietario, clave, "original", -1);
             long version = service.consultar(propietario, clave).getVersion();
             service.guardar(propietario, clave, "nuevo", version);
-            assertThrows(IllegalArgumentException.class, () -> service.guardar(propietario, clave, "obsoleto", version));
+            ConflictoDatosException conflicto = assertThrows(ConflictoDatosException.class,
+                    () -> service.guardar(propietario, clave, "obsoleto", version));
+            assertEquals("La configuración cambió. Actualiza los datos antes de guardar.",
+                    conflicto.getMessage());
             assertEquals("nuevo", service.consultar(propietario, clave).getValor());
+        }
+    }
+
+    @Test void eliminarConfiguracionProduceConflictoAlGuardarConVersionAnterior() {
+        try (SesionUsuario propietario = login(crearUsuario(Rol.PROPIETARIO))) {
+            ConfiguracionService service = new ConfiguracionService(tx);
+            String clave = UUID.randomUUID().toString();
+            service.guardar(propietario, clave, "original", -1);
+            long version = service.consultar(propietario, clave).getVersion();
+
+            tx.ejecutar(session -> {
+                session.remove(session.find(Configuracion.class, clave));
+                return null;
+            });
+
+            ConflictoDatosException conflicto = assertThrows(ConflictoDatosException.class,
+                    () -> service.guardar(propietario, clave, "obsoleto", version));
+            assertEquals("La configuración cambió o ya no existe. Actualiza los datos antes de guardar.",
+                    conflicto.getMessage());
+            assertNull(service.consultar(propietario, clave));
         }
     }
 

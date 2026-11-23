@@ -1,6 +1,5 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.config;
 
-import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.*;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.*;
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;
@@ -36,7 +35,9 @@ public final class HibernateUtil {
                 .addAnnotatedClass(Propietario.class).addAnnotatedClass(Garantia.class)
                 .addAnnotatedClass(Inquilino.class).addAnnotatedClass(Contrato.class)
                 .addAnnotatedClass(Cargo.class).addAnnotatedClass(Pago.class)
-                .addAnnotatedClass(TipoCambio.class).addAnnotatedClass(Recibo.class);
+                .addAnnotatedClass(TipoCambio.class).addAnnotatedClass(Recibo.class)
+                .addAnnotatedClass(AplicacionPago.class)
+                .addAnnotatedClass(SolicitudIdempotente.class);
         for (Class<?> entidad : entidadesAdicionales) cfg.addAnnotatedClass(entidad);
         try {
             return cfg.buildSessionFactory();

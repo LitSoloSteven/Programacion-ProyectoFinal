@@ -1,5 +1,8 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.modelo;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 import java.sql.Timestamp;
@@ -17,23 +20,41 @@ public class Inquilino {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @Getter
+    @Setter
     private UUID id;
     @Column(length = 160, nullable = false)
+    @Getter
+    @Setter
     private String nombre;
     @Column(length = 40, unique = true)
+    @Getter
+    @Setter
     private String identificacion;
     @Column(length = 30)
+    @Getter
+    @Setter
     private String telefono;
     @Column(length = 254)
+    @Getter
+    @Setter
     private String correo;
     @Column(name = "contacto_emergencia", length = 200)
+    @Getter
+    @Setter
     private String contactoEmergencia;
     @Column(nullable = false)
+    @Getter
+    @Setter
     private boolean activo;
     @CreationTimestamp
     @Column(name = "creado_en", updatable = false, nullable = false)
+    @Getter
+    @Setter
     private Timestamp creadoEn;
     @Version
+    @Getter
+    @Setter
     private long version;
 
     public Inquilino() {
@@ -55,80 +76,8 @@ public class Inquilino {
         this.version = version;
     }
 
-    public UUID getId() {
-        return id;
-    }
-
-    public void setId(UUID id) {
-        this.id = id;
-    }
-
-    public String getNombre() {
-        return nombre;
-    }
-
-    public void setNombre(String nombre) {
-        this.nombre = nombre;
-    }
-
-    public String getIdentificacion() {
-        return identificacion;
-    }
-
-    public void setIdentificacion(String identificacion) {
-        this.identificacion = identificacion;
-    }
-
-    public String getTelefono() {
-        return telefono;
-    }
-
-    public void setTelefono(String telefono) {
-        this.telefono = telefono;
-    }
-
-    public String getCorreo() {
-        return correo;
-    }
-
-    public void setCorreo(String correo) {
-        this.correo = correo;
-    }
-
-    public String getContactoEmergencia() {
-        return contactoEmergencia;
-    }
-
-    public void setContactoEmergencia(String contactoEmergencia) {
-        this.contactoEmergencia = contactoEmergencia;
-    }
-
-    public boolean isActivo() {
-        return activo;
-    }
-
-    public void setActivo(boolean activo) {
-        this.activo = activo;
-    }
-
     public String getEstadoTexto() {
         return activo ? "Activo" : "Inactivo";
-    }
-
-    public Timestamp getCreadoEn() {
-        return creadoEn;
-    }
-
-    public void setCreadoEn(Timestamp creadoEn) {
-        this.creadoEn = creadoEn;
-    }
-
-    public long getVersion() {
-        return version;
-    }
-
-    public void setVersion(long version) {
-        this.version = version;
     }
 
     public boolean esCorreoValido() {

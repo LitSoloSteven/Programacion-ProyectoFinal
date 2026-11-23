@@ -1,238 +1,316 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
 
+import javafx.stage.FileChooser;
+import lombok.RequiredArgsConstructor;
+
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
+import javafx.concurrent.Task;
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.scene.control.*;
-import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Node;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.Label;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+import javafx.stage.Window;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PropiedadRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteCatalogos;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propiedad;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ConflictoDatosException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PropiedadService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ReporteService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AccionesTabla;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AtajosLista;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.DialogoFormulario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoTabla;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PanelEstadoTabla;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
 
+import java.awt.*;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.List;
+import java.util.Locale;
 
-/**
- * Controlador de la vista de Propiedad.
- * Conecta la interfaz con PropiedadService, valida entradas, gestiona confirmaciones
- * y actualiza la TableView con datos reales de PostgreSQL.
- */
+/** Lista de propiedades y responsable del ciclo de guardado con PropiedadService. */
+@RequiredArgsConstructor
 public class PropiedadController {
+    @FXML private VBox rootView;
+    @FXML private Button btnGenerarReportePropiedades;
+    @FXML private HBox eliminarTooltipHost;
+    @FXML private Button btnNuevo;
+    @FXML private Button btnRefrescar;
+    @FXML private Button btnLimpiar;
+    @FXML private Button btnEliminar;
+    @FXML private Label lblTitulo;
+    @FXML private Label lblContador;
+    @FXML private Label lblErrorConsulta;
+    @FXML private TextField txtBuscar;
+    @FXML private TableView<Propiedad> tblPropiedades;
+    @FXML private TableColumn<Propiedad, String> colNombre;
+    @FXML private TableColumn<Propiedad, String> colDireccion;
+    @FXML private TableColumn<Propiedad, String> colEstado;
+    @FXML private TableColumn<Propiedad, Timestamp> colFecha;
+    @FXML private TableColumn<Propiedad, Void> colAcciones;
 
-    @FXML
-    private TextField txtNombre;
-
-    @FXML
-    private TextField txtDireccion;
-
-    @FXML
-    private TextField txtNombrePropietario;
-
-    @FXML
-    private TextField txtCorreoPropietario;
-
-    @FXML
-    private TextField txtTelefonoPropietario;
-
-    @FXML
-    private CheckBox chkActiva;
-
-    @FXML
-    private Button btnEliminar;
-
-    @FXML
-    private TextField txtBuscar;
-
-    @FXML
-    private TableView<Propiedad> tblPropiedades;
-
-    @FXML
-    private TableColumn<Propiedad, String> colNombre;
-
-    @FXML
-    private TableColumn<Propiedad, String> colDireccion;
-
-    @FXML
-    private TableColumn<Propiedad, String> colEstado;
-
-    @FXML
-    private TableColumn<Propiedad, Timestamp> colFecha;
-
+    private final ClienteCatalogos catalogos = new ClienteCatalogos(ClienteLatch.api());
+    private final ReporteService reporteService = new ReporteService();
     private final PropiedadService propiedadService;
-    private final ObservableList<Propiedad> listaPropiedades = FXCollections.observableArrayList();
-    private FilteredList<Propiedad> listaFiltrada;
+    private final ObservableList<Propiedad> registros = FXCollections.observableArrayList();
+    private final FilteredList<Propiedad> filtrados = new FilteredList<>(registros, item -> true);
+    private Propiedad seleccionada;
+    private final boolean permisoEliminar = SesionUsuario.esPropietario();
+    private long versionConsulta;
 
-    private Propiedad propiedadSeleccionada = null;
-
-    public PropiedadController() {
-        this.propiedadService = new PropiedadService();
-    }
-
-    public PropiedadController(PropiedadService propiedadService) {
-        this.propiedadService = propiedadService;
-    }
-
-    @FXML
-    public void initialize() {
-        configurarTabla();
-        configurarFiltro();
-        aplicarControlPermisos();
+    public PropiedadController() { this(HelloApplication.instancia().getComposicion().propiedades()); }
+    @FXML public void initialize() {
+        lblTitulo.setGraphic(Iconos.crear(Iconos.Nombre.PROPIEDAD, 20));
+        Iconos.asignar(btnRefrescar, Iconos.Nombre.ACTUALIZAR, 16);
+        Iconos.asignar(btnNuevo, Iconos.Nombre.MAS, 16);
+        Iconos.asignar(btnLimpiar, Iconos.Nombre.CERRAR, 14);
+        Iconos.asignar(btnEliminar, Iconos.Nombre.ELIMINAR, 16);
+        Tooltip.install(eliminarTooltipHost, new Tooltip(permisoEliminar
+                ? "Selecciona una propiedad para eliminarla." : "Solo el propietario puede eliminar propiedades."));
+        btnEliminar.setDisable(true);
+        tblPropiedades.setItems(filtrados);
+        tblPropiedades.setPlaceholder(PanelEstadoTabla.crear("Cargando propiedades",
+                "El listado aparecerá al terminar la consulta.", null, null));
+        colNombre.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getNombre()));
+        colDireccion.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getDireccion()));
+        colEstado.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getEstadoTexto()));
+        colEstado.setCellFactory(FormatoTabla.estado());
+        colFecha.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyObjectWrapper<>(c.getValue().getCreadoEn()));
+        colFecha.setCellFactory(FormatoTabla.fechaHora());
+        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>(
+                "Editar propiedad", this::abrirEdicion, Iconos.Nombre.EDITAR)));
+        tblPropiedades.getSelectionModel().selectedItemProperty().addListener((obs, anterior, actual) -> {
+            seleccionada = actual;
+            btnEliminar.setDisable(actual == null || !permisoEliminar);
+        });
+        txtBuscar.textProperty().addListener((obs, anterior, actual) -> aplicarFiltro(actual));
+        AtajosLista.instalar(rootView, txtBuscar, this::handleNuevo);
+        aplicarFiltro("");
         cargarDatos();
-
-        tblPropiedades.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null) {
-                seleccionarPropiedad(newVal);
-            }
-        });
     }
 
-    private void configurarTabla() {
-        colNombre.setCellValueFactory(new PropertyValueFactory<>("nombre"));
-        colDireccion.setCellValueFactory(new PropertyValueFactory<>("direccion"));
-        colEstado.setCellValueFactory(new PropertyValueFactory<>("estadoTexto"));
-        colFecha.setCellValueFactory(new PropertyValueFactory<>("creadoEn"));
-
-        listaFiltrada = new FilteredList<>(listaPropiedades, p -> true);
-        tblPropiedades.setItems(listaFiltrada);
-    }
-
-    private void configurarFiltro() {
-        txtBuscar.textProperty().addListener((obs, oldVal, newVal) -> {
-            listaFiltrada.setPredicate(prop -> {
-                if (newVal == null || newVal.isBlank()) return true;
-                String filtro = newVal.toLowerCase().trim();
-                boolean coincideNombre = prop.getNombre() != null && prop.getNombre().toLowerCase().contains(filtro);
-                boolean coincideDireccion = prop.getDireccion() != null && prop.getDireccion().toLowerCase().contains(filtro);
-                return coincideNombre || coincideDireccion;
-            });
-        });
-    }
-
-    private void aplicarControlPermisos() {
-        boolean esAdmin = SesionUsuario.esPropietario();
-        btnEliminar.setVisible(esAdmin);
-        btnEliminar.setManaged(esAdmin);
+    private void aplicarFiltro(String texto) {
+        String filtro = texto == null ? "" : texto.strip().toLowerCase(Locale.ROOT);
+        filtrados.setPredicate(propiedad -> filtro.isEmpty()
+                || propiedad.getNombre().toLowerCase(Locale.ROOT).contains(filtro)
+                || propiedad.getDireccion().toLowerCase(Locale.ROOT).contains(filtro));
+        lblContador.setText(filtrados.size() + (filtrados.size() == 1 ? " registro" : " registros"));
+        tblPropiedades.setPlaceholder(PanelEstadoTabla.crear(filtro.isEmpty() ? "Aún no hay propiedades" : "No hay coincidencias",
+                filtro.isEmpty() ? "Las propiedades registradas aparecerán aquí." : "Prueba con otro término o limpia la búsqueda.",
+                filtro.isEmpty() ? "Nueva propiedad" : "Limpiar búsqueda",
+                filtro.isEmpty() ? this::handleNuevo : this::limpiarFiltros));
     }
 
     public void cargarDatos() {
-        try {
-            List<Propiedad> datos = propiedadService.listarTodas();
-            listaPropiedades.setAll(datos);
-        } catch (SQLException e) {
-            AlertaUtil.mostrarError("Error al cargar propiedades", "No fue posible consultar los inmuebles desde PostgreSQL.");
-        }
-    }
-
-    @FXML
-    public void refrescarTabla() {
-        cargarDatos();
-        limpiarFormulario();
-        AlertaUtil.mostrarExito("Tabla actualizada", "Los datos de propiedades han sido sincronizados con PostgreSQL.");
-    }
-
-    @FXML
-    public void handleGuardar() {
-        String nombre = txtNombre.getText();
-        String direccion = txtDireccion.getText();
-        boolean activa = chkActiva.isSelected();
-
-        // Validaciones previas
-        if (nombre == null || nombre.trim().isEmpty()) {
-            AlertaUtil.mostrarAdvertencia("Campo obligatorio", "Debe ingresar el nombre del inmueble.");
-            txtNombre.requestFocus();
-            return;
-        }
-
-        if (direccion == null || direccion.trim().isEmpty()) {
-            AlertaUtil.mostrarAdvertencia("Campo obligatorio", "Debe ingresar la dirección completa de la propiedad.");
-            txtDireccion.requestFocus();
-            return;
-        }
-
-        try {
-            if (propiedadSeleccionada == null) {
-                // Registro nuevo
-                Propiedad nueva = new Propiedad();
-                nueva.setNombre(nombre.trim());
-                nueva.setDireccion(direccion.trim());
-                nueva.setActiva(activa);
-                propiedadService.guardar(nueva, txtNombrePropietario.getText(), txtCorreoPropietario.getText(), txtTelefonoPropietario.getText());
-                AlertaUtil.mostrarExito("Registro exitoso", "La propiedad ha sido registrada correctamente en PostgreSQL.");
-            } else {
-                // Edición
-                propiedadSeleccionada.setNombre(nombre.trim());
-                propiedadSeleccionada.setDireccion(direccion.trim());
-                propiedadSeleccionada.setActiva(activa);
-                propiedadService.guardar(propiedadSeleccionada, txtNombrePropietario.getText(), txtCorreoPropietario.getText(), txtTelefonoPropietario.getText());
-                AlertaUtil.mostrarExito("Actualización exitosa", "Los datos de la propiedad han sido actualizados en PostgreSQL.");
+        btnRefrescar.setDisable(true);
+        long version = ++versionConsulta;
+        Task<List<Propiedad>> tarea = new Task<>() {
+            @Override protected List<Propiedad> call() throws SQLException { return catalogos.propiedades(false); }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
+            if (version != versionConsulta) return;
+            registros.setAll(datos);
+            aplicarFiltro(txtBuscar.getText());
+            ocultarError();
+            btnRefrescar.setDisable(false);
+        }, error -> {
+            if (version == versionConsulta) {
+                lblErrorConsulta.setText("No se pudieron cargar las propiedades. Vuelve a intentarlo.");
+                lblErrorConsulta.setVisible(true);
+                lblErrorConsulta.setManaged(true);
+                tblPropiedades.setPlaceholder(PanelEstadoTabla.crear("No se pudieron cargar las propiedades",
+                        "Vuelve a intentarlo.", "Reintentar", this::cargarDatos));
             }
+            btnRefrescar.setDisable(false);
+        });
+    }
 
+    @FXML public void refrescarTabla() { cargarDatos(); }
+    @FXML public void handleNuevo() { abrirFormulario(null); }
+    private void abrirEdicion(Propiedad propiedad) { abrirFormulario(propiedad); }
+
+    private void abrirFormulario(Propiedad existente) {
+        try {
+            FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource("propiedad-form.fxml"));
+            Node contenido = loader.load();
+            PropiedadFormController formulario = loader.getController();
+            if (existente != null) formulario.cargar(existente);
+            Window propietario = tblPropiedades.getScene() == null ? null : tblPropiedades.getScene().getWindow();
+            boolean nueva = existente == null;
+            Dialog<javafx.scene.control.ButtonType> dialogo = DialogoFormulario.crear(
+                    nueva ? "Nueva propiedad" : "Editar propiedad", contenido, propietario, 620, 600,
+                    nueva ? "Guardar propiedad" : "Guardar cambios");
+            DialogoFormulario.protegerCambiosSinGuardar(dialogo, nueva ? btnNuevo : tblPropiedades, formulario::hayCambios);
+            ButtonType tipoAccion = dialogo.getDialogPane().getButtonTypes().getFirst();
+            Button accion = (Button) dialogo.getDialogPane().lookupButton(tipoAccion);
+            accion.addEventFilter(ActionEvent.ACTION, evento -> {
+                evento.consume();
+                if (!formulario.validar()) return;
+                PropiedadFormController.Datos datos = formulario.datos();
+                Task<Void> tarea = new Task<>() {
+                    @Override protected Void call() throws SQLException {
+                        catalogos.guardarPropiedad(nueva ? null : existente.getId(),
+                                new PropiedadRequest(datos.nombre(), datos.direccion(),
+                            datos.activa(), datos.nombrePropietario(), datos.correoPropietario(),
+                            datos.telefonoPropietario(), nueva ? null : existente.getVersion()));
+                        return null;
+                    }
+                };
+                TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+                    formulario.marcarLimpio();
+                    DialogoFormulario.cerrar(dialogo);
+                    AlertaUtil.mostrarExito(nueva ? "Propiedad registrada" : "Propiedad actualizada",
+                            nueva ? "La propiedad quedó registrada." : "Los cambios quedaron guardados.");
+                    cargarDatos();
+                }, error -> {
+                    accion.setDisable(false);
+                    accion.setText(nueva ? "Guardar propiedad" : "Guardar cambios");
+                    if (!nueva && error instanceof ErrorClienteException api && api.getEstado() == 409) {
+                        DialogoFormulario.cerrar(dialogo);
+                        cargarDatos();
+                        AlertaUtil.mostrarAdvertencia("No se guardaron los cambios",
+                                api.getMessage() + " Abre el registro actualizado para volver a editarlo.");
+                        return;
+                    }
+                    formulario.mostrarError(mensajeError(error));
+                });
+            });
+            dialogo.showAndWait();
+        } catch (IOException error) {
+            AlertaUtil.mostrarError("No se pudo abrir el formulario", "Vuelve a intentarlo.");
+        }
+    }
+
+    @FXML public void handleEliminar() {
+        Propiedad propiedad = seleccionada;
+        if (propiedad == null || !permisoEliminar) return;
+        String registro = "Propiedad: " + propiedad.getNombre() + " · " + propiedad.getDireccion();
+        if (!AlertaUtil.mostrarConfirmacionDestructiva("Eliminar propiedad", registro,
+                "El registro se eliminará físicamente si no tiene unidades asociadas.", "Eliminar propiedad")) return;
+        btnEliminar.setDisable(true);
+        Task<Void> tarea = new Task<>() {
+            @Override protected Void call() throws SQLException { propiedadService.eliminar(propiedad.getId()); return null; }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+            seleccionada = null;
+            AlertaUtil.mostrarExito("Propiedad eliminada", "El registro de la propiedad se eliminó.");
             cargarDatos();
-            limpiarFormulario();
-        } catch (IllegalArgumentException e) {
-            AlertaUtil.mostrarAdvertencia("Datos inválidos", e.getMessage());
-        } catch (SecurityException e) {
-            AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
-        } catch (IllegalStateException e) {
-            AlertaUtil.mostrarError("Error de persistencia", e.getMessage());
-        } catch (SQLException e) {
-            AlertaUtil.mostrarError("Error de persistencia", "No fue posible guardar la propiedad en la base de datos.");
-        }
-    }
-
-    @FXML
-    public void handleEliminar() {
-        if (propiedadSeleccionada == null) {
-            AlertaUtil.mostrarAdvertencia("Selección requerida", "Seleccione una propiedad de la tabla para eliminar.");
-            return;
-        }
-
-        boolean confirma = AlertaUtil.mostrarConfirmacion(
-                "Confirmar eliminación",
-                "¿Está seguro de que desea eliminar la propiedad '" + propiedadSeleccionada.getNombre() + "'? Esta acción afectará las unidades vinculadas."
-        );
-
-        if (confirma) {
-            try {
-                propiedadService.eliminar(propiedadSeleccionada.getId());
-                AlertaUtil.mostrarExito("Registro eliminado", "La propiedad fue eliminada correctamente.");
-                cargarDatos();
-                limpiarFormulario();
-            } catch (SecurityException e) {
-                AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
-            } catch (SQLException e) {
-                AlertaUtil.mostrarError("Restricción de integridad", "No es posible eliminar la propiedad porque tiene unidades o contratos asociados.");
+        }, error -> {
+            btnEliminar.setDisable(seleccionada == null || !permisoEliminar);
+            if (error instanceof ConflictoDatosException) {
+                AlertaUtil.mostrarAdvertencia("La propiedad tiene unidades", error.getMessage()
+                        + " Puedes desactivarla desde el formulario de propiedad.");
+            } else if (error instanceof SecurityException) {
+                AlertaUtil.mostrarAdvertencia("No tienes permiso", "Solo el propietario puede eliminar propiedades.");
+            } else {
+                AlertaUtil.mostrarError("No se pudo eliminar la propiedad", "Revisa las relaciones asociadas e inténtalo de nuevo.");
             }
-        }
+        });
+    }
+
+    @FXML public void limpiarFiltros() { txtBuscar.clear(); }
+    private void ocultarError() { lblErrorConsulta.setText(""); lblErrorConsulta.setVisible(false); lblErrorConsulta.setManaged(false); }
+    private static String mensajeError(Throwable error) {
+        if (error instanceof ErrorClienteException) return error.getMessage();
+        if (error instanceof IllegalArgumentException || error instanceof SecurityException
+                || error instanceof IllegalStateException) return error.getMessage();
+        return "No se pudo guardar la propiedad. Revisa los datos e inténtalo de nuevo.";
     }
 
     @FXML
-    public void limpiarFormulario() {
-        propiedadSeleccionada = null;
-        txtNombre.clear();
-        txtDireccion.clear();
-        txtNombrePropietario.clear();
-        txtCorreoPropietario.clear();
-        txtTelefonoPropietario.clear();
-        chkActiva.setSelected(true);
-        tblPropiedades.getSelectionModel().clearSelection();
+    public void handleGenerarReportePropiedades() {
+        if (btnGenerarReportePropiedades != null) {
+            btnGenerarReportePropiedades.setDisable(true);
+        }
+
+        Task<byte[]> tareaGenerarPdf = new Task<>() {
+            @Override
+            protected byte[] call() {
+                return reporteService.generarReportePropiedadesPdf();
+            }
+        };
+
+        TareasJavaFx.ejecutar(
+                HelloApplication.instancia().getTareas(),
+                tareaGenerarPdf,
+                pdfBytes -> {
+                    if (btnGenerarReportePropiedades != null) {
+                        btnGenerarReportePropiedades.setDisable(false);
+                    }
+                    if (pdfBytes == null || pdfBytes.length == 0) {
+                        AlertaUtil.mostrarError("Error de reporte",
+                                "El reporte de propiedades generado está vacío.");
+                        return;
+                    }
+
+                    FileChooser fileChooser = new FileChooser();
+                    fileChooser.setTitle("Guardar reporte de propiedades y unidades");
+                    fileChooser.setInitialFileName("Reporte-Propiedades-Unidades.pdf");
+                    fileChooser.getExtensionFilters().add(
+                            new FileChooser.ExtensionFilter("Documento PDF (*.pdf)", "*.pdf")
+                    );
+
+                    Window ventana = (tblPropiedades != null && tblPropiedades.getScene() != null)
+                            ? tblPropiedades.getScene().getWindow()
+                            : null;
+                    File archivoDestino = fileChooser.showSaveDialog(ventana);
+
+                    if (archivoDestino != null) {
+                        try {
+                            Files.write(archivoDestino.toPath(), pdfBytes);
+                        } catch (Exception ex) {
+                            AlertaUtil.mostrarError("Error al guardar",
+                                    "No se pudo guardar el archivo PDF en disco.");
+                            return;
+                        }
+
+                        AlertaUtil.mostrarExito("Reporte listo",
+                                "El reporte de propiedades y unidades se guardó correctamente.");
+
+                        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
+                            try {
+                                Desktop.getDesktop().open(archivoDestino);
+                            } catch (Exception ex) {
+                                AlertaUtil.mostrarAdvertencia("No se pudo abrir automáticamente",
+                                        "El PDF se guardó bien, pero no se pudo abrir el visor automáticamente.");
+                            }
+                        }
+                    }
+                },
+                error -> {
+                    if (btnGenerarReportePropiedades != null) {
+                        btnGenerarReportePropiedades.setDisable(false);
+                    }
+                    String mensaje = (error != null && error.getMessage() != null && !error.getMessage().isBlank())
+                            ? error.getMessage()
+                            : "No se pudo generar el reporte de propiedades.";
+                    AlertaUtil.mostrarError("Error al generar reporte", mensaje);
+                }
+        );
     }
 
-    private void seleccionarPropiedad(Propiedad p) {
-        this.propiedadSeleccionada = p;
-        txtNombre.setText(p.getNombre());
-        txtDireccion.setText(p.getDireccion());
-        if (p.getPropietario() != null) {
-            txtNombrePropietario.setText(p.getPropietario().getNombre());
-            txtCorreoPropietario.setText(p.getPropietario().getCorreo());
-            txtTelefonoPropietario.setText(p.getPropietario().getTelefono());
-        } else {
-            txtNombrePropietario.clear();
-            txtCorreoPropietario.clear();
-            txtTelefonoPropietario.clear();
-        }
-        chkActiva.setSelected(p.isActiva());
-    }
+
+
 }

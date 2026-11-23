@@ -1,5 +1,9 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.modelo;
 
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -7,6 +11,8 @@ import java.util.UUID;
 /** Seguimiento del depósito: monto inicial pactado y saldo aún retenido. */
 @Entity
 @Table(name = "garantia")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Garantia {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -25,8 +31,6 @@ public class Garantia {
     @Version
     private long version;
 
-    protected Garantia() {}
-
     public Garantia(Contrato contrato, BigDecimal montoInicial, BigDecimal saldoActual) {
         this.contrato = contrato;
         this.montoInicial = validarNoNegativo(montoInicial, "El monto inicial no puede ser negativo.");
@@ -42,11 +46,15 @@ public class Garantia {
         return valor;
     }
 
-    public UUID getId() { return id; }
-    public Contrato getContrato() { return contrato; }
-    public BigDecimal getMontoInicial() { return montoInicial; }
-    public BigDecimal getSaldoActual() { return saldoActual; }
-    public long getVersion() { return version; }
+    public void actualizarMontoInicial(BigDecimal nuevoMontoInicial) {
+        BigDecimal monto = validarNoNegativo(nuevoMontoInicial,
+                "El monto inicial no puede ser negativo.");
+        if (saldoActual.compareTo(monto) > 0) {
+            throw new IllegalArgumentException(
+                    "El monto inicial de la garantía no puede ser menor que el saldo actual.");
+        }
+        montoInicial = monto;
+    }
 
     public void ajustarSaldo(BigDecimal nuevoSaldo) {
         BigDecimal saldo = validarNoNegativo(nuevoSaldo, "El saldo actual no puede ser negativo.");

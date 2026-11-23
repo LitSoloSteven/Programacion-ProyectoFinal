@@ -1,480 +1,491 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
 
+import javafx.stage.FileChooser;
+import lombok.RequiredArgsConstructor;
+
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
+import javafx.concurrent.Task;
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.scene.control.*;
-import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.fxml.FXMLLoader;
+import javafx.geometry.Insets;
+import javafx.scene.Node;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.Label;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+import javafx.stage.Window;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.ContratoRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteCatalogos;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Garantia;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Inquilino;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Unidad;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ContratoService;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.InquilinoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.GarantiaService;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.UnidadService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ReporteService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AccionesTabla;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AtajosLista;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.DialogoFormulario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoTabla;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PanelEstadoTabla;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TemaAplicacion;
 
+import java.awt.*;
+import java.io.File;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.Locale;
+import java.util.UUID;
 
-/**
- * Controlador de la vista de Contratos de arrendamiento.
- * Vincula unidades e inquilinos reales de PostgreSQL y valida coherencia contractual.
- */
+/** Lista, acciones contractuales y guardado del diálogo de contrato. */
+@RequiredArgsConstructor
 public class ContratoController {
+    @FXML private VBox rootView;
+    @FXML private Button btnGenerarReporte;
+    @FXML private HBox eliminarTooltipHost;
+    @FXML private HBox garantiaTooltipHost;
+    @FXML private Button btnNuevo;
+    @FXML private Button btnRefrescar;
+    @FXML private Button btnLimpiar;
+    @FXML private Button btnTerminar;
+    @FXML private Button btnEliminar;
+    @FXML private Button btnAjustarGarantia;
+    @FXML private Label lblTitulo;
+    @FXML private Label lblContador;
+    @FXML private Label lblErrorConsulta;
+    @FXML private TextField txtBuscar;
+    @FXML private TableView<Contrato> tblContratos;
+    @FXML private TableColumn<Contrato, String> colInquilino;
+    @FXML private TableColumn<Contrato, String> colUnidad;
+    @FXML private TableColumn<Contrato, LocalDate> colInicio;
+    @FXML private TableColumn<Contrato, LocalDate> colFin;
+    @FXML private TableColumn<Contrato, String> colCanon;
+    @FXML private TableColumn<Contrato, Integer> colDiaPago;
+    @FXML private TableColumn<Contrato, String> colDeposito;
+    @FXML private TableColumn<Contrato, String> colSaldoGarantia;
+    @FXML private TableColumn<Contrato, String> colEstado;
+    @FXML private TableColumn<Contrato, Void> colAcciones;
 
-    @FXML
-    private ComboBox<Unidad> cmbUnidad;
-
-    @FXML
-    private ComboBox<Inquilino> cmbInquilino;
-
-    @FXML
-    private DatePicker dpInicio;
-
-    @FXML
-    private DatePicker dpFin;
-
-    @FXML
-    private TextField txtCanon;
-
-    @FXML
-    private ComboBox<String> cmbMoneda;
-
-    @FXML
-    private TextField txtDiaPago;
-
-    @FXML
-    private TextField txtDeposito;
-
-    @FXML
-    private ComboBox<String> cmbEstado;
-
-    @FXML
-    private Button btnTerminar;
-
-    @FXML
-    private Button btnEliminar;
-
-    @FXML
-    private TextField txtBuscar;
-
-    @FXML
-    private TableView<Contrato> tblContratos;
-
-    @FXML
-    private TableColumn<Contrato, String> colInquilino;
-
-    @FXML
-    private TableColumn<Contrato, String> colUnidad;
-
-    @FXML
-    private TableColumn<Contrato, LocalDate> colInicio;
-
-    @FXML
-    private TableColumn<Contrato, LocalDate> colFin;
-
-    @FXML
-    private TableColumn<Contrato, String> colCanon;
-
-    @FXML
-    private TableColumn<Contrato, Integer> colDiaPago;
-
-    @FXML
-    private TableColumn<Contrato, String> colDeposito;
-
-    @FXML
-    private TableColumn<Contrato, String> colEstado;
-
-    @FXML
-    private TableColumn<Contrato, String> colSaldoGarantia;
-
-    @FXML
-    private Button btnAjustarGarantia;
-
+    private final ReporteService reporteService = new ReporteService();
+    private final ClienteCatalogos clienteCatalogos = new ClienteCatalogos(ClienteLatch.api());
     private final ContratoService contratoService;
-    private final UnidadService unidadService;
-    private final InquilinoService inquilinoService;
     private final GarantiaService garantiaService;
+    private final ObservableList<Contrato> registros = FXCollections.observableArrayList();
+    private final FilteredList<Contrato> filtrados = new FilteredList<>(registros, item -> true);
+    private List<Unidad> unidadesDisponibles = List.of();
+    private List<Inquilino> inquilinosDisponibles = List.of();
+    private Contrato seleccionado;
+    private final boolean permisoEliminar = SesionUsuario.esPropietario();
+    private final boolean permisoAjustarGarantia = SesionUsuario.esPropietario();
+    private long versionConsulta;
 
-    private final ObservableList<Contrato> listaContratos = FXCollections.observableArrayList();
-    private FilteredList<Contrato> listaFiltrada;
-    private Contrato contratoSeleccionado = null;
+    private record Catalogos(List<Unidad> unidades, List<Inquilino> inquilinos) { }
+    private record DatosTabla(Catalogos catalogos, List<Contrato> contratos, Map<UUID, Garantia> garantias) { }
+
+    private Map<UUID, Garantia> garantias = Map.of();
 
     public ContratoController() {
-        this.contratoService = new ContratoService();
-        this.unidadService = new UnidadService();
-        this.inquilinoService = new InquilinoService();
-        this.garantiaService = new GarantiaService();
+        this(HelloApplication.instancia().getComposicion().contratos(),
+                HelloApplication.instancia().getComposicion().garantias());
     }
 
-    public ContratoController(ContratoService contratoService, UnidadService unidadService, InquilinoService inquilinoService) {
-        this.contratoService = contratoService;
-        this.unidadService = unidadService;
-        this.inquilinoService = inquilinoService;
-        this.garantiaService = new GarantiaService();
-    }
-
-    @FXML
-    public void initialize() {
-        inicializarCombos();
-        configurarTabla();
-        configurarFiltro();
-        aplicarControlPermisos();
-
-        cargarCatalogosReales();
+    @FXML public void initialize() {
+        lblTitulo.setGraphic(Iconos.crear(Iconos.Nombre.CONTRATO, 20));
+        Iconos.asignar(btnRefrescar, Iconos.Nombre.ACTUALIZAR, 16);
+        Iconos.asignar(btnNuevo, Iconos.Nombre.MAS, 16);
+        btnNuevo.disableProperty().bind(btnRefrescar.disableProperty());
+        Iconos.asignar(btnLimpiar, Iconos.Nombre.CERRAR, 14);
+        Iconos.asignar(btnTerminar, Iconos.Nombre.CONFIRMACION, 16);
+        Iconos.asignar(btnEliminar, Iconos.Nombre.ELIMINAR, 16);
+        Iconos.asignar(btnAjustarGarantia, Iconos.Nombre.EDITAR, 16);
+        Tooltip.install(eliminarTooltipHost, new Tooltip(permisoEliminar
+                ? "Selecciona un contrato para eliminarlo." : "Solo el propietario puede eliminar contratos."));
+        Tooltip.install(garantiaTooltipHost, new Tooltip(permisoAjustarGarantia
+                ? "Selecciona un contrato con seguimiento de garantía." : "Solo el propietario puede ajustar garantías."));
+        btnTerminar.setDisable(true);
+        btnEliminar.setDisable(true);
+        btnAjustarGarantia.setDisable(true);
+        tblContratos.setItems(filtrados);
+        tblContratos.setPlaceholder(PanelEstadoTabla.crear("Cargando contratos", "El listado aparecerá al terminar la consulta.", null, null));
+        colInquilino.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getInquilinoNombre()));
+        colUnidad.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getUnidadInfo()));
+        colInicio.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyObjectWrapper<>(c.getValue().getInicio()));
+        colInicio.setCellFactory(FormatoTabla.fecha());
+        colFin.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyObjectWrapper<>(c.getValue().getFin()));
+        colFin.setCellFactory(FormatoTabla.fecha());
+        colCanon.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getCanonFormateado()));
+        colCanon.setCellFactory(FormatoTabla.numerica());
+        colDiaPago.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyObjectWrapper<>(c.getValue().getDiaPago()));
+        colDiaPago.setCellFactory(FormatoTabla.entero());
+        colDeposito.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getDepositoFormateado()));
+        colDeposito.setCellFactory(FormatoTabla.numerica());
+        colSaldoGarantia.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(saldoGarantia(c.getValue())));
+        colSaldoGarantia.setCellFactory(FormatoTabla.numerica());
+        colEstado.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getEstado()));
+        colEstado.setCellFactory(FormatoTabla.estado());
+        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>(
+                "Editar contrato", this::abrirEdicion, Iconos.Nombre.EDITAR)));
+        tblContratos.getSelectionModel().selectedItemProperty().addListener((obs, anterior, actual) -> {
+            seleccionado = actual;
+            actualizarAcciones();
+        });
+        txtBuscar.textProperty().addListener((obs, anterior, actual) -> aplicarFiltro(actual));
+        AtajosLista.instalar(rootView, txtBuscar, this::handleNuevo);
+        aplicarFiltro("");
         cargarDatos();
+    }
 
-        tblContratos.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null) {
-                seleccionarContrato(newVal);
-                btnAjustarGarantia.setDisable(newVal.getGarantiaSeguimiento() == null);
-            } else {
-                btnAjustarGarantia.setDisable(true);
+    private void aplicarFiltro(String texto) {
+        String filtro = texto == null ? "" : texto.strip().toLowerCase(Locale.ROOT);
+        filtrados.setPredicate(contrato -> filtro.isEmpty()
+                || contiene(contrato.getInquilinoNombre(), filtro) || contiene(contrato.getUnidadInfo(), filtro)
+                || contiene(contrato.getEstado(), filtro));
+        lblContador.setText(filtrados.size() + (filtrados.size() == 1 ? " registro" : " registros"));
+        tblContratos.setPlaceholder(PanelEstadoTabla.crear(filtro.isEmpty() ? "Aún no hay contratos" : "No hay coincidencias",
+                filtro.isEmpty() ? "Los contratos registrados aparecerán aquí." : "Prueba con otro término o limpia la búsqueda.",
+                filtro.isEmpty() ? "Nuevo contrato" : "Limpiar búsqueda",
+                filtro.isEmpty() ? this::handleNuevo : this::limpiarFiltros));
+    }
+
+    public void cargarCatalogosReales() { cargarDatos(); }
+    public void cargarDatos() {
+        btnRefrescar.setDisable(true);
+        long version = ++versionConsulta;
+        Task<DatosTabla> tarea = new Task<>() {
+            @Override protected DatosTabla call() throws SQLException {
+                Catalogos catalogos = new Catalogos(clienteCatalogos.unidades(), clienteCatalogos.inquilinos(true));
+                List<Contrato> contratos = clienteCatalogos.contratos(false);
+                Map<UUID, Garantia> seguimiento = garantiaService.listarTodas().stream()
+                        .collect(Collectors.toMap(g -> g.getContrato().getId(), g -> g));
+                return new DatosTabla(catalogos, contratos, seguimiento);
             }
-        });
-
-        // Al seleccionar una unidad, autocompletar el canon y la moneda
-        cmbUnidad.valueProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null && contratoSeleccionado == null) {
-                if (newVal.getCanonReferencia() != null) {
-                    txtCanon.setText(newVal.getCanonReferencia().toPlainString());
-                }
-                if (newVal.getMoneda() != null) {
-                    cmbMoneda.setValue(newVal.getMoneda());
-                }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
+            if (version != versionConsulta) return;
+            mostrarCatalogos(datos.catalogos());
+            garantias = datos.garantias();
+            registros.setAll(datos.contratos());
+            aplicarFiltro(txtBuscar.getText());
+            ocultarError();
+            btnRefrescar.setDisable(false);
+        }, error -> {
+            if (version == versionConsulta) {
+                lblErrorConsulta.setText("No se pudieron cargar los contratos y sus opciones. Vuelve a intentarlo.");
+                lblErrorConsulta.setVisible(true); lblErrorConsulta.setManaged(true);
+                tblContratos.setPlaceholder(PanelEstadoTabla.crear("No se pudieron cargar los contratos",
+                        "Vuelve a intentarlo.", "Reintentar", this::cargarDatos));
             }
+            btnRefrescar.setDisable(false);
         });
     }
 
-    private void inicializarCombos() {
-        cmbMoneda.setItems(FXCollections.observableArrayList("USD", "NIO"));
-        cmbMoneda.getSelectionModel().selectFirst();
+    @FXML public void refrescarTabla() { cargarDatos(); }
+    @FXML public void handleNuevo() {
+        if (!btnNuevo.isDisabled()) abrirFormulario(null);
+    }
+    private void abrirEdicion(Contrato contrato) { abrirFormulario(contrato); }
 
-        cmbEstado.setItems(FXCollections.observableArrayList("Vigente", "Borrador", "Por vencer", "Vencido", "Terminado", "Cancelado"));
-        cmbEstado.getSelectionModel().selectFirst();
-
-        txtDiaPago.setText("5");
+    private void abrirFormulario(Contrato existente) {
+        try {
+            FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource("contrato-form.fxml"));
+            Node contenido = loader.load();
+            ContratoFormController formulario = loader.getController();
+            formulario.establecerCatalogos(unidadesDisponibles, inquilinosDisponibles);
+            if (existente != null) formulario.cargar(existente);
+            Window propietario = tblContratos.getScene() == null ? null : tblContratos.getScene().getWindow();
+            boolean nuevo = existente == null;
+            Dialog<ButtonType> dialogo = DialogoFormulario.crear(nuevo ? "Nuevo contrato" : "Editar contrato",
+                    contenido, propietario, 740, 680, nuevo ? "Guardar contrato" : "Guardar cambios");
+            DialogoFormulario.protegerCambiosSinGuardar(dialogo, nuevo ? btnNuevo : tblContratos, formulario::hayCambios);
+            ButtonType tipoAccion = dialogo.getDialogPane().getButtonTypes().getFirst();
+            Button accion = (Button) dialogo.getDialogPane().lookupButton(tipoAccion);
+            accion.addEventFilter(ActionEvent.ACTION, evento -> {
+                evento.consume();
+                if (!formulario.validar()) return;
+                ContratoFormController.Datos datos = formulario.datos();
+                UUID contratoId = nuevo ? null : existente.getId();
+                long version = nuevo ? 0 : existente.getVersion();
+                UUID unidadId = datos.unidad().getId();
+                UUID inquilinoId = datos.inquilino().getId();
+                BigDecimal canonGuardado = datos.canon();
+                BigDecimal depositoGuardado = datos.deposito();
+                accion.setDisable(true); accion.setText("Guardando contrato…");
+                Task<Void> tarea = new Task<>() {
+                    @Override protected Void call() throws SQLException {
+                        clienteCatalogos.guardarContrato(contratoId,
+                                new ContratoRequest(unidadId.toString(), inquilinoId.toString(),
+                            datos.inicio().toString(), datos.fin().toString(), datos.canon().toPlainString(),
+                            datos.moneda(), datos.diaPago(), datos.deposito().toPlainString(), datos.estado(),
+                            nuevo ? null : version));
+                        return null;
+                    }
+                };
+                TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+                    formulario.marcarLimpio(); DialogoFormulario.cerrar(dialogo);
+                    AlertaUtil.mostrarExito(nuevo ? "Contrato registrado" : "Contrato actualizado",
+                            nuevo ? "El contrato quedó registrado." : "Los términos del contrato quedaron guardados.");
+                    cargarDatos();
+                }, error -> {
+                    accion.setDisable(false); accion.setText(nuevo ? "Guardar contrato" : "Guardar cambios");
+                    if (!nuevo && error instanceof ErrorClienteException api && api.getEstado() == 409) {
+                        DialogoFormulario.cerrar(dialogo);
+                        cargarDatos();
+                        AlertaUtil.mostrarAdvertencia("No se guardaron los cambios",
+                                api.getMessage() + " Abre el registro actualizado para volver a editarlo.");
+                        return;
+                    }
+                    formulario.mostrarError(mensajeError(error));
+                });
+            });
+            dialogo.showAndWait();
+        } catch (IOException error) {
+            AlertaUtil.mostrarError("No se pudo abrir el formulario", "Vuelve a intentarlo.");
+        }
     }
 
-    private void configurarTabla() {
-        colInquilino.setCellValueFactory(new PropertyValueFactory<>("inquilinoNombre"));
-        colUnidad.setCellValueFactory(new PropertyValueFactory<>("unidadInfo"));
-        colInicio.setCellValueFactory(new PropertyValueFactory<>("inicio"));
-        colFin.setCellValueFactory(new PropertyValueFactory<>("fin"));
-        colCanon.setCellValueFactory(new PropertyValueFactory<>("canonFormateado"));
-        colDiaPago.setCellValueFactory(new PropertyValueFactory<>("diaPago"));
-        colDeposito.setCellValueFactory(new PropertyValueFactory<>("depositoFormateado"));
-        colEstado.setCellValueFactory(new PropertyValueFactory<>("estado"));
-        colSaldoGarantia.setCellValueFactory(new PropertyValueFactory<>("garantiaSaldoFormateado"));
-
-        listaFiltrada = new FilteredList<>(listaContratos, c -> true);
-        tblContratos.setItems(listaFiltrada);
+    @FXML public void handleTerminarContrato() {
+        Contrato contrato = seleccionado;
+        if (contrato == null || !sePuedeFinalizar(contrato)) return;
+        String registro = "Contrato de " + contrato.getInquilinoNombre() + " · "
+                + contrato.getUnidadInfo() + " · " + fecha(contrato.getInicio()) + " a " + fecha(contrato.getFin());
+        if (!AlertaUtil.mostrarConfirmacion("Finalizar contrato", registro
+                + "\nEl estado pasará a Terminado y la unidad dejará de estar reservada.", "Finalizar")) return;
+        UUID contratoId = contrato.getId();
+        btnTerminar.setDisable(true);
+        Task<Void> tarea = new Task<>() {
+            @Override protected Void call() throws SQLException { clienteCatalogos.terminarContrato(contratoId); return null; }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+            AlertaUtil.mostrarExito("Contrato finalizado", "El contrato quedó marcado como Terminado.");
+            cargarDatos();
+        }, error -> {
+            actualizarAcciones();
+            AlertaUtil.mostrarError("No se pudo finalizar el contrato", mensajeError(error));
+        });
     }
 
-    private void configurarFiltro() {
-        txtBuscar.textProperty().addListener((obs, oldVal, newVal) -> {
-            listaFiltrada.setPredicate(c -> {
-                if (newVal == null || newVal.isBlank()) return true;
-                String filtro = newVal.toLowerCase().trim();
-                boolean matchInq = c.getInquilinoNombre() != null && c.getInquilinoNombre().toLowerCase().contains(filtro);
-                boolean matchUni = c.getUnidadInfo() != null && c.getUnidadInfo().toLowerCase().contains(filtro);
-                boolean matchEst = c.getEstado() != null && c.getEstado().toLowerCase().contains(filtro);
-                return matchInq || matchUni || matchEst;
+    @FXML public void handleAjustarGarantia() {
+        Contrato contrato = seleccionado;
+        if (!permisoAjustarGarantia || contrato == null || garantias.get(contrato.getId()) == null) return;
+        Garantia garantia = garantias.get(contrato.getId());
+        UUID garantiaId = garantia.getId();
+        BigDecimal maximo = garantia.getMontoInicial();
+        TextField txtSaldo = new TextField(garantia.getSaldoActual().toPlainString());
+        txtSaldo.getStyleClass().add("field");
+        Label error = new Label("");
+        error.getStyleClass().add("field-error");
+        error.setMinHeight(18);
+        error.setVisible(false);
+        error.setManaged(false);
+        VBox contenido = new VBox(8,
+                new Label("Contrato de " + contrato.getInquilinoNombre()),
+                new Label("Nuevo saldo retenido · máximo " + maximo.toPlainString() + " " + contrato.getMoneda()),
+                txtSaldo, error);
+        contenido.setPadding(new Insets(16));
+        Window propietario = tblContratos.getScene() == null ? null : tblContratos.getScene().getWindow();
+        Dialog<ButtonType> dialogo = DialogoFormulario.crear("Ajustar garantía", contenido, propietario,
+                460, 340, "Guardar ajuste");
+        String saldoInicial = txtSaldo.getText();
+        DialogoFormulario.protegerCambiosSinGuardar(dialogo, btnAjustarGarantia,
+                () -> !saldoInicial.equals(txtSaldo.getText()));
+        ButtonType tipoAccion = dialogo.getDialogPane().getButtonTypes().getFirst();
+        Button accion = (Button) dialogo.getDialogPane().lookupButton(tipoAccion);
+        accion.addEventFilter(ActionEvent.ACTION, evento -> {
+            evento.consume();
+            BigDecimal nuevoSaldo;
+            try {
+                nuevoSaldo = new BigDecimal(txtSaldo.getText().strip());
+                if (nuevoSaldo.signum() < 0 || nuevoSaldo.compareTo(maximo) > 0
+                        || nuevoSaldo.stripTrailingZeros().scale() > 2) throw new NumberFormatException();
+            } catch (RuntimeException invalido) {
+                error.setText("El saldo debe estar entre cero y " + maximo.toPlainString()
+                        + " y tener hasta dos decimales.");
+                error.setVisible(true); error.setManaged(true);
+                ni.edu.uam.proyectofinalprogramacionappescritorio.util.ValidacionFormulario.mostrar(error, error);
+                return;
+            }
+            accion.setDisable(true); accion.setText("Guardando ajuste…");
+            BigDecimal saldoAjustado = nuevoSaldo;
+            Task<Void> tarea = new Task<>() {
+                @Override protected Void call() throws SQLException {
+                    garantiaService.ajustarSaldo(garantiaId, saldoAjustado);
+                    return null;
+                }
+            };
+            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+                DialogoFormulario.cerrar(dialogo);
+                AlertaUtil.mostrarExito("Garantía actualizada", "El saldo de la garantía quedó actualizado.");
+                cargarDatos();
+            }, fallo -> {
+                accion.setDisable(false); accion.setText("Guardar ajuste");
+                error.setText(mensajeError(fallo)); error.setVisible(true); error.setManaged(true);
             });
         });
+        dialogo.showAndWait();
     }
 
-    private void aplicarControlPermisos() {
-        boolean esAdmin = SesionUsuario.esPropietario();
-        btnEliminar.setVisible(esAdmin);
-        btnEliminar.setManaged(esAdmin);
-    }
-
-    public void cargarCatalogosReales() {
-        try {
-            List<Unidad> unidades = unidadService.listarTodas();
-            cmbUnidad.setItems(FXCollections.observableArrayList(unidades));
-
-            List<Inquilino> inquilinos = inquilinoService.listarActivos();
-            cmbInquilino.setItems(FXCollections.observableArrayList(inquilinos));
-        } catch (SQLException e) {
-            AlertaUtil.mostrarError("Error al cargar catálogos", "No fue posible consultar unidades e inquilinos desde PostgreSQL.");
-        }
-    }
-
-    public void cargarDatos() {
-        try {
-            List<Contrato> datos = contratoService.listarTodos();
-            listaContratos.setAll(datos);
-        } catch (SQLException e) {
-            AlertaUtil.mostrarError("Error al cargar contratos", "No fue posible consultar los contratos desde PostgreSQL.");
-        }
-    }
-
-    @FXML
-    public void refrescarTabla() {
-        cargarCatalogosReales();
-        cargarDatos();
-        limpiarFormulario();
-        AlertaUtil.mostrarExito("Tabla actualizada", "Los contratos han sido sincronizados con PostgreSQL.");
-    }
-
-    @FXML
-    public void handleGuardar() {
-        Unidad unidad = cmbUnidad.getValue();
-        Inquilino inquilino = cmbInquilino.getValue();
-        LocalDate inicio = dpInicio.getValue();
-        LocalDate fin = dpFin.getValue();
-        String strCanon = txtCanon.getText();
-        String moneda = cmbMoneda.getValue();
-        String strDiaPago = txtDiaPago.getText();
-        String strDeposito = txtDeposito.getText();
-        String estado = cmbEstado.getValue();
-
-        // Validaciones de relaciones
-        if (unidad == null) {
-            AlertaUtil.mostrarAdvertencia("Campo obligatorio", "Debe seleccionar una unidad inmobiliaria para el contrato.");
-            cmbUnidad.requestFocus();
-            return;
-        }
-
-        if (inquilino == null) {
-            AlertaUtil.mostrarAdvertencia("Campo obligatorio", "Debe seleccionar un inquilino arrendatario.");
-            cmbInquilino.requestFocus();
-            return;
-        }
-
-        // Validaciones de fechas
-        if (inicio == null) {
-            AlertaUtil.mostrarAdvertencia("Campo obligatorio", "Seleccione la fecha de inicio del contrato.");
-            dpInicio.requestFocus();
-            return;
-        }
-
-        if (fin == null) {
-            AlertaUtil.mostrarAdvertencia("Campo obligatorio", "Seleccione la fecha de finalización del contrato.");
-            dpFin.requestFocus();
-            return;
-        }
-
-        if (!fin.isAfter(inicio)) {
-            AlertaUtil.mostrarAdvertencia("Incoherencia en fechas", "La fecha final debe ser posterior a la fecha de inicio.");
-            dpFin.requestFocus();
-            return;
-        }
-
-        if (fin.isBefore(inicio.plusMonths(1))) {
-            AlertaUtil.mostrarAdvertencia("Duración insuficiente", "El contrato debe tener una vigencia mínima de 1 mes.");
-            dpFin.requestFocus();
-            return;
-        }
-
-        // Validación de canon
-        BigDecimal canon;
-        try {
-            canon = new BigDecimal(strCanon.trim());
-            if (canon.compareTo(BigDecimal.ZERO) <= 0) {
-                AlertaUtil.mostrarAdvertencia("Monto inválido", "El canon mensual debe ser mayor a cero.");
-                txtCanon.requestFocus();
-                return;
-            }
-        } catch (Exception e) {
-            AlertaUtil.mostrarAdvertencia("Formato numérico inválido", "Ingrese un canon mensual válido (ej. 450.00).");
-            txtCanon.requestFocus();
-            return;
-        }
-
-        // Validación de día de pago
-        int diaPago;
-        try {
-            diaPago = Integer.parseInt(strDiaPago.trim());
-            if (diaPago < 1 || diaPago > 31) {
-                AlertaUtil.mostrarAdvertencia("Día inválido", "El día de pago debe estar entre 1 y 31.");
-                txtDiaPago.requestFocus();
-                return;
-            }
-        } catch (Exception e) {
-            AlertaUtil.mostrarAdvertencia("Formato inválido", "Ingrese un número entero para el día de pago (1 - 31).");
-            txtDiaPago.requestFocus();
-            return;
-        }
-
-        // Depósito
-        BigDecimal deposito = BigDecimal.ZERO;
-        if (strDeposito != null && !strDeposito.trim().isEmpty()) {
-            try {
-                deposito = new BigDecimal(strDeposito.trim());
-                if (deposito.compareTo(BigDecimal.ZERO) < 0) {
-                    AlertaUtil.mostrarAdvertencia("Monto inválido", "El depósito en garantía no puede ser negativo.");
-                    txtDeposito.requestFocus();
-                    return;
-                }
-            } catch (Exception e) {
-                AlertaUtil.mostrarAdvertencia("Formato inválido", "Ingrese un monto válido para el depósito de garantía.");
-                txtDeposito.requestFocus();
-                return;
-            }
-        }
-
-        try {
-            if (contratoSeleccionado == null) {
-                // Nuevo contrato
-                Contrato nuevo = new Contrato();
-                nuevo.setUnidadId(unidad.getId());
-                nuevo.setInquilinoId(inquilino.getId());
-                nuevo.setInicio(inicio);
-                nuevo.setFin(fin);
-                nuevo.setCanon(canon);
-                nuevo.setMoneda(moneda);
-                nuevo.setDiaPago(diaPago);
-                nuevo.setDepositoPactado(deposito);
-                nuevo.setEstado(estado);
-
-                contratoService.guardar(nuevo);
-                AlertaUtil.mostrarExito("Registro exitoso", "El contrato de arrendamiento ha sido registrado en PostgreSQL.");
-            } else {
-                // Actualización
-                contratoSeleccionado.setUnidadId(unidad.getId());
-                contratoSeleccionado.setInquilinoId(inquilino.getId());
-                contratoSeleccionado.setInicio(inicio);
-                contratoSeleccionado.setFin(fin);
-                contratoSeleccionado.setCanon(canon);
-                contratoSeleccionado.setMoneda(moneda);
-                contratoSeleccionado.setDiaPago(diaPago);
-                contratoSeleccionado.setDepositoPactado(deposito);
-                contratoSeleccionado.setEstado(estado);
-
-                contratoService.guardar(contratoSeleccionado);
-                AlertaUtil.mostrarExito("Actualización exitosa", "Los términos del contrato fueron actualizados.");
-            }
-
+    @FXML public void handleEliminar() {
+        Contrato contrato = seleccionado;
+        if (contrato == null || !permisoEliminar) return;
+        String registro = "Contrato: " + contrato.getInquilinoNombre() + " · " + contrato.getUnidadInfo()
+                + " · " + fecha(contrato.getInicio()) + " a " + fecha(contrato.getFin());
+        if (!AlertaUtil.mostrarConfirmacionDestructiva("Eliminar contrato", registro,
+                "El registro se eliminará físicamente si no tiene cargos ni pagos asociados.", "Eliminar contrato")) return;
+        UUID contratoId = contrato.getId();
+        btnEliminar.setDisable(true);
+        Task<Void> tarea = new Task<>() {
+            @Override protected Void call() throws SQLException { contratoService.eliminar(contratoId); return null; }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+            AlertaUtil.mostrarExito("Contrato eliminado", "El registro del contrato se eliminó.");
             cargarDatos();
-            limpiarFormulario();
-        } catch (IllegalArgumentException e) {
-            AlertaUtil.mostrarAdvertencia("Validación de contrato", e.getMessage());
-        } catch (SQLException e) {
-            AlertaUtil.mostrarError("Error de persistencia", "No se pudo guardar el contrato en PostgreSQL. Verifique los datos ingresados.");
-        }
-    }
-
-    @FXML
-    public void handleTerminarContrato() {
-        if (contratoSeleccionado == null) {
-            AlertaUtil.mostrarAdvertencia("Selección requerida", "Seleccione un contrato de la tabla para finalizarlo.");
-            return;
-        }
-
-        boolean confirma = AlertaUtil.mostrarConfirmacion(
-                "Finalizar contrato",
-                "¿Desea marcar como Terminado el contrato de " + contratoSeleccionado.getInquilinoNombre() + "?"
-        );
-
-        if (confirma) {
-            try {
-                contratoService.terminarContrato(contratoSeleccionado.getId());
-                AlertaUtil.mostrarExito("Contrato finalizado", "El estado del contrato ha cambiado a 'Terminado'.");
-                cargarDatos();
-                limpiarFormulario();
-            } catch (SQLException e) {
-                AlertaUtil.mostrarError("Error", "No fue posible finalizar el contrato en la base de datos.");
-            }
-        }
-    }
-
-    @FXML
-    public void handleAjustarGarantia() {
-        if (contratoSeleccionado == null || contratoSeleccionado.getGarantiaSeguimiento() == null) {
-            AlertaUtil.mostrarAdvertencia("Garantía no disponible", "Seleccione un contrato con seguimiento de garantía.");
-            return;
-        }
-        BigDecimal saldoActual = contratoSeleccionado.getGarantiaSeguimiento().getSaldoActual();
-        TextInputDialog dialogo = new TextInputDialog(saldoActual.toPlainString());
-        dialogo.setTitle("Ajustar saldo de garantía");
-        dialogo.setHeaderText("Contrato de " + contratoSeleccionado.getInquilinoNombre());
-        dialogo.setContentText("Nuevo saldo retenido (0 a " + contratoSeleccionado.getGarantiaSeguimiento().getMontoInicial() + "): ");
-        dialogo.showAndWait().ifPresent(valor -> {
-            try {
-                garantiaService.ajustarSaldo(contratoSeleccionado.getGarantiaSeguimiento().getId(), new BigDecimal(valor.strip()));
-                cargarDatos();
-                AlertaUtil.mostrarExito("Garantía actualizada", "El saldo retenido se actualizó correctamente.");
-            } catch (IllegalArgumentException e) {
-                AlertaUtil.mostrarAdvertencia("Saldo inválido", e.getMessage() == null ? "Ingrese un monto decimal válido." : e.getMessage());
-            } catch (SQLException e) {
-                AlertaUtil.mostrarError("No se pudo actualizar", "No fue posible guardar el saldo de la garantía.");
-            } catch (IllegalStateException e) {
-                AlertaUtil.mostrarError("No se pudo actualizar", e.getMessage());
+        }, error -> {
+            actualizarAcciones();
+            if (error instanceof SecurityException) {
+                AlertaUtil.mostrarAdvertencia("No tienes permiso", "Solo el propietario puede eliminar contratos.");
+            } else {
+                AlertaUtil.mostrarError("No se pudo eliminar el contrato",
+                        "Revisa si hay cargos o pagos asociados e inténtalo de nuevo.");
             }
         });
     }
 
+    @FXML public void limpiarFiltros() { txtBuscar.clear(); }
+
+    private void mostrarCatalogos(Catalogos catalogos) {
+        unidadesDisponibles = catalogos.unidades();
+        inquilinosDisponibles = catalogos.inquilinos();
+    }
+
+    private String saldoGarantia(Contrato contrato) {
+        Garantia garantia = garantias.get(contrato.getId());
+        return garantia == null ? contrato.getGarantiaSaldoFormateado()
+                : ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoMoneda.formatear(contrato.getMoneda(), garantia.getSaldoActual());
+    }
+
+    private void actualizarAcciones() {
+        btnTerminar.setDisable(seleccionado == null || !sePuedeFinalizar(seleccionado));
+        btnEliminar.setDisable(seleccionado == null || !permisoEliminar);
+        boolean puedeAjustar = seleccionado != null && garantias.containsKey(seleccionado.getId())
+                && permisoAjustarGarantia;
+        btnAjustarGarantia.setDisable(!puedeAjustar);
+        if (seleccionado != null && !garantias.containsKey(seleccionado.getId())) {
+            Tooltip.install(garantiaTooltipHost, new Tooltip("Este contrato no tiene seguimiento de garantía."));
+        } else if (!permisoAjustarGarantia) {
+            Tooltip.install(garantiaTooltipHost, new Tooltip("Solo el propietario puede ajustar garantías."));
+        } else {
+            Tooltip.install(garantiaTooltipHost, new Tooltip("Selecciona un contrato con seguimiento de garantía."));
+        }
+    }
+
+    private static boolean sePuedeFinalizar(Contrato contrato) {
+        return !"Terminado".equalsIgnoreCase(contrato.getEstado())
+                && !"Cancelado".equalsIgnoreCase(contrato.getEstado());
+    }
+
+    private void ocultarError() { lblErrorConsulta.setText(""); lblErrorConsulta.setVisible(false); lblErrorConsulta.setManaged(false); }
+    private static boolean contiene(String texto, String filtro) { return texto != null && texto.toLowerCase(Locale.ROOT).contains(filtro); }
+    private static String fecha(LocalDate fecha) { return fecha == null ? "—" : fecha.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")); }
+    private static String mensajeError(Throwable error) {
+        if (error instanceof ErrorClienteException) return error.getMessage();
+        if (error instanceof IllegalArgumentException || error instanceof SecurityException || error instanceof IllegalStateException) {
+            return error.getMessage();
+        }
+        return "Revisa los datos e inténtalo de nuevo.";
+    }
+
     @FXML
-    public void handleEliminar() {
-        if (contratoSeleccionado == null) {
-            AlertaUtil.mostrarAdvertencia("Selección requerida", "Seleccione un contrato de la tabla para eliminar.");
+    public void handleGenerarReporte() {
+        List<Contrato> contratosActuales = tblContratos == null
+                ? List.of()
+                : List.copyOf(tblContratos.getItems());
+
+        if (contratosActuales.isEmpty()) {
+            AlertaUtil.mostrarAdvertencia("Sin datos",
+                    "No hay contratos en la tabla para generar el reporte.");
             return;
         }
 
-        boolean confirma = AlertaUtil.mostrarConfirmacion(
-                "Confirmar eliminación",
-                "¿Está seguro de que desea eliminar permanentemente este contrato? Esta acción es irreversible."
+        if (btnGenerarReporte != null) {
+            btnGenerarReporte.setDisable(true);
+        }
+
+        Task<byte[]> tareaGenerarPdf = new Task<>() {
+            @Override
+            protected byte[] call() {
+                return reporteService.generarReporteContratosOcupacionPdf(contratosActuales);
+            }
+        };
+
+        TareasJavaFx.ejecutar(
+                HelloApplication.instancia().getTareas(),
+                tareaGenerarPdf,
+                pdfBytes -> {
+                    if (btnGenerarReporte != null) {
+                        btnGenerarReporte.setDisable(false);
+                    }
+                    if (pdfBytes == null || pdfBytes.length == 0) {
+                        AlertaUtil.mostrarError("Error de reporte",
+                                "El reporte de contratos y ocupación está vacío.");
+                        return;
+                    }
+
+                    FileChooser fileChooser = new FileChooser();
+                    fileChooser.setTitle("Guardar resumen de contratos y ocupación");
+                    fileChooser.setInitialFileName("Resumen-Contratos-Ocupacion.pdf");
+                    fileChooser.getExtensionFilters().add(
+                            new FileChooser.ExtensionFilter("Documento PDF (*.pdf)", "*.pdf")
+                    );
+
+                    Window ventana = tblContratos.getScene() == null
+                            ? null
+                            : tblContratos.getScene().getWindow();
+                    File archivoDestino = fileChooser.showSaveDialog(ventana);
+
+                    if (archivoDestino != null) {
+                        try {
+                            Files.write(archivoDestino.toPath(), pdfBytes);
+                            AlertaUtil.mostrarExito("Reporte listo",
+                                    "El resumen de contratos y ocupación se guardó correctamente.");
+
+                            if (Desktop.isDesktopSupported()) {
+                                Desktop.getDesktop().open(archivoDestino);
+                            }
+                        } catch (Exception ex) {
+                            AlertaUtil.mostrarError("Error al guardar",
+                                    "No se pudo guardar el archivo PDF en disco.");
+                        }
+                    }
+                },
+                error -> {
+                    if (btnGenerarReporte != null) {
+                        btnGenerarReporte.setDisable(false);
+                    }
+                    AlertaUtil.mostrarError("Error al generar reporte", mensajeError(error));
+                }
         );
-
-        if (confirma) {
-            try {
-                contratoService.eliminar(contratoSeleccionado.getId());
-                AlertaUtil.mostrarExito("Registro eliminado", "El contrato fue eliminado de PostgreSQL.");
-                cargarDatos();
-                limpiarFormulario();
-            } catch (SecurityException e) {
-                AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
-            } catch (SQLException e) {
-                AlertaUtil.mostrarError("Restricción de integridad", "No es posible eliminar el contrato porque cuenta con cargos o pagos registrados.");
-            }
-        }
     }
 
-    @FXML
-    public void limpiarFormulario() {
-        contratoSeleccionado = null;
-        btnAjustarGarantia.setDisable(true);
-        cmbUnidad.getSelectionModel().clearSelection();
-        cmbInquilino.getSelectionModel().clearSelection();
-        dpInicio.setValue(null);
-        dpFin.setValue(null);
-        txtCanon.clear();
-        txtDeposito.clear();
-        txtDiaPago.setText("5");
-        if (!cmbMoneda.getItems().isEmpty()) cmbMoneda.getSelectionModel().selectFirst();
-        if (!cmbEstado.getItems().isEmpty()) cmbEstado.setValue("Vigente");
-        tblContratos.getSelectionModel().clearSelection();
-    }
-
-    private void seleccionarContrato(Contrato c) {
-        this.contratoSeleccionado = c;
-        dpInicio.setValue(c.getInicio());
-        dpFin.setValue(c.getFin());
-        txtCanon.setText(c.getCanon() != null ? c.getCanon().toPlainString() : "");
-        txtDeposito.setText(c.getDepositoPactado() != null ? c.getDepositoPactado().toPlainString() : "");
-        txtDiaPago.setText(String.valueOf(c.getDiaPago()));
-        cmbMoneda.setValue(c.getMoneda());
-        cmbEstado.setValue(c.getEstado());
-
-        for (Unidad u : cmbUnidad.getItems()) {
-            if (u.getId().equals(c.getUnidadId())) {
-                cmbUnidad.setValue(u);
-                break;
-            }
-        }
-
-        for (Inquilino i : cmbInquilino.getItems()) {
-            if (i.getId().equals(c.getInquilinoId())) {
-                cmbInquilino.setValue(i);
-                break;
-            }
-        }
-    }
 }

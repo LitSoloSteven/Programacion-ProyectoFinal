@@ -1,5 +1,10 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.modelo;
 
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -8,11 +13,13 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.MapsId;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.Usuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
 
 /** Datos de contacto del propietario autenticado. */
 @Entity
 @Table(name = "propietario")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Propietario {
     @Id
     private Long id;
@@ -23,15 +30,16 @@ public class Propietario {
     private Usuario usuario;
 
     @Column(nullable = false, length = 100)
+    @Setter
     private String nombre;
 
     @Column(nullable = false, length = 150, unique = true)
+    @Setter
     private String correo;
 
     @Column(length = 20)
+    @Setter
     private String telefono;
-
-    protected Propietario() {}
 
     public Propietario(Usuario usuario, String nombre, String correo, String telefono) {
         this.usuario = usuario;
@@ -39,13 +47,4 @@ public class Propietario {
         this.correo = correo;
         this.telefono = telefono;
     }
-
-    public Long getId() { return id; }
-    public Usuario getUsuario() { return usuario; }
-    public String getNombre() { return nombre; }
-    public void setNombre(String nombre) { this.nombre = nombre; }
-    public String getCorreo() { return correo; }
-    public void setCorreo(String correo) { this.correo = correo; }
-    public String getTelefono() { return telefono; }
-    public void setTelefono(String telefono) { this.telefono = telefono; }
 }

@@ -1,15 +1,20 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.service;
 
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.Configuracion;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.Usuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Configuracion;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
+
+import java.util.Objects;
 import java.util.UUID;
 
 public final class ConfiguracionService {
     private final HibernateTransactions transactions;
     private final PermisoService permisos = new PermisoService();
     private final AuditoriaService auditoria = new AuditoriaService();
-    public ConfiguracionService(HibernateTransactions transactions) { this.transactions = transactions; }
+
+    public ConfiguracionService(HibernateTransactions transactions) {
+        this.transactions = Objects.requireNonNull(transactions);
+    }
 
     public Configuracion consultar(SesionUsuario identidad, String clave) {
         return transactions.ejecutar(session -> {
@@ -23,11 +28,14 @@ public final class ConfiguracionService {
             Usuario actor = permisos.exigir(session, identidad, Permiso.CAMBIAR_CONFIGURACION);
             Configuracion config = session.find(Configuracion.class, clave);
             if (config == null) {
-                if (versionEsperada != -1) throw new IllegalArgumentException("La configuración ya no existe.");
+                if (versionEsperada != -1) {
+                    throw new ConflictoDatosException(
+                            "La configuración cambió o ya no existe. Actualiza los datos antes de guardar.");
+                }
                 session.persist(new Configuracion(clave, valor));
             } else {
                 if (config.getVersion() != versionEsperada) {
-                    throw new IllegalArgumentException(
+                    throw new ConflictoDatosException(
                             "La configuración cambió. Actualiza los datos antes de guardar.");
                 }
                 config.cambiarValor(valor);

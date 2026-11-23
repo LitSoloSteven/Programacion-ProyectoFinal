@@ -2,312 +2,493 @@ package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import javafx.collections.transformation.FilteredList;
+import javafx.concurrent.Task;
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.scene.control.*;
-import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Node;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.Label;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputDialog;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
+import javafx.stage.Window;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PaginaResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoDetalleResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoListaResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoRegistroResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.ReciboResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteCatalogos;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClientePagos;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Pago;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ReporteService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ContratoService;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PagoService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AccionesTabla;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AtajosLista;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.DialogoFormulario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoTabla;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PanelEstadoTabla;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TemaAplicacion;
 
+import java.awt.Desktop;
+import java.io.File;
+import java.io.IOException;
 import java.math.BigDecimal;
-import java.sql.SQLException;
+import java.nio.file.Files;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.UUID;
 
-/**
- * Controlador de la vista de Pagos de Latch.
- * Registra cobros y actualiza el historial en tiempo real con PostgreSQL 18.
- */
+/** Historial paginado y formulario de revisión para registrar pagos. */
 public class PagoController {
+    private static final DateTimeFormatter FECHA_VISIBLE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
-    @FXML
-    private ComboBox<Contrato> cmbContrato;
+    @FXML private VBox rootView;
+    @FXML private Button btnGenerarReporte;
+    @FXML private HBox anularTooltipHost;
+    @FXML private Button btnAnular;
+    @FXML private Button btnNuevo;
+    @FXML private Button btnLimpiar;
+    @FXML private Button btnPaginaAnterior;
+    @FXML private Button btnPaginaSiguiente;
+    @FXML private Button btnRefrescar;
+    @FXML private Label lblContador;
+    @FXML private Label lblErrorConsulta;
+    @FXML private Label lblPaginacion;
+    @FXML private Label lblTitulo;
+    @FXML private TextField txtBuscar;
+    @FXML private TableView<PagoListaResponse> tblPagos;
+    @FXML private TableColumn<PagoListaResponse, String> colContrato;
+    @FXML private TableColumn<PagoListaResponse, LocalDate> colFecha;
+    @FXML private TableColumn<PagoListaResponse, String> colMonto;
+    @FXML private TableColumn<PagoListaResponse, String> colMetodo;
+    @FXML private TableColumn<PagoListaResponse, String> colReferencia;
+    @FXML private TableColumn<PagoListaResponse, String> colEstado;
+    @FXML private TableColumn<PagoListaResponse, Void> colAcciones;
 
-    @FXML
-    private TextField txtMonto;
+    private final ReporteService reporteService = new ReporteService();
+    private final ClienteCatalogos catalogos = new ClienteCatalogos(ClienteLatch.api());
+    private final ClientePagos clientePagos = HelloApplication.instancia().getPagos();
+    private final ObservableList<PagoListaResponse> listaPagos = FXCollections.observableArrayList();
+    private List<Contrato> contratosDisponibles = List.of();
+    private PagoListaResponse pagoSeleccionado;
+    private int paginaActual = 1;
+    private long versionConsulta;
+    private final boolean permisoAnular = SesionUsuario.esPropietario();
 
-    @FXML
-    private ComboBox<String> cmbMoneda;
+    private record DatosTabla(List<Contrato> contratos, PaginaResponse<PagoListaResponse> pagos) { }
 
-    @FXML
-    private DatePicker dpFechaPago;
-
-    @FXML
-    private ComboBox<String> cmbMetodo;
-
-    @FXML
-    private TextField txtReferencia;
-
-    @FXML
-    private TextField txtNotas;
-
-    @FXML
-    private Button btnAnular;
-
-    @FXML
-    private TextField txtBuscar;
-
-    @FXML
-    private TableView<Pago> tblPagos;
-
-    @FXML
-    private TableColumn<Pago, String> colContrato;
-
-    @FXML
-    private TableColumn<Pago, LocalDate> colFecha;
-
-    @FXML
-    private TableColumn<Pago, String> colMonto;
-
-    @FXML
-    private TableColumn<Pago, String> colMetodo;
-
-    @FXML
-    private TableColumn<Pago, String> colReferencia;
-
-    @FXML
-    private TableColumn<Pago, String> colEstado;
-
-    private final PagoService pagoService;
-    private final ContratoService contratoService;
-
-    private final ObservableList<Pago> listaPagos = FXCollections.observableArrayList();
-    private FilteredList<Pago> listaFiltrada;
-    private Pago pagoSeleccionado = null;
-
-    public PagoController() {
-        this.pagoService = new PagoService();
-        this.contratoService = new ContratoService();
-    }
-
-    public PagoController(PagoService pagoService, ContratoService contratoService) {
-        this.pagoService = pagoService;
-        this.contratoService = contratoService;
-    }
-
-    @FXML
-    public void initialize() {
-        inicializarCombos();
-        configurarTabla();
-        configurarFiltro();
-        aplicarControlPermisos();
-
-        cargarContratosReales();
-        cargarDatos();
-
-        tblPagos.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null) {
-                seleccionarPago(newVal);
-            }
+    @FXML public void initialize() {
+        lblTitulo.setGraphic(Iconos.crear(Iconos.Nombre.PAGO, 20));
+        Iconos.asignar(btnRefrescar, Iconos.Nombre.ACTUALIZAR, 16);
+        Iconos.asignar(btnNuevo, Iconos.Nombre.MAS, 16);
+        Iconos.asignar(btnLimpiar, Iconos.Nombre.CERRAR, 14);
+        Iconos.asignar(btnAnular, Iconos.Nombre.ELIMINAR, 16);
+        btnAnular.setDisable(true);
+        Tooltip.install(anularTooltipHost, new Tooltip(permisoAnular
+                ? "Selecciona un pago para anularlo." : "Solo el propietario puede anular pagos."));
+        btnNuevo.setDisable(true);
+        tblPagos.setItems(listaPagos);
+        tblPagos.setPlaceholder(PanelEstadoTabla.crear("Cargando pagos",
+                "El historial aparecerá al terminar la consulta.", null, null));
+        colContrato.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().contratoInfo()));
+        colFecha.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyObjectWrapper<>(LocalDate.parse(c.getValue().fechaPago())));
+        colFecha.setCellFactory(FormatoTabla.fecha());
+        colMonto.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().montoFormateado()));
+        colMonto.setCellFactory(FormatoTabla.numerica());
+        colMetodo.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().metodo()));
+        colReferencia.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().referencia()));
+        colEstado.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().estado()));
+        colEstado.setCellFactory(FormatoTabla.estado());
+        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>(
+                "Ver pago", this::mostrarDetalle, Iconos.Nombre.VER)));
+        tblPagos.getSelectionModel().selectedItemProperty().addListener((obs, anterior, actual) -> {
+            pagoSeleccionado = actual;
+            btnAnular.setDisable(actual == null || !permisoAnular || "Anulado".equalsIgnoreCase(actual.estado()));
         });
-
-        // Al seleccionar contrato, precargar el monto con el canon y su moneda
-        cmbContrato.valueProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null && pagoSeleccionado == null) {
-                if (newVal.getCanon() != null) {
-                    txtMonto.setText(newVal.getCanon().toPlainString());
-                }
-                if (newVal.getMoneda() != null) {
-                    cmbMoneda.setValue(newVal.getMoneda());
-                }
-            }
+        txtBuscar.textProperty().addListener((obs, anterior, nuevo) -> {
+            paginaActual = 1;
+            cargarDatos();
         });
+        AtajosLista.instalar(rootView, txtBuscar, this::handleNuevo);
+        cargarContratosYPagos();
     }
 
-    private void inicializarCombos() {
-        cmbMoneda.setItems(FXCollections.observableArrayList("USD", "NIO"));
-        cmbMoneda.getSelectionModel().selectFirst();
-
-        cmbMetodo.setItems(FXCollections.observableArrayList("Efectivo", "Transferencia", "Depósito bancario", "Otro"));
-        cmbMetodo.getSelectionModel().selectFirst();
-
-        dpFechaPago.setValue(LocalDate.now());
-    }
-
-    private void configurarTabla() {
-        colContrato.setCellValueFactory(new PropertyValueFactory<>("contratoInfo"));
-        colFecha.setCellValueFactory(new PropertyValueFactory<>("fechaPago"));
-        colMonto.setCellValueFactory(new PropertyValueFactory<>("montoFormateado"));
-        colMetodo.setCellValueFactory(new PropertyValueFactory<>("metodo"));
-        colReferencia.setCellValueFactory(new PropertyValueFactory<>("referencia"));
-        colEstado.setCellValueFactory(new PropertyValueFactory<>("estado"));
-
-        listaFiltrada = new FilteredList<>(listaPagos, p -> true);
-        tblPagos.setItems(listaFiltrada);
-    }
-
-    private void configurarFiltro() {
-        txtBuscar.textProperty().addListener((obs, oldVal, newVal) -> {
-            listaFiltrada.setPredicate(p -> {
-                if (newVal == null || newVal.isBlank()) return true;
-                String filtro = newVal.toLowerCase().trim();
-                boolean matchCon = p.getContratoInfo() != null && p.getContratoInfo().toLowerCase().contains(filtro);
-                boolean matchRef = p.getReferencia() != null && p.getReferencia().toLowerCase().contains(filtro);
-                boolean matchMet = p.getMetodo() != null && p.getMetodo().toLowerCase().contains(filtro);
-                return matchCon || matchRef || matchMet;
-            });
-        });
-    }
-
-    private void aplicarControlPermisos() {
-        boolean esAdmin = SesionUsuario.esPropietario();
-        btnAnular.setVisible(esAdmin);
-        btnAnular.setManaged(esAdmin);
-    }
-
-    public void cargarContratosReales() {
-        try {
-            List<Contrato> contratos = contratoService.listarVigentes();
-            cmbContrato.setItems(FXCollections.observableArrayList(contratos));
-            if (!contratos.isEmpty()) {
-                cmbContrato.getSelectionModel().selectFirst();
+    private void cargarContratosYPagos() {
+        int pagina = paginaActual;
+        String filtro = txtBuscar.getText();
+        long version = ++versionConsulta;
+        Task<DatosTabla> tarea = new Task<>() {
+            @Override protected DatosTabla call() {
+                return new DatosTabla(catalogos.contratos(true),
+                        clientePagos.listarPagos(pagina, filtro));
             }
-        } catch (SQLException e) {
-            AlertaUtil.mostrarError("Error", "No se pudieron obtener los contratos vigentes desde PostgreSQL.");
-        }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
+            if (version != versionConsulta) return;
+            contratosDisponibles = datos.contratos();
+            btnNuevo.setDisable(contratosDisponibles.isEmpty());
+            mostrarPagina(datos.pagos());
+            btnRefrescar.setDisable(false);
+        }, error -> {
+            if (version == versionConsulta) {
+                mostrarErrorConsulta(error);
+                tblPagos.setPlaceholder(PanelEstadoTabla.crear("No se pudieron cargar los pagos",
+                        "Revisa la conexión e inténtalo de nuevo.", "Reintentar", this::cargarContratosYPagos));
+            }
+            btnRefrescar.setDisable(false);
+        });
     }
 
     public void cargarDatos() {
+        int pagina = paginaActual;
+        String filtro = txtBuscar.getText();
+        long version = ++versionConsulta;
+        Task<PaginaResponse<PagoListaResponse>> tarea = new Task<>() {
+            @Override protected PaginaResponse<PagoListaResponse> call() {
+                return clientePagos.listarPagos(pagina, filtro);
+            }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, resultado -> {
+            if (version == versionConsulta) mostrarPagina(resultado);
+            btnRefrescar.setDisable(false);
+        }, error -> {
+            if (version == versionConsulta) mostrarErrorConsulta(error);
+            btnRefrescar.setDisable(false);
+        });
+    }
+
+    private void mostrarPagina(PaginaResponse<PagoListaResponse> pagina) {
+        int paginas = (int) Math.max(1, (pagina.total() + pagina.tamano() - 1) / pagina.tamano());
+        if (paginaActual > paginas) {
+            paginaActual = paginas;
+            cargarDatos();
+            return;
+        }
+        listaPagos.setAll(pagina.elementos());
+        long desde = pagina.total() == 0 ? 0 : (long) (paginaActual - 1) * pagina.tamano() + 1;
+        long hasta = pagina.total() == 0 ? 0 : desde + pagina.elementos().size() - 1;
+        lblPaginacion.setText(desde + "–" + hasta + " de " + pagina.total() + " pagos");
+        lblContador.setText(pagina.total() + (pagina.total() == 1 ? " pago" : " pagos"));
+        btnPaginaAnterior.setDisable(paginaActual <= 1);
+        btnPaginaSiguiente.setDisable(paginaActual >= paginas);
+        tblPagos.setPlaceholder(PanelEstadoTabla.crear(txtBuscar.getText().isBlank()
+                        ? "Aún no hay pagos" : "No hay coincidencias",
+                txtBuscar.getText().isBlank() ? "Los pagos registrados aparecerán aquí." : "Prueba con otro término o limpia la búsqueda.",
+                txtBuscar.getText().isBlank() && !contratosDisponibles.isEmpty() ? "Registrar pago" : null,
+                txtBuscar.getText().isBlank() && !contratosDisponibles.isEmpty() ? this::handleNuevo : null));
+        lblErrorConsulta.setText("");
+        lblErrorConsulta.setVisible(false);
+        lblErrorConsulta.setManaged(false);
+    }
+
+    @FXML public void handleNuevo() { abrirFormulario(); }
+
+    private void abrirFormulario() {
         try {
-            List<Pago> datos = pagoService.listarTodos();
-            listaPagos.setAll(datos);
-        } catch (SQLException e) {
-            AlertaUtil.mostrarError("Error al cargar pagos", "No fue posible consultar el historial de pagos desde PostgreSQL.");
+            FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource("pago-form.fxml"));
+            Node contenido = loader.load();
+            PagoFormController formulario = loader.getController();
+            formulario.establecerContratos(contratosDisponibles);
+            Window propietario = tblPagos.getScene() == null ? null : tblPagos.getScene().getWindow();
+            Dialog<ButtonType> dialogo = DialogoFormulario.crear("Registrar pago", contenido,
+                    propietario, 740, 680, "Revisar pago");
+            DialogoFormulario.protegerCambiosSinGuardar(dialogo, btnNuevo, formulario::hayCambios);
+            ButtonType accion = dialogo.getDialogPane().getButtonTypes().getFirst();
+            Button botonAccion = (Button) dialogo.getDialogPane().lookupButton(accion);
+            botonAccion.addEventFilter(ActionEvent.ACTION, evento -> {
+                evento.consume();
+                if ("Revisar pago".equals(botonAccion.getText())) {
+                    if (formulario.validar()) {
+                        formulario.mostrarRevision();
+                        botonAccion.setText("Confirmar pago");
+                    }
+                } else {
+                    registrarPago(dialogo, botonAccion, formulario);
+                }
+            });
+            dialogo.showAndWait();
+        } catch (IOException error) {
+            AlertaUtil.mostrarError("No se pudo abrir el formulario", "Vuelve a intentarlo.");
         }
     }
 
-    @FXML
-    public void refrescarTabla() {
-        cargarContratosReales();
-        cargarDatos();
-        limpiarFormulario();
-        AlertaUtil.mostrarExito("Tabla actualizada", "El historial de pagos ha sido sincronizado con PostgreSQL.");
-    }
-
-    @FXML
-    public void handleRegistrar() {
-        Contrato contrato = cmbContrato.getValue();
-        String strMonto = txtMonto.getText();
-        String moneda = cmbMoneda.getValue();
-        LocalDate fecha = dpFechaPago.getValue();
-        String metodo = cmbMetodo.getValue();
-        String referencia = txtReferencia.getText();
-        String notas = txtNotas.getText();
-
-        if (contrato == null) {
-            AlertaUtil.mostrarAdvertencia("Campo obligatorio", "Debe seleccionar el contrato al que se le aplicará el pago.");
-            cmbContrato.requestFocus();
-            return;
-        }
-
-        if (fecha == null) {
-            AlertaUtil.mostrarAdvertencia("Campo obligatorio", "Seleccione la fecha de realización del pago.");
-            dpFechaPago.requestFocus();
-            return;
-        }
-
-        BigDecimal monto;
-        try {
-            monto = new BigDecimal(strMonto.trim());
-            if (monto.compareTo(BigDecimal.ZERO) <= 0) {
-                AlertaUtil.mostrarAdvertencia("Monto inválido", "El monto a pagar debe ser mayor a cero.");
-                txtMonto.requestFocus();
+    private void registrarPago(Dialog<ButtonType> dialogo, Button botonAccion,
+                               PagoFormController formulario) {
+        PagoFormController.Datos datos = formulario.datos();
+        PagoRequest solicitud = new PagoRequest(datos.contrato().getId().toString(),
+                datos.fecha().toString(), datos.moneda(), datos.monto().toPlainString(), datos.metodo(),
+                datos.referencia(), List.of(), datos.notas());
+        long usuarioId = SesionUsuario.getActual().getUsuarioId();
+        botonAccion.setDisable(true);
+        botonAccion.setText("Registrando pago…");
+        Task<PagoRegistroResponse> tarea = new Task<>() {
+            @Override protected PagoRegistroResponse call() { return clientePagos.registrarReintentable(usuarioId, solicitud); }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, registro -> {
+            formulario.marcarLimpio();
+            DialogoFormulario.cerrar(dialogo);
+            AlertaUtil.mostrarExito("Pago registrado", "Pago de "
+                    + String.format("%.2f %s", datos.monto(), datos.moneda()) + " registrado el "
+                    + datos.fecha().format(FECHA_VISIBLE) + ". Recibo N.º " + registro.numeroRecibo() + ".");
+            paginaActual = 1;
+            cargarDatos();
+        }, error -> {
+            botonAccion.setDisable(false);
+            botonAccion.setText("Confirmar pago");
+            if (error instanceof ErrorClienteException clienteError && clienteError.esNoAutenticado()) {
+                formulario.mostrarError("Tu sesión expiró.");
                 return;
             }
-        } catch (Exception e) {
-            AlertaUtil.mostrarAdvertencia("Formato inválido", "Ingrese un monto decimal válido para el pago.");
-            txtMonto.requestFocus();
+            formulario.mostrarError(mensajeErrorPago(error));
+        });
+    }
+
+    @FXML public void refrescarTabla() {
+        btnRefrescar.setDisable(true);
+        int pagina = paginaActual;
+        String filtro = txtBuscar.getText();
+        long version = ++versionConsulta;
+        Task<DatosTabla> tarea = new Task<>() {
+            @Override protected DatosTabla call() {
+                return new DatosTabla(catalogos.contratos(true),
+                        clientePagos.listarPagos(pagina, filtro));
+            }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
+            if (version != versionConsulta) return;
+            contratosDisponibles = datos.contratos();
+            btnNuevo.setDisable(contratosDisponibles.isEmpty());
+            mostrarPagina(datos.pagos());
+            btnRefrescar.setDisable(false);
+        }, error -> {
+            if (version == versionConsulta) mostrarErrorConsulta(error);
+            btnRefrescar.setDisable(false);
+        });
+    }
+
+    @FXML public void limpiarFiltros() {
+        if (txtBuscar.getText().isBlank()) return;
+        txtBuscar.clear();
+    }
+
+    @FXML public void paginaAnterior() {
+        if (paginaActual <= 1) return;
+        paginaActual--;
+        cargarDatos();
+    }
+
+    @FXML public void paginaSiguiente() {
+        paginaActual++;
+        cargarDatos();
+    }
+
+    @FXML public void handleAnular() {
+        PagoListaResponse pago = pagoSeleccionado;
+        if (pago == null || !permisoAnular || "Anulado".equalsIgnoreCase(pago.estado())) return;
+        TextInputDialog confirmacion = new TextInputDialog();
+        confirmacion.initOwner(tblPagos.getScene().getWindow());
+        confirmacion.setTitle("Anular pago");
+        confirmacion.setHeaderText(pago.montoFormateado() + " · " + pago.contratoInfo());
+        confirmacion.setContentText("Motivo de la anulación");
+        TemaAplicacion.aplicar(confirmacion.getDialogPane());
+        String motivo = confirmacion.showAndWait().map(String::strip).orElse(null);
+        if (motivo == null) return;
+        if (motivo.isEmpty()) {
+            AlertaUtil.mostrarAdvertencia("Motivo requerido", "Indica por qué se debe anular el pago.");
             return;
         }
-
-        try {
-            Pago nuevo = new Pago();
-            nuevo.setContratoId(contrato.getId());
-            nuevo.setFechaPago(fecha);
-            nuevo.setMonedaOriginal(moneda);
-            nuevo.setMontoOriginal(monto);
-            nuevo.setMontoContrato(monto);
-            nuevo.setMetodo(metodo);
-            nuevo.setReferencia(referencia != null && !referencia.isBlank() ? referencia.trim() : null);
-            nuevo.setNotas(notas != null && !notas.isBlank() ? notas.trim() : null);
-            nuevo.setEstado("Registrado");
-
-            pagoService.registrarPago(nuevo);
-
-            AlertaUtil.mostrarExito(
-                    "Pago Registrado",
-                    "El pago por " + String.format("%.2f %s", monto, moneda) + " fue guardado satisfactoriamente en PostgreSQL."
-            );
-
+        btnAnular.setDisable(true);
+        Task<Void> tarea = new Task<>() {
+            @Override protected Void call() {
+                clientePagos.anular(pago.id(), motivo);
+                return null;
+            }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+            pagoSeleccionado = null;
+            AlertaUtil.mostrarExito("Pago anulado", "El pago quedó marcado como anulado.");
             cargarDatos();
-            limpiarFormulario();
-        } catch (IllegalArgumentException e) {
-            AlertaUtil.mostrarAdvertencia("Datos inválidos", e.getMessage());
-        } catch (SQLException e) {
-            AlertaUtil.mostrarError("Error de persistencia", "No se pudo registrar el pago en la base de datos.");
-        }
+        }, error -> {
+            btnAnular.setDisable(pagoSeleccionado == null || !permisoAnular);
+            if (error instanceof ErrorClienteException api && api.getEstado() == 409) cargarDatos();
+            AlertaUtil.mostrarError("No se pudo anular el pago", mensajeErrorPago(error));
+        });
     }
 
     @FXML
-    public void handleAnular() {
-        if (pagoSeleccionado == null) {
-            AlertaUtil.mostrarAdvertencia("Selección requerida", "Seleccione un pago de la tabla para anular.");
+    public void handleGenerarReporte() {
+        List<PagoListaResponse> filasActuales = tblPagos == null
+                ? List.of()
+                : List.copyOf(tblPagos.getItems());
+
+        if (filasActuales.isEmpty()) {
+            AlertaUtil.mostrarAdvertencia("Sin datos",
+                    "No hay pagos en la tabla para generar el reporte.");
             return;
         }
 
-        boolean confirma = AlertaUtil.mostrarConfirmacion(
-                "Confirmar anulación",
-                "¿Está seguro de que desea anular el pago por " + pagoSeleccionado.getMontoFormateado() + "?"
+        List<Pago> pagosParaReporte = filasActuales.stream()
+                .map(this::mapearPagoDesdeLista)
+                .toList();
+
+        if (btnGenerarReporte != null) {
+            btnGenerarReporte.setDisable(true);
+        }
+
+        Task<byte[]> tareaGenerarPdf = new Task<>() {
+            @Override
+            protected byte[] call() {
+                return reporteService.generarReportePagosPdf(pagosParaReporte);
+            }
+        };
+
+        TareasJavaFx.ejecutar(
+                HelloApplication.instancia().getTareas(),
+                tareaGenerarPdf,
+                pdfBytes -> {
+                    if (btnGenerarReporte != null) {
+                        btnGenerarReporte.setDisable(false);
+                    }
+                    if (pdfBytes == null || pdfBytes.length == 0) {
+                        AlertaUtil.mostrarError("Error de reporte",
+                                "El reporte generado está vacío.");
+                        return;
+                    }
+
+                    FileChooser fileChooser = new FileChooser();
+                    fileChooser.setTitle("Guardar reporte de pagos");
+                    fileChooser.setInitialFileName("Reporte-Pagos.pdf");
+                    fileChooser.getExtensionFilters().add(
+                            new FileChooser.ExtensionFilter("Documento PDF (*.pdf)", "*.pdf")
+                    );
+
+                    Window ventana = tblPagos.getScene() == null
+                            ? null
+                            : tblPagos.getScene().getWindow();
+                    File archivoDestino = fileChooser.showSaveDialog(ventana);
+
+                    if (archivoDestino != null) {
+                        try {
+                            Files.write(archivoDestino.toPath(), pdfBytes);
+                            AlertaUtil.mostrarExito("Reporte listo",
+                                    "El reporte de pagos se guardó correctamente.");
+
+                            if (Desktop.isDesktopSupported()) {
+                                Desktop.getDesktop().open(archivoDestino);
+                            }
+                        } catch (Exception ex) {
+                            AlertaUtil.mostrarError("Error al guardar",
+                                    "No se pudo guardar el archivo PDF en disco.");
+                        }
+                    }
+                },
+                error -> {
+                    if (btnGenerarReporte != null) {
+                        btnGenerarReporte.setDisable(false);
+                    }
+                    AlertaUtil.mostrarError("Error al generar reporte", mensajeErrorPago(error));
+                }
         );
+    }
 
-        if (confirma) {
+    private Pago mapearPagoDesdeLista(PagoListaResponse item) {
+        Pago pago = new Pago();
+        if (item.id() != null) {
             try {
-                pagoService.anular(pagoSeleccionado.getId());
-                AlertaUtil.mostrarExito("Pago anulado", "El estado del pago fue cambiado a 'Anulado'.");
-                cargarDatos();
-                limpiarFormulario();
-            } catch (SecurityException e) {
-                AlertaUtil.mostrarAdvertencia("Permiso denegado", e.getMessage());
-            } catch (SQLException e) {
-                AlertaUtil.mostrarError("Error", "No fue posible anular el pago en PostgreSQL.");
+                pago.setId(UUID.fromString(item.id()));
+            } catch (IllegalArgumentException ignored) {
             }
         }
-    }
-
-    @FXML
-    public void limpiarFormulario() {
-        pagoSeleccionado = null;
-        if (!cmbContrato.getItems().isEmpty()) {
-            cmbContrato.getSelectionModel().selectFirst();
-        } else {
-            cmbContrato.getSelectionModel().clearSelection();
-        }
-        txtMonto.clear();
-        if (!cmbMoneda.getItems().isEmpty()) cmbMoneda.getSelectionModel().selectFirst();
-        dpFechaPago.setValue(LocalDate.now());
-        if (!cmbMetodo.getItems().isEmpty()) cmbMetodo.getSelectionModel().selectFirst();
-        txtReferencia.clear();
-        txtNotas.clear();
-        tblPagos.getSelectionModel().clearSelection();
-    }
-
-    private void seleccionarPago(Pago p) {
-        this.pagoSeleccionado = p;
-        txtMonto.setText(p.getMontoOriginal() != null ? p.getMontoOriginal().toPlainString() : "");
-        cmbMoneda.setValue(p.getMonedaOriginal());
-        dpFechaPago.setValue(p.getFechaPago());
-        cmbMetodo.setValue(p.getMetodo());
-        txtReferencia.setText(p.getReferencia() != null ? p.getReferencia() : "");
-        txtNotas.setText(p.getNotas() != null ? p.getNotas() : "");
-
-        for (Contrato c : cmbContrato.getItems()) {
-            if (c.getId().equals(p.getContratoId())) {
-                cmbContrato.setValue(c);
-                break;
+        pago.setContratoInfo(item.contratoInfo());
+        if (item.fechaPago() != null && !item.fechaPago().isBlank()) {
+            try {
+                pago.setFechaPago(LocalDate.parse(item.fechaPago()));
+            } catch (Exception ignored) {
             }
         }
+        String formateado = item.montoFormateado();
+        if (formateado != null && !formateado.isBlank()) {
+            String[] partes = formateado.strip().split("\\s+");
+            if (partes.length >= 1) {
+                try {
+                    BigDecimal monto = new BigDecimal(partes[0].replace(",", ""));
+                    pago.setMontoOriginal(monto);
+                    pago.setMontoContrato(monto);
+                } catch (NumberFormatException ignored) {
+                }
+            }
+            if (partes.length >= 2) {
+                pago.setMonedaOriginal(partes[1]);
+            }
+        }
+        pago.setMetodo(item.metodo());
+        pago.setReferencia(item.referencia());
+        pago.setEstado(item.estado());
+        return pago;
+    }
+
+    private record Detalle(PagoDetalleResponse pago, ReciboResponse recibo) { }
+
+    private void mostrarDetalle(PagoListaResponse pago) {
+        Task<Detalle> tarea = new Task<>() {
+            @Override protected Detalle call() {
+                PagoDetalleResponse detalle = clientePagos.detalle(pago.id());
+                ReciboResponse recibo = detalle.numeroRecibo() == null ? null
+                        : clientePagos.recibo(detalle.numeroRecibo());
+                return new Detalle(detalle, recibo);
+            }
+        };
+        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, detalle -> {
+            PagoDetalleResponse datos = detalle.pago();
+            ReciboResponse recibo = detalle.recibo();
+            Alert alerta = new Alert(Alert.AlertType.INFORMATION);
+            alerta.initOwner(tblPagos.getScene().getWindow());
+            alerta.setTitle("Detalle del pago");
+            alerta.setHeaderText(recibo == null ? pago.montoFormateado()
+                    : "Recibo N.º " + recibo.numero() + " · " + pago.montoFormateado());
+            alerta.setContentText(datos.contratoInfo()
+                    + "\nFecha: " + LocalDate.parse(datos.fechaPago()).format(FECHA_VISIBLE)
+                    + "\nMétodo: " + datos.metodo()
+                    + "\nReferencia: " + (datos.referencia() == null ? "—" : datos.referencia())
+                    + "\nEstado: " + datos.estado());
+            TemaAplicacion.aplicar(alerta.getDialogPane());
+            alerta.showAndWait();
+        }, error -> AlertaUtil.mostrarError("No se pudo consultar el pago", mensajeErrorPago(error)));
+    }
+
+    private void mostrarErrorConsulta(Throwable error) {
+        lblErrorConsulta.setText("No se pudo actualizar el historial. " + mensajeErrorPago(error));
+        lblErrorConsulta.setVisible(true);
+        lblErrorConsulta.setManaged(true);
+    }
+
+    private String mensajeErrorPago(Throwable error) {
+        if (error instanceof ErrorClienteException clienteError) {
+            if (clienteError.esSinConexion() || clienteError.getEstado() >= 500) {
+                return clienteError.getMessage() + " Si el resultado es incierto, reintenta sin cambiar los datos.";
+            }
+            return clienteError.getMessage();
+        }
+        if (error instanceof IllegalArgumentException || error instanceof IllegalStateException
+                || error instanceof SecurityException) return error.getMessage();
+        return "Revisa los datos y vuelve a intentarlo.";
     }
 }

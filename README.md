@@ -1,131 +1,322 @@
 # Latch — Proyecto de Programación de Aplicaciones de Escritorio
 
-Aplicación académica de administración de alquileres. Esta entrega implementa la parte de Steven Cuadra: infraestructura Hibernate, usuarios, roles, auditoría, configuración y base de tareas en segundo plano. La pantalla inicial sigue siendo la plantilla JavaFX; los formularios y las entidades de alquileres corresponden a las siguientes integraciones del equipo.
+Aplicación de escritorio para administrar alquileres: propiedades, unidades,
+inquilinos, contratos, cargos, tasas de cambio, pagos, recibos, estado de cuenta
+y métricas. La interfaz JavaFX consume la **API REST local de Spring Boot**,
+que también puede ejecutarse de forma independiente.
+
+- JavaFX 21 + Hibernate 7.4.6.Final + PostgreSQL 18.
+- JSON con Gson 2.13.2.
+- Paquete raíz: `ni.edu.uam.proyectofinalprogramacionappescritorio`.
 
 ## Requisitos
 
 - JDK 21 (configurar `JAVA_HOME`).
-- PostgreSQL 18 para ejecutar la persistencia.
+- PostgreSQL 18 para la persistencia real.
 - Maven Wrapper incluido: `./mvnw.cmd` en Windows y `./mvnw` en Linux/macOS.
-- JavaFX 21.0.6, Hibernate 6.6.59.Final y controlador PostgreSQL 42.7.14, declarados en Maven.
+- JavaFX 21.0.13, Hibernate ORM 7.4.6.Final, JasperReports 7.0.8 y controlador
+  PostgreSQL 42.7.14, declarados en `pom.xml`.
 
-## Base de datos y configuración
+## Configuración
 
-Desde pgAdmin o psql, crear un usuario local con contraseña propia y una base llamada `latch_db` de su propiedad. No utilizar el superusuario de PostgreSQL para la aplicación.
-
-La aplicación carga automáticamente `.env` desde la raíz del proyecto. Copiar `.env.example` a `.env` si no existe y completar:
+La aplicación carga `.env` desde la raíz del proyecto. Copiar `.env.example` a
+`.env` y completar:
 
 ```dotenv
 LATCH_DB_URL=jdbc:postgresql://localhost:5432/latch_db
 LATCH_DB_USER=tu_usuario_postgresql
 LATCH_DB_PASSWORD=tu_contraseña_postgresql
-LATCH_DB_SCHEMA_MODE=update
+LATCH_DB_SCHEMA_MODE=validate
+LATCH_API_PORT=8090
 ```
 
-Ejecutar los comandos Maven desde la raíz del proyecto. En IntelliJ, establecer esa carpeta como directorio de trabajo. Usar `update` en la primera ejecución y cambiarlo a `validate` después de crear las tablas.
+- `LATCH_API_PORT` es obligatorio: la API solo escucha en `127.0.0.1` y ese
+  puerto. Si falta, la aplicación muestra un error y no continúa.
+- Las variables de entorno tienen prioridad sobre el archivo.
+- `.env` está ignorado por Git. No introducir credenciales en la URL JDBC ni en
+  el código.
+- Para `localhost`, la URL actual sin parámetros sigue siendo válida. Para una
+  base remota, usar `sslmode=verify-full` (recomendado) o `sslmode=verify-ca`
+  y añadir `sslrootcert` con la ruta absoluta a un certificado raíz existente y
+  legible. Codificar los caracteres reservados de la ruta como `%XX` dentro de
+  la URL; por ejemplo, `C:\certs\ca.crt` se escribe como
+  `C%3A%5Ccerts%5Cca.crt`.
+- La URL solo admite los parámetros `sslmode` y `sslrootcert`. Un host remoto
+  rechaza `disable`, `allow`, `prefer` y `require`; `require` cifra la conexión,
+  pero pgJDBC no valida el certificado del servidor en ese modo. Los modos
+  `verify-ca` y `verify-full` requieren `sslrootcert`.
+- `validate` (predeterminado) verifica el esquema sin modificarlo. `update` solo
+  debe usarse en una base de desarrollo durante la inicialización.
 
-Para comprobar la conexión y crear las tablas con `update`, ejecutar:
+## Base de datos y migraciones
+
+Crear un usuario local propio y una base `latch_db` de su propiedad. Después,
+aplicar **en orden** las migraciones de `docs/migrations`:
+
+| Archivo | Contenido |
+| --- | --- |
+| `V1__propietario_perfil.sql` | Perfil de propietario y relación con propiedades |
+| `V2__seguimiento_garantias.sql` | Seguimiento del depósito en garantía |
+| `V3__descripcion_unidad.sql` | Descripción de unidades |
+| `V4__tasas_autorizadas.sql` | Una tasa autorizada por fecha y tasa positiva |
+| `V5__pagos_idempotencia_aplicaciones.sql` | Idempotencia, aplicaciones de pago y datos de anulación |
+| `V6__contratos_activos_por_unidad.sql` | Una ocupación activa por unidad |
+| `V7__retencion_idempotencia_pagos.sql` | Índice para limpiar idempotencias vencidas |
+| `V8__consecutivo_recibos_transaccional.sql` | Consecutivo de recibos sin huecos por rollback |
+| `V9__auditoria_login_fallido.sql` | Auditoría de login fallido sin requerir una cuenta existente |
+| `V10__instante_operativo_pago.sql` | Instante UTC de registro del pago, separado de su fecha efectiva |
+
+Ejemplo con `psql`:
+
+```powershell
+psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V1__propietario_perfil.sql
+psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V2__seguimiento_garantias.sql
+psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V3__descripcion_unidad.sql
+psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V4__tasas_autorizadas.sql
+psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V5__pagos_idempotencia_aplicaciones.sql
+psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V6__contratos_activos_por_unidad.sql
+psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V7__retencion_idempotencia_pagos.sql
+psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V8__consecutivo_recibos_transaccional.sql
+psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V9__auditoria_login_fallido.sql
+psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V10__instante_operativo_pago.sql
+```
+
+Comprobar la conexión:
 
 ```powershell
 ./mvnw.cmd compile exec:java
 ```
 
-Debe aparecer `Conexión con PostgreSQL verificada correctamente.`. Esta comprobación no crea una cuenta de la aplicación; para eso se utiliza el paso «Primer propietario» de abajo. La pantalla JavaFX sigue siendo la plantilla inicial hasta integrar los formularios.
-
-También se pueden usar variables de entorno para PowerShell; tienen prioridad sobre los valores del archivo:
-
-```powershell
-$env:JAVA_HOME = 'C:/ruta/al/jdk-21'
-$env:LATCH_DB_URL = 'jdbc:postgresql://localhost:5432/latch_db'
-$env:LATCH_DB_USER = 'latch_local'
-$clave = Read-Host 'Contraseña PostgreSQL' -AsSecureString
-$env:LATCH_DB_PASSWORD = [System.Net.NetworkCredential]::new('', $clave).Password
-$env:LATCH_DB_SCHEMA_MODE = 'update'
-```
-
-`update` crea las tablas de esta entrega en una base de desarrollo. Después del primer inicio, usar `validate`, el valor predeterminado: verifica el esquema sin modificarlo. `none` desactiva esa verificación. No se aceptan `create` ni `create-drop` en la configuración de ejecución.
-
-El archivo `.env` está ignorado por Git. Admite líneas `NOMBRE=valor`, líneas vacías, comentarios que empiezan con `#` y valores entre comillas simples o dobles. Los valores son literales: no se expanden variables ni secuencias de escape. No añadir comentarios al final de una credencial. No introducir credenciales ni parámetros en la URL JDBC; usuario y contraseña tienen sus propias variables.
+Debe aparecer `Conexión con PostgreSQL verificada correctamente.`.
 
 ## Primer propietario
 
-Ejecutar una sola vez, con la aplicación detenida y la conexión configurada:
+Ejecutar una sola vez, con la aplicación detenida:
 
 ```powershell
 $env:LATCH_INITIAL_USER = 'steven'
 $claveInicial = Read-Host 'Contraseña inicial (12 a 128 caracteres)' -AsSecureString
 $env:LATCH_INITIAL_PASSWORD = [System.Net.NetworkCredential]::new('', $claveInicial).Password
-./mvnw.cmd compile exec:java '-Dexec.mainClass=ni.edu.uam.proyectofinalprogramacionappescritorio.util.CrearPropietarioInicial'
+./mvnw.cmd compile exec:java '-Dexec.mainClass=ni.edu.uam.proyectofinalprogramacionappescritorio.herramientas.CrearPropietarioInicial'
 Remove-Item Env:LATCH_INITIAL_PASSWORD
 Remove-Item Env:LATCH_INITIAL_USER
-$env:LATCH_DB_SCHEMA_MODE = 'validate'
 ```
 
-La herramienta inicializa Hibernate, crea el propietario y su auditoría en una transacción, y cierra los recursos. Rechaza la operación si ya existen usuarios; serializa los instaladores mediante un bloqueo transaccional de PostgreSQL. Las cuentas posteriores se crean con `UsuarioService` y requieren una sesión de propietario.
+La herramienta crea el propietario y su auditoría en una transacción y rechaza
+la operación si ya existen usuarios.
 
-## Ejecución y pruebas
+## Ejecución
 
 ```powershell
-./mvnw.cmd test
 ./mvnw.cmd javafx:run
 ```
 
-Las pruebas normales usan H2 en memoria y datos sintéticos. Comprueban autenticación, permisos, auditoría, rollback, restricciones y versiones concurrentes.
+La aplicación levanta Spring Boot en loopback, inicia el cliente local cuando la API está lista y abre la interfaz. Si la
+API no puede arrancar, muestra un diálogo de error y detiene el arranque.
 
-Para repetir la suite contra PostgreSQL, configurar las mismas variables `LATCH_DB_*` apuntando a **una base desechable exclusiva para pruebas**, y ejecutar:
+Para ejecutar solo el servicio HTTP (útil para pruebas con `curl` o
+PowerShell):
 
 ```powershell
-./mvnw.cmd test '-Dlatch.test.postgres=true'
+./mvnw.cmd compile exec:java '-Dexec.mainClass=ni.edu.uam.proyectofinalprogramacionappescritorio.herramientas.IniciarApi'
 ```
 
-Esta modalidad de pruebas crea y elimina las tablas de la suite; no debe apuntar a `latch_db` ni a una base con datos que se quieran conservar.
+### JAR y demostración en Windows
 
-## Arquitectura y uso por el equipo
+Desde la raíz del repositorio, después de empaquetar con `verify -Ppostgres`,
+genera el classpath de ejecución y elige uno de los dos puntos de entrada.
+Ambos necesitan la configuración local descrita arriba y un puerto libre.
 
-`JavaFX/FXML → Controller → Service → DAO → Hibernate → PostgreSQL`.
+```powershell
+$runtimeFile = Join-Path (Get-Location) 'target\latch-runtime.txt'
+./mvnw.cmd org.apache.maven.plugins:maven-dependency-plugin:3.7.0:build-classpath '-DincludeScope=runtime' "-Dmdep.outputFile=$runtimeFile"
+$jar = (Resolve-Path 'target\ProyectoFInal-ProgramacionAppEscritorio-1.0-SNAPSHOT.jar').Path
+$cp = "$jar;$((Get-Content -Raw -LiteralPath $runtimeFile).Trim())"
+$paquete = 'ni.edu.uam.proyectofinalprogramacionappescritorio'
 
-Se conserva el paquete existente `ni.edu.uam.proyectofinalprogramacionappescritorio`.
+# Escritorio con Spring Boot integrado
+java -cp $cp "$paquete.Launcher"
 
-| Clase/paquete | Responsabilidad |
+# Solo API REST, en una ejecución aparte
+java -cp $cp "$paquete.herramientas.IniciarApi"
+```
+
+Si JavaFX se cierra con un fallo nativo en `glass.dll` al abrir el recibo,
+reinicia el escritorio con renderizado por software. Para la demo en el equipo
+donde se observó ese fallo, inicia directamente con esta variante.
+
+```powershell
+java '-Dprism.order=sw' -cp $cp "$paquete.Launcher"
+```
+
+Consulta la [guía de demostración con datos sintéticos](docs/demo-docente.md).
+
+## Pruebas
+
+```powershell
+./mvnw.cmd clean test
+```
+
+Las pruebas normales usan H2 en memoria con `MODE=PostgreSQL` y datos
+sintéticos. La suite cubre autenticación, tokens, permisos vigentes, auditoría,
+rollback, restricciones, versiones concurrentes, tasas, catálogos,
+validaciones, pagos, idempotencia, recibos, anulación, estado de cuenta,
+métricas y seguridad HTTP.
+
+La suite normal permanece en H2. Para ejecutar la verificación adicional en PostgreSQL,
+configurar una base **desechable y exclusiva** con permisos para crear y eliminar tablas.
+El perfil genera el esquema con Hibernate y aplica las migraciones V1 a V10,
+y al terminar elimina las tablas creadas, la función de recibos y su contador auxiliar.
+No usar la base configurada para la aplicación:
+
+```powershell
+$env:LATCH_TEST_DB_URL = 'jdbc:postgresql://localhost:5432/latch_test'
+$env:LATCH_TEST_DB_USER = 'latch_test'
+$env:LATCH_TEST_DB_PASSWORD = 'contraseña_de_prueba'
+./mvnw.cmd verify -Ppostgres
+Remove-Item Env:LATCH_TEST_DB_URL
+Remove-Item Env:LATCH_TEST_DB_USER
+Remove-Item Env:LATCH_TEST_DB_PASSWORD
+```
+
+El perfil vuelve a ejecutar `InfraestructuraTest` y `ApiPagosTest` sobre PostgreSQL para
+cubrir persistencia y concurrencia, y ejecuta `PostgresMigrationIT` para comprobar los
+índices parciales, el consecutivo transaccional y la columna `pago.creado_en`. La suite
+H2 se ejecuta primero. El perfil requiere que PostgreSQL esté disponible; si faltan las
+variables de `LATCH_TEST_DB_*` o no se puede conectar, la verificación falla.
+
+Para ejecutar solo las pruebas H2:
+
+```powershell
+./mvnw.cmd test
+```
+
+## Arquitectura
+
+```text
+JavaFX/FXML → Controller → ClienteApi (HTTP) → Spring MVC → Service de API
+            → Services de negocio → Hibernate → PostgreSQL
+```
+
+| Paquete | Responsabilidad |
 | --- | --- |
-| `config/DatabaseConfig` | Configuración sin credenciales en código |
-| `config/HibernateUtil` | Una SessionFactory compartida y registro de entidades |
-| `config/HibernateTransactions` | Sesión por operación, commit, rollback y cierre |
-| `entity/Usuario` | Cuenta, contraseña derivada, rol, estado y versión |
-| `entity/Auditoria` | Actor relacionado, instante UTC, correlación, acción y referencia |
-| `entity/Configuracion` | Parámetro de aplicación con control de versión; no guardar secretos aquí |
-| `service/*` | Autenticación, permisos y operaciones auditadas |
-| `util/PasswordHasher` | PBKDF2-HMAC-SHA256, sal aleatoria y comparación segura |
-| `util/TareasSegundoPlano` | Cola acotada, ejecución de Task y cancelación al cerrar |
+| `config/` | Configuración, SessionFactory y transacciones |
+| `modelo/` | Entidades JPA y reglas de dominio |
+| `dto/` | Copias inmutables para presentación y reportes |
+| `dao/` | Acceso a datos reutilizable |
+| `service/` | Autenticación, permisos, auditoría y operaciones de negocio |
+| `api/comun/` | Tokens, JSON, errores y lectura acotada |
+| `api/piloto/` | Arranque de Spring Boot, filtros HTTP y controladores MVC |
+| `api/auth/` | Inicio y cierre de sesión HTTP |
+| `api/tasas/` | Consulta, registro y autorización de tasas |
+| `api/catalogos/` | Propiedades, unidades, inquilinos y contratos |
+| `api/validaciones/` | Validaciones de entrada |
+| `api/pagos/` | Pagos, recibos, anulación y estado de cuenta |
+| `api/indicadores/` | Métricas del panel |
+| `cliente/` | Cliente HTTP de la interfaz, con token en memoria |
+| `util/` | Contraseñas, formato de moneda, validaciones y tareas de fondo |
 
-Los roles y permisos son **clases con constantes String**. No hay `enum` ni clases de excepciones personalizadas. Los errores de validación usan `IllegalArgumentException`, los de permisos `SecurityException` y los técnicos de persistencia `IllegalStateException`. El Controller muestra `getMessage()`; no muestra la causa técnica ni un stack trace al usuario.
+Reglas transversales:
 
-Matriz inicial de permisos (propuesta de esta entrega, pendiente de contrastar con el PRD completo):
+- Importes con `BigDecimal` y 2 decimales, redondeo `HALF_EVEN`; tasas con 8
+  decimales. En JSON los importes viajan como texto.
+- Solo se admiten `USD` y `NIO`; los totales nunca mezclan monedas.
+- Cada Service de negocio llama a `PermisoService.exigir` dentro de su
+  transacción. Deshabilitar un botón no sustituye esa comprobación.
+- Los errores de validación usan `IllegalArgumentException`, los de permisos
+  `SecurityException`, los conflictos `ConflictoDatosException` y los técnicos
+  `IllegalStateException`. Al cliente nunca se le muestra un stack trace.
+
+## API local
+
+La referencia completa está en [docs/API_Latch.md](docs/API_Latch.md).
+
+- Base: `http://127.0.0.1:<LATCH_API_PORT>/api/v1`
+- Token Bearer de 15 minutos, guardado solo en memoria.
+- Errores uniformes: `{"error":{"codigo":"...","mensaje":"..."}}`.
+- Escrituras financieras con `Idempotency-Key` (UUID).
+- Cuerpo máximo 256 KiB y `Content-Type: application/json` obligatorio.
+
+| API | Rutas principales |
+| --- | --- |
+| Autenticación | `POST /auth/login`, `POST /auth/logout` |
+| Tasas | `GET/POST /tasas`, `POST /tasas/{id}/autorizar` |
+| Catálogos | `GET/POST /propiedades`, `/unidades`, `/inquilinos`, `/contratos` y `GET/PUT/PATCH /{id}` |
+| Validaciones | `POST /validaciones` |
+| Cobranza | `POST /pagos`, `GET /pagos/{id}`, `GET /recibos/{numero}`, `POST /pagos/{id}/anulacion`, `GET /contratos/{id}/estado-cuenta` |
+| Indicadores | `GET /dashboard/metricas` |
+
+## Permisos
 
 | Operación | Propietario | Asistente |
 | --- | --- | --- |
 | Gestionar usuarios y configuración | Sí | No |
 | Consultar auditoría | Sí | No |
-| Operar alquileres y consultar reportes | Sí | Sí |
+| Operar alquileres | Sí | Sí |
+| Consultar reportes y métricas | Sí | Sí |
+| Registrar tasas informativas | Sí | Sí |
+| Autorizar tasas | Sí | No |
+| Anular pagos | Sí | No |
 
-Cada Service de los módulos futuros debe llamar a `PermisoService.exigir` dentro de su transacción. Deshabilitar un botón no sustituye esa comprobación. Se revisa el usuario activo y su rol actual en la base; cerrar `SesionUsuario` invalida esa sesión local.
+## Seguridad
 
-Consultar [la guía de integración](docs/steven-infraestructura.md) para ejemplos y el recorrido de demostración.
+- La API solo escucha en `127.0.0.1`; el host no se puede configurar.
+- Tokens opacos de 32 bytes; se guarda solo su huella SHA-256 y expiran a los
+  15 minutos. `logout` los revoca de inmediato.
+- Contraseñas con PBKDF2-HMAC-SHA256 (600 000 iteraciones, sal aleatoria y
+  comparación en tiempo constante).
+- El rol y el estado del usuario se revalidan contra la base en cada operación.
+- Al cambiar el rol o desactivar un usuario, la versión de su cuenta invalida
+  todas las sesiones anteriores; reactivarlo no restaura los tokens revocados.
+- Las escrituras financieras toman su instante y fecha operativa de PostgreSQL.
+  Si el reloj local difiere más de cinco minutos, devuelven `ERR-057` y no
+  escriben la operación; las fechas efectivas de pago se conservan aparte.
+- Una petición HTTP nunca hereda la sesión global de JavaFX: si su identidad
+  aislada no es válida, la operación falla cerrada.
+- Sin cabeceras CORS, con `Cache-Control: no-store` y
+  `X-Content-Type-Options: nosniff`.
+- Nunca se registran contraseñas, tokens ni la cabecera `Authorization`.
+
+El detalle de controles, verificación y riesgos aceptados está en
+[docs/SEGURIDAD.md](docs/SEGURIDAD.md).
 
 ## Problemas frecuentes
 
 - `JAVA_HOME` inválido: apuntar a la carpeta del JDK 21, no a `bin`.
-- Falta una variable: configurarla en la terminal o en Run Configuration de IntelliJ; reiniciar la ejecución después de cambiarla.
-- Error de conexión: comprobar el servicio PostgreSQL, puerto, base, usuario y contraseña.
-- Tabla ausente con `validate`: usar `update` sólo para inicializar la base de desarrollo y luego volver a `validate`.
-- Datos duplicados o relaciones inválidas: se revierte la operación completa; corregir la entrada antes de reintentar.
-- Registro modificado por otro usuario: recargar los datos y volver a aplicar el cambio.
+- `Falta configurar LATCH_API_PORT`: agregar la variable al `.env`.
+- Tabla ausente con `validate`: aplicar las migraciones pendientes; usar
+  `update` solo en una base de desarrollo.
+- `409` al actualizar: otro usuario modificó el registro; recargar y reintentar.
+- `409` al repetir un pago: la `Idempotency-Key` se usó con otro contenido u
+  otro usuario. Usar una clave nueva para un pago distinto.
+- `401` tras 15 minutos: la sesión expiró; cerrar sesión y volver a iniciar.
+- `401` después de cambiar el rol o el estado de la cuenta: iniciar sesión otra
+  vez para obtener un token vigente.
+- `429` al iniciar sesión: cinco fallos para la cuenta o 25 desde el mismo
+  origen; esperar 15 minutos.
+- Error de conexión: comprobar el servicio PostgreSQL, puerto, base, usuario y
+  contraseña.
+
+## Limitaciones conocidas
+
+- `Recibo` usa `GenerationType.IDENTITY`: un rollback después de insertarlo
+  puede dejar un hueco en la numeración.
+- No hay refresh token; al expirar, la sesión debe iniciarse de nuevo.
+- Si dos peticiones simultáneas usan la misma `Idempotency-Key`, una puede
+  recibir `409` mientras la otra termina; reintentar con la misma clave
+  devuelve la respuesta original.
+- Las eliminaciones físicas de catálogos, el ajuste de garantías y las
+  escrituras de cargos se ejecutan localmente. El detalle está en
+  [el cierre técnico de la fase 5](docs/migracion-spring-fase-5.md).
+- El pool de conexiones de Hibernate es el básico; suficiente para la demo
+  académica, no para producción.
 
 ## Alcance del equipo
 
-- **Steven Cuadra:** infraestructura, seguridad, auditoría y concurrencia base (esta entrega).
-- **Alfredo Montalvan:** entidades de alquileres, PostgreSQL, DAOs, CRUD y HQL relacionadas.
+- **Steven Cuadra:** infraestructura, seguridad, auditoría y concurrencia base.
+- **Alfredo Montalvan:** entidades de alquileres, PostgreSQL, DAOs, CRUD y HQL.
 - **Caleb Tardencilla:** FXML, Controllers, validaciones y flujos JavaFX.
 - **Aris Gavarrete:** recibos, tipo de cambio, reportes y documentación final.
 
-Pendientes del equipo: integrar sus entidades en `HibernateUtil`, servicios de negocio, login y formularios, tareas H1–H5, reportes y evidencias de GitHub. El pool básico de Hibernate es suficiente para la demo académica; una distribución de producción requeriría revisar su configuración de conexiones y seguridad.
+Consultar [la guía de integración](docs/steven-infraestructura.md) para ejemplos
+del recorrido de demostración.

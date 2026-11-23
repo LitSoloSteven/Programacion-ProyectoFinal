@@ -1,6 +1,6 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.dao;
 
-import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.Usuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
 import org.hibernate.Session;
 import java.util.Optional;
 

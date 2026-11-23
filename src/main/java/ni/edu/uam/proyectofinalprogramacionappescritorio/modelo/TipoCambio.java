@@ -1,7 +1,11 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.modelo;
 
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import jakarta.persistence.*;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.entity.Usuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
 import org.hibernate.annotations.Immutable;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -19,24 +23,33 @@ import java.util.UUID;
 @Entity
 @Table(name = "tipo_cambio", indexes = @Index(columnList = "fecha, registrado_en"))
 @Immutable
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class TipoCambio {
+    /** Banda comercial informativa; no se aplica como CHECK en la base de datos. */
+    public static final BigDecimal BANDA_MINIMA = new BigDecimal("1");
+    public static final BigDecimal BANDA_MAXIMA = new BigDecimal("100");
+
     @Id
+    @Getter
     private UUID id;
     @Column(nullable = false)
+    @Getter
     private LocalDate fecha;
     @Column(name = "nio_por_usd", nullable = false, precision = 19, scale = 8)
+    @Getter
     private BigDecimal nioPorUsd;
     @Column(nullable = false, length = 500)
+    @Getter
     private String fuente;
     @Column(name = "registrado_en", nullable = false)
+    @Getter
     private Instant registradoEn;
     @ManyToOne
     @JoinColumn(name = "autorizado_por")
     private Usuario autorizadoPor;
     @Column(length = 500)
+    @Getter
     private String motivo;
-
-    protected TipoCambio() { }
 
     private TipoCambio(LocalDate fecha, BigDecimal tasa, String fuente,
                        Instant registradoEn, Usuario autorizadoPor, String motivo) {
@@ -100,12 +113,15 @@ public class TipoCambio {
         return valor.trim();
     }
 
-    public UUID getId() { return id; }
-    public LocalDate getFecha() { return fecha; }
-    public BigDecimal getNioPorUsd() { return nioPorUsd; }
-    public String getFuente() { return fuente; }
-    public Instant getRegistradoEn() { return registradoEn; }
     public Long getAutorizadoPor() { return autorizadoPor == null ? null : autorizadoPor.getId(); }
-    public String getMotivo() { return motivo; }
+    public String getAutorizadoPorNombre() {
+        return autorizadoPor == null ? null : autorizadoPor.getNombre();
+    }
     public boolean isAutorizada() { return autorizadoPor != null; }
+
+    /** Banda inclusiva 1–100 NIO/USD; fuera de ella se exige confirmación expresa. */
+    public boolean estaFueraDeBanda() {
+        return nioPorUsd.compareTo(BANDA_MINIMA) < 0
+                || nioPorUsd.compareTo(BANDA_MAXIMA) > 0;
+    }
 }

@@ -1,56 +1,101 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.modelo;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
+import java.util.Map;
+import java.util.Set;
+import java.util.Objects;
 
 /**
- * Entidad de dominio que representa un Contrato de arrendamiento en Latch.
+ - Entidad de dominio que representa un Contrato de arrendamiento en Latch.
+
  */
 @Entity
 @Table(name = "contrato")
 public class Contrato {
 
+    private static final Set<String> ESTADOS = Set.of(
+            "Borrador", "Vigente", "Por vencer", "Vencido", "Terminado", "Cancelado");
+    private static final Set<String> ESTADOS_QUE_RESERVAN_UNIDAD = Set.of(
+            "Vigente", "Por vencer", "Vencido");
+    private static final Map<String, Set<String>> TRANSICIONES = Map.of(
+            "Borrador", Set.of("Vigente", "Cancelado"),
+            "Vigente", Set.of("Por vencer", "Vencido", "Terminado"),
+            "Por vencer", Set.of("Vigente", "Vencido", "Terminado"),
+            "Vencido", Set.of("Vigente", "Por vencer", "Terminado"),
+            "Terminado", Set.of(),
+            "Cancelado", Set.of());
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @Getter
+    @Setter
     private UUID id;
-    @Column(name = "unidad_id", nullable = false)
-    private UUID unidadId;
-    @Transient
-    private String unidadInfo;
-    @Column(name = "inquilino_id", nullable = false)
-    private UUID inquilinoId;
-    @Transient
-    private String inquilinoNombre;
-    @Column(nullable = false)
-    private LocalDate inicio;
-    @Column(nullable = false)
-    private LocalDate fin;
-    @Column(precision = 19, scale = 2, nullable = false)
-    private BigDecimal canon;
-    @Column(length = 3, nullable = false)
-    private String moneda;
-    @Column(name = "dia_pago", nullable = false)
-    private int diaPago;
-    @Embedded
-    private DepositoPactado deposito = new DepositoPactado(BigDecimal.ZERO);
-    @OneToOne(mappedBy = "contrato", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Garantia garantiaSeguimiento;
-    @Column(name = "deposito_pactado", insertable = false, updatable = false, precision = 19, scale = 2)
-    private BigDecimal depositoPactadoLegacy;
-    @PostLoad
-    private void sincronizarGarantia() {
-        if (depositoPactadoLegacy != null) deposito = new DepositoPactado(depositoPactadoLegacy);
-    }
-    @PrePersist
-    @PreUpdate
-    private void prepararGarantia() { depositoPactadoLegacy = deposito.getMontoPactado(); }
-    @Column(length = 24, nullable = false)
-    private String estado;
-    @Version
-    private long version;
 
+    @Column(name = "unidad_id", nullable = false)
+    @Getter
+    @Setter
+    private UUID unidadId;
+
+    @Transient
+    @Setter
+    private String unidadInfo;
+
+    @Column(name = "inquilino_id", nullable = false)
+    @Getter
+    @Setter
+    private UUID inquilinoId;
+
+    @Transient
+    @Setter
+    private String inquilinoNombre;
+
+    @Column(nullable = false)
+    @Getter
+    @Setter
+    private LocalDate inicio;
+
+    @Column(nullable = false)
+    @Getter
+    @Setter
+    private LocalDate fin;
+
+    @Column(precision = 19, scale = 2, nullable = false)
+    @Getter
+    @Setter
+    private BigDecimal canon;
+
+    @Column(length = 3, nullable = false)
+    @Getter
+    @Setter
+    private String moneda;
+
+    @Column(name = "dia_pago", nullable = false)
+    @Getter
+    @Setter
+    private int diaPago;
+
+    @OneToOne(mappedBy = "contrato", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Getter
+    private Garantia garantiaSeguimiento;
+
+    @Column(name = "deposito_pactado", nullable = false, precision = 19, scale = 2)
+    @Getter
+    private BigDecimal depositoPactado = BigDecimal.ZERO;
+
+    @Column(length = 24, nullable = false)
+    @Getter
+    private String estado;
+
+    @Version
+    @Getter
+    @Setter
+    private long version;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "unidad_id", insertable = false, updatable = false)
@@ -67,7 +112,7 @@ public class Contrato {
         this.moneda = "USD";
         this.diaPago = 5;
         this.canon = BigDecimal.ZERO;
-        this.estado = "Vigente";
+        this.estado = "Borrador";
         this.version = 0;
     }
 
@@ -84,100 +129,28 @@ public class Contrato {
         this.canon = canon;
         this.moneda = moneda;
         this.diaPago = diaPago;
-        this.deposito = new DepositoPactado(depositoPactado);
+        this.depositoPactado = new DepositoPactado(depositoPactado).getMontoPactado();
         this.estado = estado;
         this.version = version;
     }
 
-    public UUID getId() {
-        return id;
-    }
-
-    public void setId(UUID id) {
-        this.id = id;
-    }
-
-    public UUID getUnidadId() {
-        return unidadId;
-    }
-
-    public void setUnidadId(UUID unidadId) {
-        this.unidadId = unidadId;
+    public void setUnidad(Unidad unidad) {
+        this.unidad = unidad;
+        this.unidadId = unidad == null ? null : unidad.getId();
     }
 
     public String getUnidadInfo() {
         return unidad == null ? unidadInfo : unidad.toString();
     }
 
-    public void setUnidadInfo(String unidadInfo) {
-        this.unidadInfo = unidadInfo;
-    }
-
-    public UUID getInquilinoId() {
-        return inquilinoId;
-    }
-
-    public void setInquilinoId(UUID inquilinoId) {
-        this.inquilinoId = inquilinoId;
+    public void setInquilino(Inquilino inquilino) {
+        this.inquilino = inquilino;
+        this.inquilinoId = inquilino == null ? null : inquilino.getId();
     }
 
     public String getInquilinoNombre() {
         return inquilino == null ? inquilinoNombre : inquilino.getNombre();
     }
-
-    public void setInquilinoNombre(String inquilinoNombre) {
-        this.inquilinoNombre = inquilinoNombre;
-    }
-
-    public LocalDate getInicio() {
-        return inicio;
-    }
-
-    public void setInicio(LocalDate inicio) {
-        this.inicio = inicio;
-    }
-
-    public LocalDate getFin() {
-        return fin;
-    }
-
-    public void setFin(LocalDate fin) {
-        this.fin = fin;
-    }
-
-    public BigDecimal getCanon() {
-        return canon;
-    }
-
-    public void setCanon(BigDecimal canon) {
-        this.canon = canon;
-    }
-
-    public String getMoneda() {
-        return moneda;
-    }
-
-    public void setMoneda(String moneda) {
-        this.moneda = moneda;
-    }
-
-    public int getDiaPago() {
-        return diaPago;
-    }
-
-    public void setDiaPago(int diaPago) {
-        this.diaPago = diaPago;
-    }
-
-    public BigDecimal getDepositoPactado() {
-        return deposito.getMontoPactado();
-    }
-
-    public void setDepositoPactado(BigDecimal depositoPactado) {
-        this.deposito = new DepositoPactado(depositoPactado);
-    }
-
-    public Garantia getGarantiaSeguimiento() { return garantiaSeguimiento; }
 
     public String getGarantiaSaldoFormateado() {
         if (garantiaSeguimiento == null || garantiaSeguimiento.getSaldoActual() == null) return "—";
@@ -191,20 +164,49 @@ public class Contrato {
         }
     }
 
-    public String getEstado() {
-        return estado;
+    public void setDepositoPactado(BigDecimal depositoPactado) {
+        DepositoPactado nuevoDeposito = new DepositoPactado(depositoPactado);
+        BigDecimal montoPactado = nuevoDeposito.getMontoPactado();
+        if (garantiaSeguimiento != null) {
+            garantiaSeguimiento.actualizarMontoInicial(montoPactado);
+        }
+        this.depositoPactado = montoPactado;
     }
 
     public void setEstado(String estado) {
-        this.estado = estado;
+        transicionarA(estado, LocalDate.now());
     }
 
-    public long getVersion() {
-        return version;
+    public static boolean esEstadoValido(String estado) {
+        return ESTADOS.contains(estado);
     }
 
-    public void setVersion(long version) {
-        this.version = version;
+    public static boolean reservaUnidad(String estado) {
+        return ESTADOS_QUE_RESERVAN_UNIDAD.contains(estado);
+    }
+
+    public void validarTransicionA(String nuevoEstado) {
+        if (!esEstadoValido(nuevoEstado)) {
+            throw new IllegalArgumentException("El estado del contrato no es válido.");
+        }
+        if (!Objects.equals(estado, nuevoEstado)
+                && !TRANSICIONES.getOrDefault(estado, Set.of()).contains(nuevoEstado)) {
+            throw new IllegalArgumentException("La transición de estado del contrato no está permitida.");
+        }
+    }
+
+    public void transicionarA(String nuevoEstado, LocalDate fechaTerminacion) {
+        validarTransicionA(nuevoEstado);
+        if (Objects.equals(estado, nuevoEstado)) return;
+        if ("Terminado".equals(nuevoEstado)) {
+            if (fechaTerminacion == null) {
+                throw new IllegalArgumentException("La fecha de terminación del contrato es obligatoria.");
+            }
+            terminadoEl = fechaTerminacion;
+        } else {
+            terminadoEl = null;
+        }
+        estado = nuevoEstado;
     }
 
     public String getCanonFormateado() {
@@ -223,7 +225,6 @@ public class Contrato {
     }
 
     public void terminar(LocalDate fecha) {
-        estado = "Terminado";
-        terminadoEl = fecha;
+        transicionarA("Terminado", fecha);
     }
 }

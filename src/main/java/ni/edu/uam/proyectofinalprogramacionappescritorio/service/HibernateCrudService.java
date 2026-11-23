@@ -1,5 +1,8 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.service;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
 import org.hibernate.Session;
@@ -9,9 +12,14 @@ import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 final class HibernateCrudService {
-    private final HibernateTransactions tx = new HibernateTransactions(HibernateUtil.getSessionFactory());
+    private final HibernateTransactions tx;
     private final PermisoService permisos = new PermisoService();
+
+    HibernateCrudService() {
+        this(new HibernateTransactions(HibernateUtil.getSessionFactory()));
+    }
 
     <T> List<T> listar(Class<T> tipo, String hql) {
         return tx.ejecutar(s -> {
@@ -22,10 +30,13 @@ final class HibernateCrudService {
 
     <T> void guardar(T item, Function<T, UUID> id, Consumer<T> validar) {
         validar.accept(item);
+        if (id.apply(item) != null) {
+            throw new IllegalArgumentException(
+                    "No se guardan entidades desconectadas; actualice la entidad administrada.");
+        }
         tx.ejecutar(s -> {
             permisos.exigir(s, SesionUsuario.getActual(), Permiso.OPERAR_ALQUILERES);
-            if (id.apply(item) == null) s.persist(item);
-            else s.merge(item);
+            s.persist(item);
             return null;
         });
     }
