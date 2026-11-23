@@ -16,7 +16,13 @@ public final class ReciboService {
     private final PermisoService permisos = new PermisoService();
     public ReciboService(SessionFactory factory) { this(factory, SesionUsuario::getActual); }
     public ReciboService(SessionFactory factory, Supplier<SesionUsuario> identidad) {
-        tx = new HibernateTransactions(factory);
+        this(new HibernateTransactions(factory), identidad);
+    }
+    ReciboService(HibernateTransactions tx) {
+        this(tx, SesionUsuario::getActual);
+    }
+    private ReciboService(HibernateTransactions tx, Supplier<SesionUsuario> identidad) {
+        this.tx = Objects.requireNonNull(tx);
         this.identidad = Objects.requireNonNull(identidad);
     }
     public Optional<ReciboDTO> buscarPorId(Long numero) {

@@ -13,7 +13,6 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.ReciboDTO;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Pago;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Recibo;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Unidad;
 
 import java.io.InputStream;
@@ -34,7 +33,7 @@ public final class ReporteService {
 
     private final HibernateTransactions tx;
     private final PermisoService permisos = new PermisoService();
-    private final PagoService pagoService;
+    private final ReciboService recibos;
 
     public ReporteService() {
         this(new HibernateTransactions(HibernateUtil.getSessionFactory()));
@@ -42,7 +41,7 @@ public final class ReporteService {
 
     public ReporteService(HibernateTransactions tx) {
         this.tx = Objects.requireNonNull(tx, "Faltan las transacciones.");
-        this.pagoService = new PagoService(tx);
+        this.recibos = new ReciboService(tx);
     }
 
     /**
@@ -74,13 +73,9 @@ public final class ReporteService {
     public byte[] generarPdfPago(UUID pagoId) {
         Objects.requireNonNull(pagoId, "Falta el identificador del pago.");
 
-        ReciboDTO datosRecibo = tx.ejecutar(session -> {
-            permisos.exigir(session, SesionUsuario.getActual(), Permiso.CONSULTAR_REPORTES);
-            Recibo recibo = pagoService.obtenerReciboDePago(pagoId)
-                    .orElseThrow(() -> new IllegalArgumentException(
-                            "No se encontró un recibo asociado al pago indicado."));
-            return recibo.presentar();
-        });
+        ReciboDTO datosRecibo = recibos.buscarPorPago(pagoId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "No se encontró un recibo asociado al pago indicado."));
 
         SesionUsuario usuarioActual = SesionUsuario.getActual();
         Map<String, Object> parametros = new HashMap<>();
