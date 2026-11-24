@@ -1,5 +1,6 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
 
+import javafx.stage.FileChooser;
 import lombok.RequiredArgsConstructor;
 
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteCatalogos;
@@ -32,6 +33,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.Pagin
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Cargo;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.CargoService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ReporteService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AccionesTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
@@ -42,8 +44,11 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PanelEstadoTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
 
+import java.awt.*;
+import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
@@ -56,6 +61,7 @@ public class CargoController {
     @FXML private HBox anularTooltipHost;
     @FXML private Button btnAnular;
     @FXML private Button btnNuevo;
+    @FXML private Button btnGenerarReporte;
     @FXML private Button btnLimpiar;
     @FXML private Button btnPaginaAnterior;
     @FXML private Button btnPaginaSiguiente;
@@ -74,6 +80,7 @@ public class CargoController {
     @FXML private TableColumn<CargoListaResponse, String> colEstado;
     @FXML private TableColumn<CargoListaResponse, Void> colAcciones;
 
+    private final ReporteService reporteService = new ReporteService();
     private final CargoService cargoService;
     private final ClienteCatalogos catalogos = new ClienteCatalogos(ClienteLatch.api());
     private final ClientePagos cobranza = new ClientePagos();
@@ -327,4 +334,86 @@ public class CargoController {
                 || error instanceof SecurityException) return error.getMessage();
         return "Revisa los datos y vuelve a intentarlo.";
     }
+
+    @FXML
+    public void handleGenerarReporte() {
+        List<CargoListaResponse> cargosActuales = tblCargos == null
+                ? List.of()
+                : List.copyOf(tblCargos.getItems());
+
+        if (cargosActuales.isEmpty()) {
+            AlertaUtil.mostrarAdvertencia("Sin datos",
+                    "No hay cargos en la tabla para generar el reporte de cartera y mora.");
+            return;
+        }
+
+        if (btnGenerarReporte != null) {
+            btnGenerarReporte.setDisable(true);
+        }
+
+        Task<byte[]> tareaGenerarPdf = new Task<>() {
+            @Override
+            protected byte[] call() {
+                return reporteService.generarReporteCargosCarteraDesdeListaPdf(cargosActuales);
+            }
+        };
+
+        TareasJavaFx.ejecutar(
+                HelloApplication.instancia().getTareas(),
+                tareaGenerarPdf,
+                pdfBytes -> {
+                    if (btnGenerarReporte != null) {
+                        btnGenerarReporte.setDisable(false);
+                    }
+                    if (pdfBytes == null || pdfBytes.length == 0) {
+                        AlertaUtil.mostrarError("Error de reporte",
+                                "El reporte de cartera y mora está vacío.");
+                        return;
+                    }
+
+                    FileChooser fileChooser = new FileChooser();
+                    fileChooser.setTitle("Guardar reporte de cargos, cartera y mora");
+                    fileChooser.setInitialFileName("Reporte-Cargos-Cartera-Mora.pdf");
+                    fileChooser.getExtensionFilters().add(
+                            new FileChooser.ExtensionFilter("Documento PDF (*.pdf)", "*.pdf")
+                    );
+
+                    Window ventana = tblCargos.getScene() == null
+                            ? null
+                            : tblCargos.getScene().getWindow();
+                    File archivoDestino = fileChooser.showSaveDialog(ventana);
+
+                    if (archivoDestino != null) {
+                        try {
+                            Files.write(archivoDestino.toPath(), pdfBytes);
+                        } catch (Exception ex) {
+                            AlertaUtil.mostrarError("Error al guardar",
+                                    "No se pudo guardar el archivo PDF en disco.");
+                            return;
+                        }
+
+                        AlertaUtil.mostrarExito("Reporte listo",
+                                "El reporte de cargos, cartera y mora se guardó correctamente.");
+
+                        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
+                            try {
+                                Desktop.getDesktop().open(archivoDestino);
+                            } catch (Exception ex) {
+                                AlertaUtil.mostrarAdvertencia("No se pudo abrir automáticamente",
+                                        "El PDF se guardó bien, pero no se pudo abrir el visor automáticamente.");
+                            }
+                        }
+                    }
+                },
+                error -> {
+                    if (btnGenerarReporte != null) {
+                        btnGenerarReporte.setDisable(false);
+                    }
+                    AlertaUtil.mostrarError("Error al generar reporte", mensajeError(error));
+                }
+        );
+    }
+
+
+
 }

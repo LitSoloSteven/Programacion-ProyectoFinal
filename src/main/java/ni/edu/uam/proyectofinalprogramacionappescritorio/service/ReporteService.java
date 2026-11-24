@@ -6,15 +6,11 @@ import net.sf.jasperreports.engine.JasperExportManager;
 import net.sf.jasperreports.engine.JasperFillManager;
 import net.sf.jasperreports.engine.JasperPrint;
 import net.sf.jasperreports.engine.JasperReport;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propiedad;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.*;
 import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.ReciboDTO;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Pago;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Recibo;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Unidad;
 
 import java.io.InputStream;
 import java.math.BigDecimal;
@@ -27,10 +23,14 @@ import java.util.Objects;
 import java.util.UUID;
 
 public final class ReporteService {
+
+    private static final String PLANTILLA_UNIDADES = "/reportes/unidades.jrxml";
     private static final String PLANTILLA_RECIBO = "/reportes/recibo.jrxml";
     private static final String PLANTILLA_PAGOS_TABLA = "/reportes/pagos_tabla.jrxml";
     private static final String PLANTILLA_CONTRATOS_OCUPACION = "/reportes/contratos_ocupacion.jrxml";
     private static final String PLANTILLA_PROPIEDADES_UNIDADES = "/reportes/propiedades_unidades.jrxml";
+    private static final String PLANTILLA_CARGOS_CARTERA = "/reportes/cargos_cartera.jrxml";
+    private static final String PLANTILLA_INQUILINOS = "/reportes/inquilinos.jrxml";
 
     private final HibernateTransactions tx;
     private final PermisoService permisos = new PermisoService();
@@ -475,6 +475,395 @@ public final class ReporteService {
 
         return exportarPdf(PLANTILLA_PROPIEDADES_UNIDADES, parametros, filas);
     }
+
+    public byte[] generarReporteCargosCarteraDesdeListaPdf(
+            List<ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.CargoListaResponse> cargosEnVista) {
+        Objects.requireNonNull(cargosEnVista, "La lista de cargos no puede ser nula.");
+        if (cargosEnVista.isEmpty()) {
+            throw new IllegalArgumentException("No hay cargos para generar el reporte de cartera y mora.");
+        }
+
+        LocalDate fechaCorte = LocalDate.now();
+
+        List<FilaCargoCarteraReporte> filas = tx.ejecutar(session -> {
+            permisos.exigir(session, SesionUsuario.getActual(), Permiso.CONSULTAR_REPORTES);
+            return cargosEnVista.stream()
+                    .filter(Objects::nonNull)
+                    .map(item -> mapearFilaCargoLista(item, fechaCorte))
+                    .toList();
+        });
+
+        int totalCargos = filas.size();
+        int cargosVencidos = (int) filas.stream()
+                .filter(f -> "Vencido".equalsIgnoreCase(f.getEstadoDerivado()))
+                .count();
+        int cargosPendientes = (int) filas.stream()
+                .filter(f -> "Pendiente".equalsIgnoreCase(f.getEstadoDerivado())
+                        || "Parcial".equalsIgnoreCase(f.getEstadoDerivado()))
+                .count();
+
+        BigDecimal totalSaldoPendiente = filas.stream()
+                .map(FilaCargoCarteraReporte::getSaldoPendiente)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalEnMora = filas.stream()
+                .filter(f -> f.getDiasMora() > 0)
+                .map(FilaCargoCarteraReporte::getSaldoPendiente)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        SesionUsuario usuarioActual = SesionUsuario.getActual();
+        Map<String, Object> parametros = new HashMap<>();
+        parametros.put("TITULO_SISTEMA", "LATCH — Cartera de Cargos y Mora");
+        parametros.put("GENERADO_POR", usuarioActual != null ? usuarioActual.getNombre() : "Sistema");
+        parametros.put("FECHA_CORTE", fechaCorte);
+        parametros.put("TOTAL_CARGOS", totalCargos);
+        parametros.put("CARGOS_VENCIDOS", cargosVencidos);
+        parametros.put("CARGOS_PENDIENTES", cargosPendientes);
+        parametros.put("TOTAL_SALDO_PENDIENTE", formatearMonto(totalSaldoPendiente));
+        parametros.put("TOTAL_EN_MORA", formatearMonto(totalEnMora));
+
+        return exportarPdf(PLANTILLA_CARGOS_CARTERA, parametros, filas);
+    }
+
+    private FilaCargoCarteraReporte mapearFilaCargoLista(
+            ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.CargoListaResponse item,
+            LocalDate fechaCorte) {
+        String contrato = (item.contratoInfo() != null && !item.contratoInfo().isBlank())
+                ? item.contratoInfo() : "—";
+        String tipo = (item.tipo() != null && !item.tipo().isBlank())
+                ? item.tipo() : "—";
+        String concepto = (item.concepto() != null && !item.concepto().isBlank())
+                ? item.concepto() : "—";
+
+        LocalDate vence = null;
+        if (item.venceEl() != null && !item.venceEl().isBlank()) {
+            try {
+                vence = LocalDate.parse(item.venceEl().trim());
+            } catch (Exception ignored) {
+                vence = null;
+            }
+        }
+
+        String textoImporte = item.importeFormateado() == null ? "" : item.importeFormateado();
+        String moneda = "—";
+        if (textoImporte.contains("USD")) moneda = "USD";
+        else if (textoImporte.contains("NIO") || textoImporte.contains("C$")) moneda = "NIO";
+
+        BigDecimal importe = parsearImporteFormateado(textoImporte);
+
+        String estadoRaw = (item.estado() != null && !item.estado().isBlank())
+                ? item.estado().trim() : "Pendiente";
+        boolean anulado = "Anulado".equalsIgnoreCase(estadoRaw) || "Cancelado".equalsIgnoreCase(estadoRaw);
+        boolean pagado = "Pagado".equalsIgnoreCase(estadoRaw);
+
+        BigDecimal saldo = (anulado || pagado)
+                ? BigDecimal.ZERO.setScale(2, java.math.RoundingMode.HALF_EVEN)
+                : importe.setScale(2, java.math.RoundingMode.HALF_EVEN);
+
+        String estadoDerivado = anulado ? "Anulado"
+                : pagado ? "Pagado"
+                : (vence != null && vence.isBefore(fechaCorte) && saldo.signum() > 0) ? "Vencido"
+                : estadoRaw;
+
+        long diasMora = 0;
+        if (vence != null && vence.isBefore(fechaCorte) && saldo.signum() > 0 && !anulado && !pagado) {
+            diasMora = Math.max(0, java.time.temporal.ChronoUnit.DAYS.between(vence, fechaCorte));
+        }
+
+        return new FilaCargoCarteraReporte(
+                contrato,
+                tipo,
+                concepto,
+                null,
+                vence,
+                importe,
+                saldo,
+                moneda,
+                diasMora,
+                estadoDerivado
+        );
+    }
+
+    private static BigDecimal parsearImporteFormateado(String texto) {
+        if (texto == null || texto.isBlank()) return BigDecimal.ZERO;
+        String limpio = texto.replaceAll("[^0-9.,-]", "").trim();
+        if (limpio.isEmpty()) return BigDecimal.ZERO;
+        // Si tiene coma y punto (ej. 1,250.00), quitar comas de miles
+        if (limpio.contains(",") && limpio.contains(".")) {
+            limpio = limpio.replace(",", "");
+        } else if (limpio.contains(",") && !limpio.contains(".")) {
+            // Si solo tiene coma, revisar si es decimal (2 dígitos al final) o miles
+            int idx = limpio.lastIndexOf(',');
+            if (limpio.length() - idx - 1 == 2) {
+                limpio = limpio.replace(",", ".");
+            } else {
+                limpio = limpio.replace(",", "");
+            }
+        }
+        try {
+            return new BigDecimal(limpio);
+        } catch (NumberFormatException ex) {
+            return BigDecimal.ZERO;
+        }
+    }
+
+    private static String formatearMonto(BigDecimal monto) {
+        BigDecimal valor = monto == null ? BigDecimal.ZERO : monto;
+        java.text.NumberFormat formato = java.text.NumberFormat.getNumberInstance(Locale.US);
+        formato.setMinimumFractionDigits(2);
+        formato.setMaximumFractionDigits(2);
+        return formato.format(valor);
+    }
+
+    public static final class FilaCargoCarteraReporte {
+        private final String contrato;
+        private final String tipo;
+        private final String concepto;
+        private final LocalDate periodo;
+        private final LocalDate venceEl;
+        private final BigDecimal importe;
+        private final BigDecimal saldoPendiente;
+        private final String moneda;
+        private final long diasMora;
+        private final String estadoDerivado;
+
+        public FilaCargoCarteraReporte(String contrato,
+                                       String tipo,
+                                       String concepto,
+                                       LocalDate periodo,
+                                       LocalDate venceEl,
+                                       BigDecimal importe,
+                                       BigDecimal saldoPendiente,
+                                       String moneda,
+                                       long diasMora,
+                                       String estadoDerivado) {
+            this.contrato = contrato;
+            this.tipo = tipo;
+            this.concepto = concepto;
+            this.periodo = periodo;
+            this.venceEl = venceEl;
+            this.importe = importe;
+            this.saldoPendiente = saldoPendiente;
+            this.moneda = moneda;
+            this.diasMora = diasMora;
+            this.estadoDerivado = estadoDerivado;
+        }
+
+        public String getContrato() { return contrato; }
+        public String getTipo() { return tipo; }
+        public String getConcepto() { return concepto; }
+        public LocalDate getPeriodo() { return periodo; }
+        public LocalDate getVenceEl() { return venceEl; }
+        public BigDecimal getImporte() { return importe; }
+        public BigDecimal getSaldoPendiente() { return saldoPendiente; }
+        public String getMoneda() { return moneda; }
+        public long getDiasMora() { return diasMora; }
+        public String getEstadoDerivado() { return estadoDerivado; }
+    }
+
+    public byte[] generarReporteInquilinosPdf(List<Inquilino> inquilinosEnVista) {
+        Objects.requireNonNull(inquilinosEnVista, "La lista de inquilinos no puede ser nula.");
+        if (inquilinosEnVista.isEmpty()) {
+            throw new IllegalArgumentException("No hay inquilinos en la vista para generar el reporte.");
+        }
+
+        List<FilaInquilinoReporte> filas = tx.ejecutar(session -> {
+            permisos.exigir(session, SesionUsuario.getActual(), Permiso.CONSULTAR_REPORTES);
+            return inquilinosEnVista.stream()
+                    .filter(Objects::nonNull)
+                    .map(this::mapearFilaInquilino)
+                    .toList();
+        });
+
+        int totalInquilinos = filas.size();
+        int activos = (int) filas.stream()
+                .filter(f -> "Activo".equalsIgnoreCase(f.getEstado()))
+                .count();
+        int inactivos = totalInquilinos - activos;
+
+        SesionUsuario usuarioActual = SesionUsuario.getActual();
+        Map<String, Object> parametros = new HashMap<>();
+        parametros.put("TITULO_SISTEMA", "LATCH — Directorio de Inquilinos");
+        parametros.put("GENERADO_POR", usuarioActual != null ? usuarioActual.getNombre() : "Sistema");
+        parametros.put("TOTAL_INQUILINOS", totalInquilinos);
+        parametros.put("INQUILINOS_ACTIVOS", activos);
+        parametros.put("INQUILINOS_INACTIVOS", inactivos);
+
+        return exportarPdf(PLANTILLA_INQUILINOS, parametros, filas);
+    }
+
+    private FilaInquilinoReporte mapearFilaInquilino(Inquilino inquilino) {
+        String nombre = (inquilino.getNombre() != null && !inquilino.getNombre().isBlank())
+                ? inquilino.getNombre().trim() : "—";
+        String identificacion = (inquilino.getIdentificacion() != null && !inquilino.getIdentificacion().isBlank())
+                ? inquilino.getIdentificacion().trim() : "—";
+        String telefono = (inquilino.getTelefono() != null && !inquilino.getTelefono().isBlank())
+                ? inquilino.getTelefono().trim() : "—";
+        String correo = (inquilino.getCorreo() != null && !inquilino.getCorreo().isBlank())
+                ? inquilino.getCorreo().trim() : "—";
+        String emergencia = (inquilino.getContactoEmergencia() != null && !inquilino.getContactoEmergencia().isBlank())
+                ? inquilino.getContactoEmergencia().trim() : "—";
+        String estado = inquilino.getEstadoTexto();
+
+        return new FilaInquilinoReporte(
+                nombre,
+                identificacion,
+                telefono,
+                correo,
+                emergencia,
+                estado
+        );
+    }
+
+    public static final class FilaInquilinoReporte {
+        private final String nombre;
+        private final String identificacion;
+        private final String telefono;
+        private final String correo;
+        private final String contactoEmergencia;
+        private final String estado;
+
+        public FilaInquilinoReporte(String nombre,
+                                    String identificacion,
+                                    String telefono,
+                                    String correo,
+                                    String contactoEmergencia,
+                                    String estado) {
+            this.nombre = nombre;
+            this.identificacion = identificacion;
+            this.telefono = telefono;
+            this.correo = correo;
+            this.contactoEmergencia = contactoEmergencia;
+            this.estado = estado;
+        }
+
+        public String getNombre() { return nombre; }
+        public String getIdentificacion() { return identificacion; }
+        public String getTelefono() { return telefono; }
+        public String getCorreo() { return correo; }
+        public String getContactoEmergencia() { return contactoEmergencia; }
+        public String getEstado() { return estado; }
+
+
+    }
+
+    public byte[] generarReporteUnidadesPdf(List<Unidad> unidadesEnVista) {
+        Objects.requireNonNull(unidadesEnVista, "La lista de unidades no puede ser nula.");
+        if (unidadesEnVista.isEmpty()) {
+            throw new IllegalArgumentException("No hay unidades en la tabla para generar el reporte.");
+        }
+
+        List<FilaUnidadReporte> filas = tx.ejecutar(session -> {
+            permisos.exigir(session, SesionUsuario.getActual(), Permiso.CONSULTAR_REPORTES);
+            return unidadesEnVista.stream()
+                    .filter(Objects::nonNull)
+                    .map(this::mapearFilaUnidad)
+                    .toList();
+        });
+
+        int totalUnidades = filas.size();
+        int disponibles = (int) filas.stream()
+                .filter(f -> "Disponible".equalsIgnoreCase(f.getEstado()))
+                .count();
+        int ocupadas = (int) filas.stream()
+                .filter(f -> {
+                    String est = f.getEstado() == null ? "" : f.getEstado().strip().toLowerCase(Locale.ROOT);
+                    return "ocupada".equals(est) || "ocupado".equals(est);
+                })
+                .count();
+
+        BigDecimal totalCanonReferencia = filas.stream()
+                .map(FilaUnidadReporte::getCanonReferencia)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        SesionUsuario usuarioActual = SesionUsuario.getActual();
+        Map<String, Object> parametros = new HashMap<>();
+        parametros.put("TITULO_SISTEMA", "LATCH — Catálogo de Unidades");
+        parametros.put("GENERADO_POR", usuarioActual != null ? usuarioActual.getNombre() : "Sistema");
+        parametros.put("TOTAL_UNIDADES", totalUnidades);
+        parametros.put("UNIDADES_DISPONIBLES", disponibles);
+        parametros.put("UNIDADES_OCUPADAS", ocupadas);
+        parametros.put("TOTAL_CANON_REFERENCIA", formatearMonto(totalCanonReferencia));
+
+        return exportarPdf(PLANTILLA_UNIDADES, parametros, filas);
+    }
+
+    private FilaUnidadReporte mapearFilaUnidad(Unidad unidad) {
+        String propiedad = null;
+        try {
+            propiedad = unidad.getPropiedadNombre();
+        } catch (Exception ignored) {
+            // Respaldo si el proxy no está inicializado
+        }
+        if (propiedad == null || propiedad.isBlank()) {
+            propiedad = unidad.getPropiedadId() != null
+                    ? unidad.getPropiedadId().toString()
+                    : "—";
+        }
+
+        String codigo = (unidad.getCodigo() != null && !unidad.getCodigo().isBlank())
+                ? unidad.getCodigo().trim() : "—";
+        String tipo = (unidad.getTipo() != null && !unidad.getTipo().isBlank())
+                ? unidad.getTipo().trim() : "—";
+        String estado = (unidad.getEstado() != null && !unidad.getEstado().isBlank())
+                ? unidad.getEstado().trim() : "—";
+        BigDecimal canon = unidad.getCanonReferencia() == null
+                ? BigDecimal.ZERO : unidad.getCanonReferencia();
+        String moneda = (unidad.getMoneda() != null && !unidad.getMoneda().isBlank())
+                ? unidad.getMoneda().trim() : "";
+        String descripcion = (unidad.getDescripcion() != null && !unidad.getDescripcion().isBlank())
+                ? unidad.getDescripcion().trim() : "—";
+
+        return new FilaUnidadReporte(
+                propiedad,
+                codigo,
+                tipo,
+                estado,
+                canon,
+                moneda,
+                descripcion
+        );
+    }
+
+    public static final class FilaUnidadReporte {
+        private final String propiedad;
+        private final String codigo;
+        private final String tipo;
+        private final String estado;
+        private final BigDecimal canonReferencia;
+        private final String moneda;
+        private final String descripcion;
+
+        public FilaUnidadReporte(String propiedad,
+                                 String codigo,
+                                 String tipo,
+                                 String estado,
+                                 BigDecimal canonReferencia,
+                                 String moneda,
+                                 String descripcion) {
+            this.propiedad = propiedad;
+            this.codigo = codigo;
+            this.tipo = tipo;
+            this.estado = estado;
+            this.canonReferencia = canonReferencia;
+            this.moneda = moneda;
+            this.descripcion = descripcion;
+        }
+
+        public String getPropiedad() { return propiedad; }
+        public String getCodigo() { return codigo; }
+        public String getTipo() { return tipo; }
+        public String getEstado() { return estado; }
+        public BigDecimal getCanonReferencia() { return canonReferencia; }
+        public String getMoneda() { return moneda; }
+        public String getDescripcion() { return descripcion; }
+    }
+
+
+
 
 
 

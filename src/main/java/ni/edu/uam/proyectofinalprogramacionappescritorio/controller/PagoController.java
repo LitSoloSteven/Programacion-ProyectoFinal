@@ -429,7 +429,7 @@ public class PagoController {
             String[] partes = formateado.strip().split("\\s+");
             if (partes.length >= 1) {
                 try {
-                    BigDecimal monto = new BigDecimal(partes[0].replace(",", ""));
+                    BigDecimal monto = parsearMontoTexto(partes[0]);
                     pago.setMontoOriginal(monto);
                     pago.setMontoContrato(monto);
                 } catch (NumberFormatException ignored) {
@@ -443,6 +443,37 @@ public class PagoController {
         pago.setReferencia(item.referencia());
         pago.setEstado(item.estado());
         return pago;
+    }
+
+    private static BigDecimal parsearMontoTexto(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return BigDecimal.ZERO;
+        }
+        String limpio = raw.strip().replaceAll("[^0-9.,-]", "");
+        if (limpio.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        int ultimaComa = limpio.lastIndexOf(',');
+        int ultimoPunto = limpio.lastIndexOf('.');
+
+        if (ultimaComa >= 0 && ultimoPunto >= 0) {
+            // Si la coma está después del punto, la coma es decimal (ej. 1.250,00)
+            if (ultimaComa > ultimoPunto) {
+                limpio = limpio.replace(".", "").replace(",", ".");
+            } else {
+                // Si el punto está después de la coma, la coma es separador de miles (ej. 1,250.00)
+                limpio = limpio.replace(",", "");
+            }
+        } else if (ultimaComa >= 0) {
+            // Solo hay coma: si tiene 1 o 2 dígitos al final es decimal (ej. 1000,00 -> 1000.00)
+            int decimales = limpio.length() - ultimaComa - 1;
+            if (decimales <= 2) {
+                limpio = limpio.replace(",", ".");
+            } else {
+                limpio = limpio.replace(",", "");
+            }
+        }
+        return new BigDecimal(limpio);
     }
 
     private record Detalle(PagoDetalleResponse pago, ReciboResponse recibo) { }

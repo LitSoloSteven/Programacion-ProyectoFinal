@@ -28,6 +28,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propiedad;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Unidad;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ReporteService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.UnidadService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AccionesTabla;
@@ -50,6 +51,7 @@ import java.util.Locale;
 public class UnidadController {
     @FXML private VBox rootView;
     @FXML private HBox eliminarTooltipHost;
+    @FXML private Button btnGenerarReporte;
     @FXML private Button btnNuevo;
     @FXML private Button btnRefrescar;
     @FXML private Button btnLimpiar;
@@ -67,6 +69,7 @@ public class UnidadController {
     @FXML private TableColumn<Unidad, String> colDescripcion;
     @FXML private TableColumn<Unidad, Void> colAcciones;
 
+    private final ReporteService reporteService = new ReporteService();
     private final ClienteCatalogos catalogos = new ClienteCatalogos(ClienteLatch.api());
     private final UnidadService unidadService;
     private final ObservableList<Unidad> registros = FXCollections.observableArrayList();
@@ -247,4 +250,87 @@ public class UnidadController {
                 || error instanceof IllegalStateException) return error.getMessage();
         return "No se pudo guardar la unidad. Revisa los datos e inténtalo de nuevo.";
     }
+
+    @FXML
+    public void handleGenerarReporte() {
+        List<Unidad> unidadesActuales = tblUnidades == null
+                ? List.of()
+                : List.copyOf(tblUnidades.getItems());
+
+        if (unidadesActuales.isEmpty()) {
+            AlertaUtil.mostrarAdvertencia("Sin datos",
+                    "No hay unidades en la tabla para generar el reporte.");
+            return;
+        }
+
+        if (btnGenerarReporte != null) {
+            btnGenerarReporte.setDisable(true);
+        }
+
+        Task<byte[]> tareaGenerarPdf = new Task<>() {
+            @Override
+            protected byte[] call() {
+                return reporteService.generarReporteUnidadesPdf(unidadesActuales);
+            }
+        };
+
+        TareasJavaFx.ejecutar(
+                HelloApplication.instancia().getTareas(),
+                tareaGenerarPdf,
+                pdfBytes -> {
+                    if (btnGenerarReporte != null) {
+                        btnGenerarReporte.setDisable(false);
+                    }
+                    if (pdfBytes == null || pdfBytes.length == 0) {
+                        AlertaUtil.mostrarError("Error de reporte",
+                                "El reporte de unidades está vacío.");
+                        return;
+                    }
+
+                    javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
+                    fileChooser.setTitle("Guardar reporte de unidades");
+                    fileChooser.setInitialFileName("Reporte-Unidades.pdf");
+                    fileChooser.getExtensionFilters().add(
+                            new javafx.stage.FileChooser.ExtensionFilter("Documento PDF (*.pdf)", "*.pdf")
+                    );
+
+                    Window ventana = tblUnidades.getScene() == null
+                            ? null
+                            : tblUnidades.getScene().getWindow();
+                    java.io.File archivoDestino = fileChooser.showSaveDialog(ventana);
+
+                    if (archivoDestino != null) {
+                        try {
+                            java.nio.file.Files.write(archivoDestino.toPath(), pdfBytes);
+                        } catch (Exception ex) {
+                            AlertaUtil.mostrarError("Error al guardar",
+                                    "No se pudo guardar el archivo PDF en disco.");
+                            return;
+                        }
+
+                        AlertaUtil.mostrarExito("Reporte listo",
+                                "El reporte de unidades se guardó correctamente.");
+
+                        if (java.awt.Desktop.isDesktopSupported()
+                                && java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.OPEN)) {
+                            try {
+                                java.awt.Desktop.getDesktop().open(archivoDestino);
+                            } catch (Exception ex) {
+                                AlertaUtil.mostrarAdvertencia("No se pudo abrir automáticamente",
+                                        "El PDF se guardó bien, pero no se pudo abrir el visor automáticamente.");
+                            }
+                        }
+                    }
+                },
+                error -> {
+                    if (btnGenerarReporte != null) {
+                        btnGenerarReporte.setDisable(false);
+                    }
+                    AlertaUtil.mostrarError("Error al generar reporte", mensajeError(error));
+                }
+        );
+    }
+
+
+
 }

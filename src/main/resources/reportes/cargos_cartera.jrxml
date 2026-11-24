@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport name="cargos_cartera" pageWidth="842" pageHeight="595" orientation="Landscape"
+              columnWidth="782" leftMargin="30" rightMargin="30" topMargin="24" bottomMargin="24">
+
+    <parameter name="TITULO_SISTEMA" class="java.lang.String"/>
+    <parameter name="GENERADO_POR" class="java.lang.String"/>
+    <parameter name="FECHA_CORTE" class="java.time.LocalDate"/>
+    <parameter name="TOTAL_CARGOS" class="java.lang.Integer"/>
+    <parameter name="CARGOS_VENCIDOS" class="java.lang.Integer"/>
+    <parameter name="CARGOS_PENDIENTES" class="java.lang.Integer"/>
+    <parameter name="TOTAL_SALDO_PENDIENTE" class="java.lang.String"/>
+    <parameter name="TOTAL_EN_MORA" class="java.lang.String"/>
+
+    <field name="contrato" class="java.lang.String"/>
+    <field name="tipo" class="java.lang.String"/>
+    <field name="concepto" class="java.lang.String"/>
+    <field name="periodo" class="java.time.LocalDate"/>
+    <field name="venceEl" class="java.time.LocalDate"/>
+    <field name="importe" class="java.math.BigDecimal"/>
+    <field name="saldoPendiente" class="java.math.BigDecimal"/>
+    <field name="moneda" class="java.lang.String"/>
+    <field name="diasMora" class="java.lang.Long"/>
+    <field name="estadoDerivado" class="java.lang.String"/>
+
+    <title height="90">
+        <element kind="rectangle" x="0" y="0" width="782" height="42" backcolor="#0F172A">
+            <pen lineWidth="0.0"/>
+        </element>
+        <element kind="textField" x="14" y="6" width="510" height="30" forecolor="#FFFFFF" vTextAlign="Middle" fontSize="15.0" bold="true">
+            <expression><![CDATA[$P{TITULO_SISTEMA} == null ? "LATCH — Cartera de Cargos y Mora" : $P{TITULO_SISTEMA}]]></expression>
+        </element>
+        <element kind="textField" x="528" y="8" width="240" height="26" forecolor="#CBD5E1" hTextAlign="Right" vTextAlign="Middle" fontSize="9.0">
+            <expression><![CDATA["Cargos: " + ($P{TOTAL_CARGOS} == null ? 0 : $P{TOTAL_CARGOS}) + " · Vencidos: " + ($P{CARGOS_VENCIDOS} == null ? 0 : $P{CARGOS_VENCIDOS})]]></expression>
+        </element>
+        <element kind="textField" x="0" y="46" width="782" height="18" forecolor="#475569" vTextAlign="Middle" fontSize="9.0">
+            <expression><![CDATA["Generado por: " + ($P{GENERADO_POR} == null || $P{GENERADO_POR}.isBlank() ? "Sistema" : $P{GENERADO_POR}) + " · Corte: " + ($P{FECHA_CORTE} == null ? "—" : $P{FECHA_CORTE}.toString())]]></expression>
+        </element>
+        <element kind="rectangle" x="0" y="66" width="782" height="20" backcolor="#F1F5F9">
+            <pen lineWidth="0.0"/>
+        </element>
+        <element kind="textField" x="10" y="66" width="762" height="20" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.5" bold="true">
+            <expression><![CDATA["Pendientes/Parciales: " + ($P{CARGOS_PENDIENTES} == null ? 0 : $P{CARGOS_PENDIENTES}) + "   |   Saldo pendiente: " + ($P{TOTAL_SALDO_PENDIENTE} == null ? "0.00" : $P{TOTAL_SALDO_PENDIENTE}) + "   |   En mora: " + ($P{TOTAL_EN_MORA} == null ? "0.00" : $P{TOTAL_EN_MORA})]]></expression>
+        </element>
+    </title>
+
+    <columnHeader height="26">
+        <element kind="rectangle" x="0" y="0" width="782" height="24" backcolor="#E2E8F0">
+            <pen lineWidth="0.0"/>
+        </element>
+        <element kind="staticText" x="6" y="0" width="160" height="24" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.5" bold="true">
+            <text><![CDATA[Contrato]]></text>
+        </element>
+        <element kind="staticText" x="166" y="0" width="68" height="24" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.5" bold="true">
+            <text><![CDATA[Tipo]]></text>
+        </element>
+        <element kind="staticText" x="234" y="0" width="166" height="24" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.5" bold="true">
+            <text><![CDATA[Concepto]]></text>
+        </element>
+        <element kind="staticText" x="400" y="0" width="74" height="24" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.5" bold="true">
+            <text><![CDATA[Vence]]></text>
+        </element>
+        <element kind="staticText" x="474" y="0" width="92" height="24" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="8.5" bold="true">
+            <text><![CDATA[Importe]]></text>
+        </element>
+        <element kind="staticText" x="566" y="0" width="92" height="24" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="8.5" bold="true">
+            <text><![CDATA[Saldo]]></text>
+        </element>
+        <element kind="staticText" x="662" y="0" width="42" height="24" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.5" bold="true">
+            <text><![CDATA[Mon.]]></text>
+        </element>
+        <element kind="staticText" x="704" y="0" width="38" height="24" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="8.5" bold="true">
+            <text><![CDATA[Mora]]></text>
+        </element>
+        <element kind="staticText" x="744" y="0" width="38" height="24" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.5" bold="true">
+            <text><![CDATA[Estado]]></text>
+        </element>
+    </columnHeader>
+
+    <detail>
+        <band height="24">
+            <element kind="textField" x="6" y="2" width="160" height="18" forecolor="#1E293B" vTextAlign="Middle" fontSize="8.5" textAdjust="StretchHeight">
+                <expression><![CDATA[$F{contrato} == null || $F{contrato}.isBlank() ? "—" : $F{contrato}]]></expression>
+            </element>
+            <element kind="textField" x="166" y="2" width="68" height="18" forecolor="#334155" vTextAlign="Middle" fontSize="8.5">
+                <expression><![CDATA[$F{tipo} == null || $F{tipo}.isBlank() ? "—" : $F{tipo}]]></expression>
+            </element>
+            <element kind="textField" x="234" y="2" width="166" height="18" forecolor="#334155" vTextAlign="Middle" fontSize="8.5" textAdjust="StretchHeight">
+                <expression><![CDATA[$F{concepto} == null || $F{concepto}.isBlank() ? "—" : $F{concepto}]]></expression>
+            </element>
+            <element kind="textField" x="400" y="2" width="74" height="18" forecolor="#334155" vTextAlign="Middle" fontSize="8.5">
+                <expression><![CDATA[$F{venceEl} == null ? "—" : $F{venceEl}.toString()]]></expression>
+            </element>
+            <element kind="textField" x="474" y="2" width="92" height="18" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="8.5" pattern="#,##0.00">
+                <expression><![CDATA[$F{importe}]]></expression>
+            </element>
+            <element kind="textField" x="566" y="2" width="92" height="18" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="8.5" pattern="#,##0.00">
+                <expression><![CDATA[$F{saldoPendiente}]]></expression>
+            </element>
+            <element kind="textField" x="662" y="2" width="42" height="18" forecolor="#334155" vTextAlign="Middle" fontSize="8.5">
+                <expression><![CDATA[$F{moneda} == null || $F{moneda}.isBlank() ? "—" : $F{moneda}]]></expression>
+            </element>
+            <element kind="textField" x="704" y="2" width="38" height="18" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="8.5">
+                <expression><![CDATA[($F{diasMora} == null ? 0L : $F{diasMora}) + "d"]]></expression>
+            </element>
+            <element kind="textField" x="744" y="2" width="38" height="18" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.5" bold="true">
+                <expression><![CDATA[$F{estadoDerivado} == null || $F{estadoDerivado}.isBlank() ? "—" : $F{estadoDerivado}]]></expression>
+            </element>
+            <element kind="line" x="0" y="22" width="782" height="1" forecolor="#E2E8F0">
+                <pen lineWidth="0.5"/>
+            </element>
+        </band>
+    </detail>
+
+    <pageFooter height="22">
+        <element kind="textField" x="0" y="2" width="660" height="18" forecolor="#64748B" vTextAlign="Middle" fontSize="8.5">
+            <expression><![CDATA["Latch · Documento generado automáticamente"]]></expression>
+        </element>
+        <element kind="textField" x="660" y="2" width="90" height="18" forecolor="#64748B" hTextAlign="Right" vTextAlign="Middle" fontSize="8.5">
+            <expression><![CDATA["Página " + $V{PAGE_NUMBER} + " de "]]></expression>
+        </element>
+        <element kind="textField" x="750" y="2" width="32" height="18" forecolor="#64748B" vTextAlign="Middle" fontSize="8.5" evaluationTime="Report">
+            <expression><![CDATA[$V{PAGE_NUMBER}]]></expression>
+        </element>
+    </pageFooter>
+</jasperReport>

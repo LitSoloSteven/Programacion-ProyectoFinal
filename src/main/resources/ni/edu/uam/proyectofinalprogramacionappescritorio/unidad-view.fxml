@@ -27,6 +27,8 @@
             <Button fx:id="btnEliminar" disable="true" onAction="#handleEliminar"
                     styleClass="button-destructive" text="Eliminar unidad" />
         </HBox>
+        <Button fx:id="btnGenerarReporte" onAction="#handleGenerarReporte"
+                styleClass="button-secondary" text="Generar reporte" />
     </HBox>
     <Label fx:id="lblErrorConsulta" managed="false" minHeight="18.0" styleClass="field-error"
            text="" visible="false" wrapText="true" />

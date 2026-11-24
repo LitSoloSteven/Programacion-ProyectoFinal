@@ -28,6 +28,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Inquilino;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.InquilinoService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ReporteService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AccionesTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
@@ -50,6 +51,7 @@ public class InquilinoController {
     @FXML private HBox eliminarTooltipHost;
     @FXML private Button btnNuevo;
     @FXML private Button btnRefrescar;
+    @FXML private Button btnGenerarReporte;
     @FXML private Button btnLimpiar;
     @FXML private Button btnDarBaja;
     @FXML private Button btnEliminar;
@@ -66,6 +68,7 @@ public class InquilinoController {
     @FXML private TableColumn<Inquilino, String> colEstado;
     @FXML private TableColumn<Inquilino, Void> colAcciones;
 
+    private final ReporteService reporteService = new ReporteService();
     private final ClienteCatalogos catalogos = new ClienteCatalogos(ClienteLatch.api());
     private final InquilinoService inquilinoService;
     private final ObservableList<Inquilino> registros = FXCollections.observableArrayList();
@@ -250,4 +253,88 @@ public class InquilinoController {
                 || error instanceof IllegalStateException) return error.getMessage();
         return "No se pudo guardar el inquilino. Revisa los datos e inténtalo de nuevo.";
     }
+
+    @FXML
+    public void handleGenerarReporte() {
+        List<Inquilino> inquilinosActuales = tblInquilinos == null
+                ? List.of()
+                : List.copyOf(tblInquilinos.getItems());
+
+        if (inquilinosActuales.isEmpty()) {
+            AlertaUtil.mostrarAdvertencia("Sin datos",
+                    "No hay inquilinos en la tabla para generar el reporte.");
+            return;
+        }
+
+        if (btnGenerarReporte != null) {
+            btnGenerarReporte.setDisable(true);
+        }
+
+        Task<byte[]> tareaGenerarPdf = new Task<>() {
+            @Override
+            protected byte[] call() {
+                return reporteService.generarReporteInquilinosPdf(inquilinosActuales);
+            }
+        };
+
+        TareasJavaFx.ejecutar(
+                HelloApplication.instancia().getTareas(),
+                tareaGenerarPdf,
+                pdfBytes -> {
+                    if (btnGenerarReporte != null) {
+                        btnGenerarReporte.setDisable(false);
+                    }
+                    if (pdfBytes == null || pdfBytes.length == 0) {
+                        AlertaUtil.mostrarError("Error de reporte",
+                                "El reporte de inquilinos está vacío.");
+                        return;
+                    }
+
+                    javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
+                    fileChooser.setTitle("Guardar reporte de inquilinos");
+                    fileChooser.setInitialFileName("Reporte-Inquilinos.pdf");
+                    fileChooser.getExtensionFilters().add(
+                            new javafx.stage.FileChooser.ExtensionFilter("Documento PDF (*.pdf)", "*.pdf")
+                    );
+
+                    Window ventana = tblInquilinos.getScene() == null
+                            ? null
+                            : tblInquilinos.getScene().getWindow();
+                    java.io.File archivoDestino = fileChooser.showSaveDialog(ventana);
+
+                    if (archivoDestino != null) {
+                        try {
+                            java.nio.file.Files.write(archivoDestino.toPath(), pdfBytes);
+                        } catch (Exception ex) {
+                            AlertaUtil.mostrarError("Error al guardar",
+                                    "No se pudo guardar el archivo PDF en disco.");
+                            return;
+                        }
+
+                        AlertaUtil.mostrarExito("Reporte listo",
+                                "El reporte de inquilinos se guardó correctamente.");
+
+                        if (java.awt.Desktop.isDesktopSupported()
+                                && java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.OPEN)) {
+                            try {
+                                java.awt.Desktop.getDesktop().open(archivoDestino);
+                            } catch (Exception ex) {
+                                AlertaUtil.mostrarAdvertencia("No se pudo abrir automáticamente",
+                                        "El PDF se guardó bien, pero no se pudo abrir el visor automáticamente.");
+                            }
+                        }
+                    }
+                },
+                error -> {
+                    if (btnGenerarReporte != null) {
+                        btnGenerarReporte.setDisable(false);
+                    }
+                    AlertaUtil.mostrarError("Error al generar reporte", mensajeError(error));
+                }
+        );
+    }
+
+
+
+
 }
