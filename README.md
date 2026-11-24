@@ -91,16 +91,23 @@ Debe aparecer `Conexión con PostgreSQL verificada correctamente.`.
 
 ## Primer propietario
 
-Ejecutar una sola vez, con la aplicación detenida:
+En Windows, abre PowerShell en la carpeta que contiene `pom.xml`. Ejecuta este
+bloque una sola vez, con PostgreSQL configurado y la aplicación detenida.
 
 ```powershell
-$env:LATCH_INITIAL_USER = 'steven'
+$env:LATCH_INITIAL_USER = Read-Host 'Usuario del primer propietario'
 $claveInicial = Read-Host 'Contraseña inicial (12 a 128 caracteres)' -AsSecureString
 $env:LATCH_INITIAL_PASSWORD = [System.Net.NetworkCredential]::new('', $claveInicial).Password
-./mvnw.cmd compile exec:java '-Dexec.mainClass=ni.edu.uam.proyectofinalprogramacionappescritorio.herramientas.CrearPropietarioInicial'
-Remove-Item Env:LATCH_INITIAL_PASSWORD
-Remove-Item Env:LATCH_INITIAL_USER
+
+try {
+    .\mvnw.cmd compile exec:java '-Dexec.mainClass=ni.edu.uam.proyectofinalprogramacionappescritorio.herramientas.CrearPropietarioInicial'
+} finally {
+    Remove-Item Env:LATCH_INITIAL_USER, Env:LATCH_INITIAL_PASSWORD
+    Remove-Variable claveInicial
+}
 ```
+
+Al completar el registro, verás `Propietario inicial creado.`.
 
 La herramienta crea el propietario y su auditoría en una transacción y rechaza
 la operación si ya existen usuarios.
