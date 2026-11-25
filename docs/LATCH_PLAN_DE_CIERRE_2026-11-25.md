@@ -1,5 +1,7 @@
 # Latch — Plan de ejecución y entrega del 25 de noviembre de 2026
 
+> **Plan cerrado por decisión de Steven el 25 de noviembre de 2026.** El resultado es un candidato técnico con brechas declaradas. El acta de C4 conserva las comprobaciones y los criterios pendientes para una futura aceptación de producción. [Acta de C4](evidencia-cierre-2026-11-25/C4_P9_aceptacion.md)
+
 ## Objetivo y plazo
 
 Entregar el miércoles **25 de noviembre de 2026**, hora de Managua, un candidato reproducible y acompañado por evidencia. El objetivo de alcance completo es cerrar los 126 requisitos funcionales del PRD —115 Must, 9 Should y 2 Could—, las 38 reglas de negocio, los 60 requisitos no funcionales, los diez reportes y los controles del Plan de Implementación. Se incluyen los Should y Could porque el objetivo pedido es terminar todo lo documentado. Las exclusiones explícitas del PRD quedan fuera.
@@ -134,6 +136,8 @@ C3 pasó la auditoría técnica en el equipo disponible. La [auditoría integrad
 ### C4 · Aceptar y cerrar el proyecto (P9)
 
 **Salida:** matriz completa, entrega reproducible y revisión humana con cero pendientes abiertos.
+
+**Resultado de P9.** Candidato técnico `318b78f` empaquetado y probado fuera del IDE. Pasaron 335 pruebas normales, 41 de PostgreSQL y dos comprobaciones adicionales con dos JVM. La conciliación completa de la matriz, los recorridos y la revisión de entrega quedaron pendientes al cerrar el plan. [Acta de C4](evidencia-cierre-2026-11-25/C4_P9_aceptacion.md)
 
 | Orden y dependencia | Área y modelo previsto | Trabajo y criterio de salida |
 | --- | --- | --- |
