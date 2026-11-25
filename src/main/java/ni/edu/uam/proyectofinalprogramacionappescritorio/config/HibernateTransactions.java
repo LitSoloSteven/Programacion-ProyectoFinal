@@ -6,7 +6,10 @@ import lombok.RequiredArgsConstructor;
 import jakarta.persistence.OptimisticLockException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ExcepcionApi;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ConflictoDatosException;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.OperacionCanceladaException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojDesfasadoException;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RespaldoException;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RestauracionException;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.StaleStateException;
@@ -69,7 +72,9 @@ public final class HibernateTransactions {
     private static RuntimeException traducir(RuntimeException error) {
         if (error instanceof SecurityException || error instanceof IllegalArgumentException
                 || error instanceof ConflictoDatosException
-                || error instanceof RelojDesfasadoException || error instanceof ExcepcionApi) {
+                || error instanceof RelojDesfasadoException || error instanceof ExcepcionApi
+                || error instanceof RespaldoException || error instanceof RestauracionException
+                || error instanceof OperacionCanceladaException) {
             return error;
         }
         if (error instanceof OptimisticLockException || error instanceof StaleStateException) {

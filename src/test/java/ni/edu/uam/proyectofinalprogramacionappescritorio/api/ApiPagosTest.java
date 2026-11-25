@@ -10,12 +10,16 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.api.piloto.ServidorSpri
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.indicadores.dto.MetricasResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.indicadores.dto.TotalMonedaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.ServicioPagos;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.CarteraResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.DistribucionRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.EstadoCuentaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoDetalleResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoRegistroResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PrevisualizacionLoteResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.ReciboResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.ResultadoLoteResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.ResultadoRevisionH2Response;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.PostgresTestSupport;
@@ -28,6 +32,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Pago;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Rol;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.SolicitudIdempotente;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.TipoCambio;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.ReferenciaTipoCambio;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Unidad;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
@@ -564,13 +569,33 @@ class ApiPagosTest {
         PagoRequest sinTasa = new PagoRequest(contratoId.toString(),
                 FECHA_PAGO.plusDays(1).toString(), "NIO", "36624.30",
                 "Transferencia", "REF-SIN-TASA", null, null);
-        HttpResponse<String> fallo = postJson("/api/v1/pagos",
-                GSON.toJson(sinTasa), token, UUID.randomUUID().toString());
-        assertEquals(422, fallo.statusCode(), fallo.body());
-        assertEquals("ENTIDAD_NO_PROCESABLE", error(fallo).error().codigo());
-        assertTrue(error(fallo).error().mensaje().toLowerCase().contains("tasa"));
-        assertEquals(1, contar("select count(p) from Pago p"));
-        assertEquals(1, contar("select count(s) from SolicitudIdempotente s"));
+        UUID referenciaId = tx.ejecutar(session -> {
+            Instant actualizada = FECHA_PAGO.plusDays(1).atStartOfDay(RelojService.ZONA_OPERATIVA).toInstant();
+            var referencia = new ReferenciaTipoCambio(new BigDecimal("40.00000000"), actualizada,
+                    actualizada.plusSeconds(86400), actualizada, "b".repeat(64));
+            session.persist(referencia);
+            return referencia.getId();
+        });
+        try {
+            HttpResponse<String> fallo = postJson("/api/v1/pagos",
+                    GSON.toJson(sinTasa), token, UUID.randomUUID().toString());
+            assertEquals(422, fallo.statusCode(), fallo.body());
+            assertEquals("ENTIDAD_NO_PROCESABLE", error(fallo).error().codigo());
+            assertTrue(error(fallo).error().mensaje().toLowerCase().contains("tasa"));
+            assertEquals(1, contar("select count(p) from Pago p"));
+            assertEquals(1, contar("select count(s) from SolicitudIdempotente s"));
+
+            var tasaAplicada = tx.ejecutar(session -> session.createQuery(
+                    "select p.tipoCambio from Pago p where p.id = :id", TipoCambio.class)
+                    .setParameter("id", UUID.fromString(registro.pagoId())).getSingleResult());
+            assertEquals(TASA.setScale(8), tasaAplicada.getNioPorUsd());
+            assertEquals("BCN", tasaAplicada.getFuente());
+        } finally {
+            tx.ejecutar(session -> {
+                session.remove(session.find(ReferenciaTipoCambio.class, referenciaId));
+                return null;
+            });
+        }
     }
 
     @Test
@@ -813,6 +838,55 @@ class ApiPagosTest {
         assertEquals(0, contar("select count(r) from Recibo r"));
         assertEquals(0, contar("select count(i) from SolicitudIdempotente i"));
         assertEquals(201, postJson("/api/v1/pagos", cuerpo, token, clave).statusCode());
+    }
+
+    @Test
+    void endpointsP3CarteraGeneracionMoraAnulacionYAplicacionAutomatica() throws Exception {
+        String tokenProp = login(nombrePropietario);
+        String tokenAsis = login(nombreAsistente);
+
+        // 1. Previsualizar y generar diciembre 2026
+        HttpResponse<String> previaResp = get("/api/v1/cargos/generacion-mes/vista-previa?periodo=2026-12", tokenAsis);
+        assertEquals(200, previaResp.statusCode(), previaResp.body());
+        PrevisualizacionLoteResponse previa = GSON.fromJson(previaResp.body(), PrevisualizacionLoteResponse.class);
+        assertEquals(1, previa.porGenerar());
+        assertEquals("1000.00", previa.items().getFirst().canon());
+
+        HttpResponse<String> genResp = postJson("/api/v1/cargos/generacion-mes",
+                "{\"periodo\":\"2026-12\"}", tokenAsis, null);
+        assertEquals(200, genResp.statusCode(), genResp.body());
+        ResultadoLoteResponse gen = GSON.fromJson(genResp.body(), ResultadoLoteResponse.class);
+        assertEquals(1, gen.confirmados());
+
+        // 2. Pago con aplicación automática sobre vencidos y excedente
+        PagoRequest pagoAuto = new PagoRequest(contratoId.toString(), FECHA_PAGO.toString(), "USD",
+                "1200.00", "Transferencia", "REF-AUTO-HTTP", List.of(), null, true);
+        HttpResponse<String> autoResp = postJson("/api/v1/pagos",
+                GSON.toJson(pagoAuto), tokenAsis, UUID.randomUUID().toString());
+        assertEquals(201, autoResp.statusCode(), autoResp.body());
+        PagoRegistroResponse autoReg = GSON.fromJson(autoResp.body(), PagoRegistroResponse.class);
+        assertEquals("200.00", autoReg.credito());
+
+        // 3. Cartera al corte 2026-12-10
+        HttpResponse<String> carteraResp = get("/api/v1/cargos/cartera?corte=2026-12-10", tokenAsis);
+        assertEquals(200, carteraResp.statusCode(), carteraResp.body());
+        CarteraResponse cartera = GSON.fromJson(carteraResp.body(), CarteraResponse.class);
+        assertEquals(1, cartera.items().size());
+        assertEquals("1000.00", cartera.items().getFirst().saldo());
+
+        // 4. Revisión H2 HTTP
+        HttpResponse<String> moraResp = postJson("/api/v1/cargos/revisar-mora",
+                "{\"fecha\":\"2026-12-10\"}", tokenProp, null);
+        assertEquals(200, moraResp.statusCode(), moraResp.body());
+        ResultadoRevisionH2Response rev = GSON.fromJson(moraResp.body(), ResultadoRevisionH2Response.class);
+        assertEquals("2026-12-10", rev.fechaEvaluacion());
+
+        // 5. Anular cargo de diciembre: asistente 403, propietario 200
+        String cargoDicId = gen.cargosGenerados().getFirst();
+        assertEquals(403, postJson("/api/v1/cargos/" + cargoDicId + "/anulacion",
+                "{\"motivo\":\"No autorizado\"}", tokenAsis, null).statusCode());
+        assertEquals(200, postJson("/api/v1/cargos/" + cargoDicId + "/anulacion",
+                "{\"motivo\":\"Ajuste administrativo\"}", tokenProp, null).statusCode());
     }
 
     private PagoRequest pago(String monto, List<DistribucionRequest> distribucion) {

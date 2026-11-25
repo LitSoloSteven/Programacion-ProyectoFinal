@@ -28,7 +28,7 @@
     -latch-dark-selected: rgba(230,233,239,0.14);
     -latch-icon: -latch-navy-800;
 
-    -fx-font-family: "Fira Sans", "Segoe UI", sans-serif;
+    -fx-font-family: "Segoe UI", "Fira Sans", sans-serif;
     -fx-font-size: 14px;
     -fx-base: -latch-slate-100;
     -fx-accent: -latch-navy-950;
@@ -77,46 +77,58 @@
 }
 
 .login-root {
-    -fx-background-color: -latch-navy-950;
+    -fx-background-color: -latch-background;
     -fx-alignment: center;
     -fx-padding: 24px;
 }
+.theme-dark .login-root {
+    -fx-background-color: -latch-navy-950;
+}
 
 .login-card {
-    -latch-background: -latch-slate-100;
-    -latch-surface: -latch-slate-100;
-    -latch-surface-raised: -latch-slate-100;
-    -latch-text: -latch-ink-900;
-    -latch-text-muted: -latch-navy-800;
-    -latch-heading: -latch-navy-950;
-    -latch-action: -latch-navy-950;
-    -latch-action-secondary: -latch-navy-800;
-    -latch-focus: -latch-navy-950;
-    -latch-icon: -latch-navy-800;
-    -fx-base: -latch-slate-100;
-    -fx-accent: -latch-navy-950;
-    -fx-control-inner-background: -latch-slate-100;
-    -fx-background: -latch-slate-100;
-    -fx-text-base-color: -latch-ink-900;
-    -fx-text-fill: -latch-ink-900;
-    -fx-background-color: -latch-slate-100;
+    -fx-background-color: -latch-surface-raised;
+    -fx-border-color: -latch-divider;
+    -fx-border-width: 1px;
+    -fx-border-radius: 10px;
     -fx-background-radius: 10px;
     -fx-padding: 24px;
-    -fx-spacing: 16px;
+    -fx-spacing: 14px;
     -fx-max-width: 400px;
     -fx-min-width: 360px;
+}
+.theme-dark .login-card {
+    -fx-background-color: -latch-navy-800;
+    -fx-border-color: -latch-border;
 }
 
 .login-brand {
     -fx-font-size: 32px;
     -fx-font-weight: 600;
-    -fx-text-fill: -latch-navy-950;
+    -fx-text-fill: -latch-heading;
 }
 
 .login-title {
     -fx-font-size: 22px;
     -fx-font-weight: 600;
-    -fx-text-fill: -latch-navy-950;
+    -fx-text-fill: -latch-heading;
+}
+
+.login-toolbar {
+    -fx-spacing: 10px;
+    -fx-alignment: center-left;
+}
+
+.aurora-layer {
+    -fx-background-color: -latch-hover;
+    -fx-background-radius: 180px;
+}
+.no-effects .aurora-layer,
+.reduced-motion .aurora-layer {
+    -fx-opacity: 0;
+}
+.no-effects *,
+.reduced-motion * {
+    -fx-effect: null;
 }
 
 .login-subtitle,
@@ -275,7 +287,7 @@
 .field-help { -fx-text-fill: -latch-text-muted; }
 .field-error { -fx-text-fill: -latch-navy-950; -fx-font-weight: 600; }
 .theme-dark .field-error { -fx-text-fill: -latch-slate-100; }
-.login-card .field-error { -fx-text-fill: -latch-navy-950; }
+.login-card .field-error { -fx-text-fill: -latch-heading; }
 .review-panel {
     -fx-background-color: -latch-surface-raised;
     -fx-background-radius: 8px;
@@ -314,7 +326,8 @@
     -fx-border-width: 2px;
     -fx-effect: dropshadow(gaussian, -latch-focus-veil, 0, 0, 0, 0);
 }
-.check-box { -fx-text-fill: -latch-text; }
+.check-box { -fx-text-fill: -latch-text; -fx-padding: 3px 6px; -fx-border-color: transparent; -fx-border-width: 2px; -fx-border-radius: 5px; }
+.check-box:focused { -fx-border-color: -latch-focus; -fx-border-width: 2px; }
 .check-box .box {
     -fx-background-color: -latch-surface;
     -fx-border-color: -latch-border;
@@ -448,8 +461,15 @@
     -fx-background-radius: 8px;
     -fx-padding: 16px;
 }
-.kpi-card { -fx-min-height: 124px; -fx-pref-height: 132px; }
-.kpi-card.kpi-financial { -fx-min-height: 148px; -fx-pref-height: 148px; }
+.kpi-card { -fx-min-height: 124px; -fx-pref-height: 136px; }
+.kpi-card.kpi-financial { -fx-min-height: 144px; -fx-pref-height: 148px; }
+.kpi-card-action { -fx-cursor: hand; }
+.kpi-card-action:hover { -fx-background-color: -latch-hover; -fx-border-color: -latch-border; }
+.kpi-card-action:focused { -fx-border-color: -latch-focus; -fx-border-width: 2px; }
+.kpi-action-hint { -fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: -latch-action-secondary; }
+.table-view:focused { -fx-border-color: -latch-focus; -fx-border-width: 2px; }
+.tab-pane .tab:focused { -fx-border-color: -latch-focus; -fx-border-width: 2px; }
+.toast-warning { -fx-background-color: -latch-navy-800; -fx-border-color: -latch-slate-100; }
 .kpi-currency-totals { -fx-spacing: 2px; }
 .kpi-title { -fx-font-size: 12px; -fx-font-weight: 500; -fx-text-fill: -latch-text-muted; }
 .kpi-value { -fx-font-size: 30px; -fx-font-weight: 600; -fx-text-fill: -latch-heading; }

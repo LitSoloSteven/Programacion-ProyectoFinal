@@ -23,6 +23,7 @@ module ni.edu.uam.proyectofinalprogramacionappescritorio {
     requires org.apache.tomcat.embed.core;
     requires net.sf.jasperreports.core;
     requires java.desktop;
+    requires org.bouncycastle.provider;
 
 
     opens ni.edu.uam.proyectofinalprogramacionappescritorio to javafx.fxml;
@@ -40,6 +41,7 @@ module ni.edu.uam.proyectofinalprogramacionappescritorio {
     opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto to com.google.gson;
     opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.validaciones.dto to com.google.gson;
     opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto to com.google.gson;
+    opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.mantenimiento.dto to com.google.gson;
     opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.indicadores.dto to com.google.gson;
     opens ni.edu.uam.proyectofinalprogramacionappescritorio.dto to com.google.gson;
     opens ni.edu.uam.proyectofinalprogramacionappescritorio.api.piloto

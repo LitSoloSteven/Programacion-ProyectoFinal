@@ -10,7 +10,9 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Inquilino;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Pago;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propiedad;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propietario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.ReferenciaTipoCambio;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Rol;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.TipoCambio;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Unidad;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PasswordHasher;
@@ -22,13 +24,18 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DashboardServiceTest {
     private static final char[] PASSWORD = "ClaveSintetica-2026".toCharArray();
@@ -141,6 +148,112 @@ class DashboardServiceTest {
         });
 
         assertThrows(SecurityException.class, dashboardService::obtenerMetricas);
+    }
+
+    @Test
+    void calculaOcupacionMoraSeparadaFiltroPeriodoYTasaDisponible() {
+        sembrarEscenario(true);
+        transactions.ejecutar(session -> {
+            Propiedad propiedad = session.createQuery("from Propiedad", Propiedad.class).getSingleResult();
+            Inquilino inquilino = session.createQuery("from Inquilino", Inquilino.class).getSingleResult();
+
+            Unidad unidadLibre = new Unidad();
+            unidadLibre.setPropiedadId(propiedad.getId());
+            unidadLibre.setCodigo("U-LIBRE");
+            unidadLibre.setCanonReferencia(new BigDecimal("300.00"));
+            unidadLibre.setMoneda("USD");
+            session.persist(unidadLibre);
+
+            Unidad unidadInactiva = new Unidad();
+            unidadInactiva.setPropiedadId(propiedad.getId());
+            unidadInactiva.setCodigo("U-INACT");
+            unidadInactiva.setEstado("Inactiva");
+            unidadInactiva.setCanonReferencia(new BigDecimal("300.00"));
+            unidadInactiva.setMoneda("USD");
+            session.persist(unidadInactiva);
+            session.flush();
+
+            UUID contratoPorVencer = insertarContratoConEstado(
+                    session, unidadLibre.getId(), inquilino.getId(), "USD", "Por vencer");
+            Cargo moraUsd = new Cargo();
+            moraUsd.setContratoId(contratoPorVencer);
+            moraUsd.setTipo("Mora");
+            moraUsd.setPeriodo(LocalDate.of(2026, 12, 1));
+            moraUsd.setFechaEmision(LocalDate.of(2026, 12, 1));
+            moraUsd.setVenceEl(LocalDate.of(2026, 12, 10));
+            moraUsd.setImporte(new BigDecimal("25.50"));
+            moraUsd.setConcepto("Mora 2026-12");
+            moraUsd.setEstado("Pendiente");
+            session.persist(moraUsd);
+
+            session.persist(new ReferenciaTipoCambio(
+                    new BigDecimal("36.62430000"),
+                    Instant.now().minusSeconds(300),
+                    Instant.now().plusSeconds(3600),
+                    Instant.now().minusSeconds(60),
+                    "0".repeat(64)));
+            return null;
+        });
+
+        MetricasDashboardDTO general = dashboardService.obtenerMetricas();
+        assertEquals(3, general.unidades());
+        assertEquals(2, general.unidadesActivas());
+        assertEquals(2, general.unidadesOcupadas());
+        assertEquals(new BigDecimal("100.00"), general.porcentajeOcupacion());
+        assertNotNull(general.instanteGeneracion());
+        assertEquals(1, general.contratosPorVencer());
+        assertEquals(new BigDecimal("25.50"), total(general.moraExigible(), "USD").total());
+        assertEquals(new BigDecimal("400.25"), total(general.principalPendiente(), "USD").total());
+        assertTrue(general.tasaDisponible().disponible());
+        assertFalse(general.tasaDisponible().autorizadaParaPagos());
+        assertEquals(new BigDecimal("36.62430000"), general.tasaDisponible().valor());
+
+        MetricasDashboardDTO dic = dashboardService.obtenerMetricas(YearMonth.of(2026, 12));
+        assertEquals("2026-12", dic.periodo());
+        assertEquals(new BigDecimal("25.50"), total(dic.moraExigible(), "USD").total());
+        assertEquals(new BigDecimal("0.00"), total(dic.principalPendiente(), "USD").total());
+        assertEquals(new BigDecimal("0.00"), total(dic.pagosRegistrados(), "USD").total());
+
+        transactions.ejecutar(session -> {
+            Usuario admin = session.find(Usuario.class, usuarioId);
+            session.persist(TipoCambio.autorizada(
+                    LocalDate.of(2026, 11, 25),
+                    new BigDecimal("36.70000000"),
+                    "Banco Central",
+                    Instant.now(),
+                    admin,
+                    "Autorizada para prueba"));
+            return null;
+        });
+
+        MetricasDashboardDTO conAutorizada = dashboardService.obtenerMetricas();
+        assertTrue(conAutorizada.tasaDisponible().autorizadaParaPagos());
+        assertEquals("AUTORIZADA", conAutorizada.tasaDisponible().estado());
+        assertEquals(new BigDecimal("36.70000000"), conAutorizada.tasaDisponible().valor());
+    }
+
+    private UUID insertarContratoConEstado(Session session, UUID unidadId, UUID inquilinoId,
+                                           String moneda, String estado) {
+        UUID contratoId = UUID.randomUUID();
+        session.createNativeMutationQuery("""
+                insert into contrato (id, unidad_id, inquilino_id, inicio, fin, canon, moneda,
+                                      dia_pago, deposito_pactado, estado, version)
+                values (:id, :unidadId, :inquilinoId, :inicio, :fin, :canon, :moneda,
+                        :diaPago, :depositoPactado, :estado, :version)
+                """)
+                .setParameter("id", contratoId)
+                .setParameter("unidadId", unidadId)
+                .setParameter("inquilinoId", inquilinoId)
+                .setParameter("inicio", LocalDate.of(2026, 11, 1))
+                .setParameter("fin", LocalDate.of(2027, 11, 30))
+                .setParameter("canon", new BigDecimal("450.25"))
+                .setParameter("moneda", moneda)
+                .setParameter("diaPago", 5)
+                .setParameter("depositoPactado", BigDecimal.ZERO)
+                .setParameter("estado", estado)
+                .setParameter("version", 0L)
+                .executeUpdate();
+        return contratoId;
     }
 
     private void sembrarEscenario(boolean incluirMovimientos) {

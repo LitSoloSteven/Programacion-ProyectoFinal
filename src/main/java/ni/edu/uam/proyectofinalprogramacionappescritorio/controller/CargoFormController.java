@@ -38,7 +38,7 @@ public class CargoFormController {
 
     @FXML
     public void initialize() {
-        cmbTipo.setItems(FXCollections.observableArrayList("Renta", "Mora", "Reparación", "Servicio", "Otro"));
+        cmbTipo.setItems(FXCollections.observableArrayList("Reparación", "Servicio", "Otro", "Renta"));
         cmbTipo.getSelectionModel().selectFirst();
         cmbEstado.setItems(FXCollections.observableArrayList("Pendiente", "Pagado", "Cancelado"));
         cmbEstado.getSelectionModel().selectFirst();
@@ -57,6 +57,10 @@ public class CargoFormController {
     }
 
     public void cargar(Cargo cargo) {
+        if ("Mora".equals(cargo.getTipo()) && !cmbTipo.getItems().contains("Mora")) {
+            cmbTipo.getItems().add("Mora");
+            cmbTipo.setDisable(true);
+        }
         cmbTipo.setValue(cargo.getTipo());
         cmbEstado.setValue(cargo.getEstadoPersistido());
         txtImporte.setText(cargo.getImporte() == null ? "" : cargo.getImporte().toPlainString());

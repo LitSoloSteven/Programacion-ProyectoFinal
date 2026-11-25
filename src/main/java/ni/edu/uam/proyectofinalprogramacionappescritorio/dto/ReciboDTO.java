@@ -27,12 +27,23 @@ public final class ReciboDTO {
     private final String metodo;
     private final String referencia;
     private final boolean anulado;
+    private final String emisorInfo;
 
     public ReciboDTO(long numero, UUID pagoId, UUID contratoId,
                      LocalDate fechaPago, String contratoInfo,
                      BigDecimal montoOriginal, String monedaOriginal,
                      BigDecimal montoContrato, String monedaContrato, String metodo,
                      String referencia, boolean anulado) {
+        this(numero, pagoId, contratoId, fechaPago, contratoInfo, montoOriginal,
+                monedaOriginal, montoContrato, monedaContrato, metodo, referencia,
+                anulado, null);
+    }
+
+    public ReciboDTO(long numero, UUID pagoId, UUID contratoId,
+                     LocalDate fechaPago, String contratoInfo,
+                     BigDecimal montoOriginal, String monedaOriginal,
+                     BigDecimal montoContrato, String monedaContrato, String metodo,
+                     String referencia, boolean anulado, String emisorInfo) {
         if (numero <= 0) {
             throw new IllegalArgumentException("El numero debe ser positivo.");
         }
@@ -52,6 +63,7 @@ public final class ReciboDTO {
         this.metodo = texto(metodo, "metodo de pago");
         this.referencia = referencia == null ? "" : referencia.trim();
         this.anulado = anulado;
+        this.emisorInfo = emisorInfo == null || emisorInfo.isBlank() ? null : emisorInfo.trim();
     }
 
     private static String texto(String valor, String campo) {

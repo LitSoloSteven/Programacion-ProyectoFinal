@@ -20,6 +20,7 @@ public class PropiedadService {
     private final HibernateCrudService db;
     private final HibernateTransactions transactions;
     private final PermisoService permisos = new PermisoService();
+    private final AuditoriaService auditoria = new AuditoriaService();
 
     public PropiedadService() {
         this(new HibernateTransactions(HibernateUtil.getSessionFactory()));
@@ -50,12 +51,15 @@ public class PropiedadService {
         }
 
         transactions.ejecutar(session -> {
-            Usuario usuario = permisos.exigir(session, sesion, Permiso.OPERAR_ALQUILERES);
+            Usuario usuario = permisos.exigir(session, sesion, Permiso.GESTIONAR_PROPIEDADES);
             if (propiedad.getId() == null) {
                 Propietario propietario = guardarPerfilPropietario(session, usuario,
                         nombrePropietario, correoPropietario, telefonoPropietario);
                 propiedad.setPropietario(propietario);
                 session.persist(propiedad);
+                session.flush();
+                auditoria.registrar(session, usuario, UUID.randomUUID(),
+                        "CREAR_PROPIEDAD", "propiedad:" + propiedad.getId());
                 return null;
             }
 
@@ -66,6 +70,9 @@ public class PropiedadService {
             if (propiedad.getVersion() != existente.getVersion()) {
                 throw new ConflictoDatosException(
                         "Otro usuario modificó el registro. Actualiza los datos antes de reintentar.");
+            }
+            if (existente.isActiva() && !propiedad.isActiva()) {
+                exigirSinUnidadesActivas(session, existente.getId());
             }
 
             cambiarPropietarioSiFueSolicitado(session, usuario, existente,
@@ -78,6 +85,8 @@ public class PropiedadService {
             existente.setNombre(propiedad.getNombre().strip());
             existente.setDireccion(propiedad.getDireccion().strip());
             existente.setActiva(propiedad.isActiva());
+            auditoria.registrar(session, usuario, UUID.randomUUID(),
+                    "ACTUALIZAR_PROPIEDAD", "propiedad:" + existente.getId());
             return null;
         });
     }
@@ -150,7 +159,7 @@ public class PropiedadService {
 
     public void eliminar(UUID id) throws SQLException {
         transactions.ejecutar(session -> {
-            permisos.exigir(session, SesionUsuario.getActual(), Permiso.GESTIONAR_USUARIOS);
+            Usuario actor = permisos.exigir(session, SesionUsuario.getActual(), Permiso.GESTIONAR_PROPIEDADES);
             Propiedad propiedad = session.find(Propiedad.class, id, LockModeType.PESSIMISTIC_WRITE);
             if (propiedad == null) return null;
 
@@ -164,11 +173,36 @@ public class PropiedadService {
             }
 
             session.remove(propiedad);
+            auditoria.registrar(session, actor, UUID.randomUUID(), "ELIMINAR_PROPIEDAD", "propiedad:" + id);
             return null;
         });
     }
 
     public void cambiarEstado(UUID id, boolean activa) throws SQLException {
-        db.cambiar(Propiedad.class, id, propiedad -> propiedad.setActiva(activa));
+        transactions.ejecutar(session -> {
+            Usuario actor = permisos.exigir(session, SesionUsuario.getActual(), Permiso.GESTIONAR_PROPIEDADES);
+            Propiedad propiedad = session.find(Propiedad.class, id, LockModeType.PESSIMISTIC_WRITE);
+            if (propiedad == null) throw new IllegalArgumentException("El registro ya no existe.");
+            if (!activa) {
+                exigirSinUnidadesActivas(session, id);
+            }
+            propiedad.setActiva(activa);
+            auditoria.registrar(session, actor, UUID.randomUUID(),
+                    activa ? "ACTIVAR_PROPIEDAD" : "DESACTIVAR_PROPIEDAD",
+                    "propiedad:" + id);
+            return null;
+        });
+    }
+
+    private static void exigirSinUnidadesActivas(Session session, UUID propiedadId) {
+        Long unidadesActivas = session.createQuery(
+                        "select count(u) from Unidad u where u.propiedadId = :propiedadId and u.estado <> 'Inactiva'",
+                        Long.class)
+                .setParameter("propiedadId", propiedadId)
+                .getSingleResult();
+        if (unidadesActivas > 0) {
+            throw new ConflictoDatosException(
+                    "No se puede desactivar la propiedad porque todavía tiene unidades activas.");
+        }
     }
 }

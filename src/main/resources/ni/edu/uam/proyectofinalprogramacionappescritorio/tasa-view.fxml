@@ -6,6 +6,7 @@
 <?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
 
 <VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
@@ -18,9 +19,13 @@
         </VBox>
         <Button fx:id="btnRefrescar" onAction="#refrescarTabla" styleClass="button-secondary" text="Actualizar" />
         <Button fx:id="btnGenerarReporte" onAction="#handleGenerarReporte"
-                minWidth="USE_PREF_SIZE" styleClass="button-secondary" text="Reporte" />
+                styleClass="button-secondary" text="Reporte">
+            <minWidth><Region fx:constant="USE_PREF_SIZE" /></minWidth>
+        </Button>
         <Button fx:id="btnRegistrar" onAction="#handleRegistrar" styleClass="button-primary" text="Registrar tasa informativa" />
     </HBox>
+    <Label fx:id="lblReferencia" styleClass="secondary-text" wrapText="true"
+           text="Cargando referencia comercial…" />
     <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
         <TextField fx:id="txtBuscar" prefWidth="360.0" promptText="Buscar por fecha, fuente o estado"
                    styleClass="search-field" />

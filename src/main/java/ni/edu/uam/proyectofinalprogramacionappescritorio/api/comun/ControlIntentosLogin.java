@@ -85,6 +85,10 @@ public final class ControlIntentosLogin {
         if (claveOrigen != null) estados.remove(claveOrigen);
     }
 
+    public synchronized void desbloquear(String usuario) {
+        estados.remove(claveUsuario(usuario));
+    }
+
     private void incrementar(String clave, int limite, Instant ahora) {
         if (clave == null) return;
         Estado estado = estadoVigente(clave);

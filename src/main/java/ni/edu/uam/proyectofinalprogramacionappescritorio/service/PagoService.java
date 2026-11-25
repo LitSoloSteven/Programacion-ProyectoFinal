@@ -121,6 +121,12 @@ public class PagoService {
         return tx.ejecutar(session -> registrarPagoEnSesion(session, pago, aplicaciones));
     }
 
+    public RegistroPago registrarPagoAutomatico(Pago pago) {
+        validarPago(pago);
+        return tx.ejecutar(session -> registrarPagoEnSesion(
+                session, pago, List.of(), reloj.comprobar(session), true));
+    }
+
     /**
      * Variante transaccional usada por la API para compartir la transacción
      * con el registro de idempotencia. No abre una transacción propia.
@@ -128,15 +134,26 @@ public class PagoService {
     public RegistroPago registrarPagoEnSesion(Session session, Pago pago,
                                               List<AplicacionPago> aplicaciones) {
         Objects.requireNonNull(session, "Falta la sesión.");
-        return registrarPagoEnSesion(session, pago, aplicaciones, reloj.comprobar(session));
+        return registrarPagoEnSesion(session, pago, aplicaciones, reloj.comprobar(session), false);
     }
 
     public RegistroPago registrarPagoEnSesion(Session session, Pago pago,
                                               List<AplicacionPago> aplicaciones,
                                               RelojService.TiempoOperativo tiempo) {
+        return registrarPagoEnSesion(session, pago, aplicaciones, tiempo, false);
+    }
+
+    public RegistroPago registrarPagoEnSesion(Session session, Pago pago,
+                                              List<AplicacionPago> aplicaciones,
+                                              RelojService.TiempoOperativo tiempo,
+                                              boolean aplicacionAutomatica) {
         Objects.requireNonNull(session, "Falta la sesión.");
         Objects.requireNonNull(tiempo, "Falta la hora operativa.");
         validarPago(pago);
+        if (aplicacionAutomatica && aplicaciones != null && !aplicaciones.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "La aplicación automática no admite distribución manual.");
+        }
         Usuario actor = permisos.exigir(session, SesionUsuario.getActual(),
                 Permiso.OPERAR_ALQUILERES);
 
@@ -170,10 +187,17 @@ public class PagoService {
         session.persist(pago);
         session.flush();
 
+        BigDecimal credito = aplicacionAutomatica
+                ? aplicarAutomaticamente(session, pago, actor, tiempo)
+                : aplicarDistribucion(session, pago, aplicaciones, actor, tiempo);
+        session.flush();
+
         long numeroRecibo = reservarNumeroRecibo(session);
-        Recibo recibo = new Recibo(numeroRecibo, pago, contrato.toString());
+        String emisorInfo = ConfiguracionService.buscarResumenEmisorVigente(session, reloj.leer(session).instante());
+        Recibo recibo = new Recibo(numeroRecibo, pago, contrato.toString(), emisorInfo);
         session.persist(recibo);
-        BigDecimal credito = aplicarDistribucion(session, pago, aplicaciones);
+        session.flush();
+
         auditoria.registrar(session, actor, UUID.randomUUID(), "PAGO_REGISTRADO",
                 "pago:" + pago.getId());
         return new RegistroPago(pago, recibo, credito);
@@ -193,6 +217,7 @@ public class PagoService {
                             join fetch p.contrato c
                             join fetch c.unidad
                             join fetch c.inquilino
+                            left join fetch p.tipoCambio
                             where p.id = :id
                             """, Pago.class)
                     .setParameter("id", id)
@@ -210,6 +235,7 @@ public class PagoService {
                             join fetch p.contrato c
                             join fetch c.unidad
                             join fetch c.inquilino
+                            left join fetch p.tipoCambio
                             where r.numero = :numero
                             """, Recibo.class)
                     .setParameter("numero", numero)
@@ -238,7 +264,22 @@ public class PagoService {
             return session.createQuery("""
                             from AplicacionPago a
                             where a.pagoId = :pagoId
+                              and a.revertidaEn is null
                             order by a.id
+                            """, AplicacionPago.class)
+                    .setParameter("pagoId", pagoId)
+                    .getResultList();
+        });
+    }
+
+    public List<AplicacionPago> listarAplicacionesHistorial(UUID pagoId) {
+        Objects.requireNonNull(pagoId, "Falta el identificador del pago.");
+        return tx.ejecutar(session -> {
+            permisos.exigir(session, SesionUsuario.getActual(), Permiso.OPERAR_ALQUILERES);
+            return session.createQuery("""
+                            from AplicacionPago a
+                            where a.pagoId = :pagoId
+                            order by a.creadoEn, a.id
                             """, AplicacionPago.class)
                     .setParameter("pagoId", pagoId)
                     .getResultList();
@@ -252,8 +293,9 @@ public class PagoService {
     }
 
     /**
-     * Anula un pago. Solo el propietario puede hacerlo; el motivo queda
-     * guardado y la acción se audita en la misma transacción.
+     * Anula un pago. Solo el propietario puede hacerlo; exige ausencia de
+     * aplicaciones posteriores activas de su crédito (RN-31), revierte sus
+     * aplicaciones activas y audita en la misma transacción.
      */
     public Optional<Pago> anular(UUID id, String motivo) {
         Objects.requireNonNull(id, "Falta el identificador del pago.");
@@ -262,11 +304,39 @@ public class PagoService {
             Usuario actor = permisos.exigir(session, SesionUsuario.getActual(),
                     Permiso.ANULAR_PAGOS);
             RelojService.TiempoOperativo tiempo = reloj.comprobar(session);
-            Pago pago = session.find(Pago.class, id);
+            Pago pago = bloquearPago(session, id);
             if (pago == null) return Optional.<Pago>empty();
             if ("Anulado".equals(pago.getEstado())) {
                 throw new ConflictoDatosException("El pago ya está anulado.");
             }
+            bloquearContrato(session, pago.getContratoId());
+
+            Long dependenciasCredito = session.createQuery("""
+                            select count(a) from AplicacionPago a
+                            where a.pagoId = :pagoId
+                              and a.origen = :origenCredito
+                              and a.revertidaEn is null
+                            """, Long.class)
+                    .setParameter("pagoId", id)
+                    .setParameter("origenCredito", AplicacionPago.ORIGEN_CREDITO)
+                    .getSingleResult();
+            if (dependenciasCredito > 0) {
+                throw new ConflictoDatosException(
+                        "No se puede anular el pago porque su crédito tiene aplicaciones posteriores activas. "
+                                + "Revierta primero esas aplicaciones.");
+            }
+
+            List<AplicacionPago> activas = session.createQuery("""
+                            from AplicacionPago a
+                            where a.pagoId = :pagoId and a.revertidaEn is null
+                            order by a.id
+                            """, AplicacionPago.class)
+                    .setParameter("pagoId", id)
+                    .getResultList();
+            for (AplicacionPago aplicacion : activas) {
+                aplicacion.revertir(limpio, actor.getId(), tiempo.instante());
+            }
+
             pago.anular(limpio, actor.getId(), tiempo.instante());
             auditoria.registrar(session, actor, UUID.randomUUID(), "PAGO_ANULADO",
                     "pago:" + pago.getId());
@@ -274,12 +344,91 @@ public class PagoService {
         });
     }
 
+    /**
+     * Revierte una aplicación posterior originada en saldo a favor (RN-31),
+     * dejando trazabilidad de motivo, actor e instante para habilitar la
+     * anulación del pago origen.
+     */
+    public AplicacionPago revertirAplicacionCredito(UUID aplicacionId, String motivo) {
+        Objects.requireNonNull(aplicacionId, "Falta el identificador de la aplicación.");
+        String limpio = textoRequerido(motivo, "motivo de reversión", 500);
+        return tx.ejecutar(session -> {
+            Usuario actor = permisos.exigir(session, SesionUsuario.getActual(),
+                    Permiso.ANULAR_PAGOS);
+            RelojService.TiempoOperativo tiempo = reloj.comprobar(session);
+            AplicacionPago aplicacion = bloquearAplicacion(session, aplicacionId);
+            if (aplicacion == null) {
+                throw new IllegalArgumentException("La aplicación de pago ya no existe.");
+            }
+            if (!AplicacionPago.ORIGEN_CREDITO.equals(aplicacion.getOrigen())) {
+                throw new IllegalArgumentException(
+                        "Solo se pueden revertir aplicaciones originadas en saldo a favor.");
+            }
+            if (aplicacion.isRevertida()) {
+                throw new ConflictoDatosException("La aplicación de crédito ya fue revertida.");
+            }
+
+            Pago pagoOrigen = session.find(Pago.class, aplicacion.getPagoId());
+            if (pagoOrigen != null) {
+                bloquearContrato(session, pagoOrigen.getContratoId());
+            }
+            bloquearCargo(session, aplicacion.getCargoId());
+
+            aplicacion.revertir(limpio, actor.getId(), tiempo.instante());
+            String referencia = "ap:" + aplicacion.getId()
+                    + ";pago:" + aplicacion.getPagoId()
+                    + ";cargo:" + aplicacion.getCargoId();
+            auditoria.registrar(session, actor, UUID.randomUUID(),
+                    "APLICACION_CREDITO_REVERTIDA", referencia);
+            return aplicacion;
+        });
+    }
+
     public void eliminar(UUID id) throws SQLException {
         db.eliminar(Pago.class, id, Permiso.GESTIONAR_USUARIOS);
     }
 
+    private BigDecimal aplicarAutomaticamente(Session session, Pago pago, Usuario actor,
+                                              RelojService.TiempoOperativo tiempo) {
+        BigDecimal restante = pago.getMontoContrato()
+                .setScale(2, RoundingMode.HALF_EVEN);
+        List<UUID> cargosVencidos = session.createQuery("""
+                        select c.id from Cargo c
+                        where c.contratoId = :contratoId
+                          and c.estado not in ('Cancelado', 'Anulado')
+                          and c.venceEl < :hoy
+                        order by c.venceEl asc, c.id asc
+                        """, UUID.class)
+                .setParameter("contratoId", pago.getContratoId())
+                .setParameter("hoy", tiempo.fecha())
+                .getResultList();
+
+        for (UUID cargoId : cargosVencidos) {
+            if (restante.signum() <= 0) break;
+            Cargo cargo = bloquearCargo(session, cargoId);
+            if (cargo == null || "Cancelado".equals(cargo.getEstadoPersistido())
+                    || "Anulado".equals(cargo.getEstadoPersistido())) {
+                continue;
+            }
+            BigDecimal yaAplicado = saldoAplicadoActivo(session, cargoId);
+            BigDecimal saldo = cargo.saldoPendiente(yaAplicado);
+            if (saldo.signum() <= 0) continue;
+
+            BigDecimal abono = restante.min(saldo).setScale(2, RoundingMode.HALF_EVEN);
+            if (abono.signum() <= 0) continue;
+
+            session.persist(AplicacionPago.inicial(
+                    pago.getId(), cargoId, abono, pago.getFechaPago(),
+                    tiempo.instante(), actor.getId()));
+            restante = restante.subtract(abono).setScale(2, RoundingMode.HALF_EVEN);
+        }
+        return restante;
+    }
+
     private BigDecimal aplicarDistribucion(Session session, Pago pago,
-                                           List<AplicacionPago> aplicaciones) {
+                                           List<AplicacionPago> aplicaciones,
+                                           Usuario actor,
+                                           RelojService.TiempoOperativo tiempo) {
         BigDecimal montoContrato = pago.getMontoContrato()
                 .setScale(2, RoundingMode.HALF_EVEN);
         if (aplicaciones == null || aplicaciones.isEmpty()) {
@@ -330,19 +479,13 @@ public class PagoService {
                 throw new IllegalArgumentException(
                         "Todos los cargos deben pertenecer al contrato del pago.");
             }
-            if ("Cancelado".equals(cargo.getEstado())) {
+            if ("Cancelado".equals(cargo.getEstadoPersistido())
+                    || "Anulado".equals(cargo.getEstadoPersistido())) {
                 throw new IllegalArgumentException(
                         "No se puede aplicar un pago a un cargo cancelado.");
             }
 
-            BigDecimal yaAplicado = session.createQuery("""
-                            select sum(ap.monto) from AplicacionPago ap, Pago p
-                            where ap.pagoId = p.id and ap.cargoId = :cargoId
-                              and p.estado <> 'Anulado'
-                            """, BigDecimal.class)
-                    .setParameter("cargoId", cargoId)
-                    .getSingleResult();
-            if (yaAplicado == null) yaAplicado = BigDecimal.ZERO;
+            BigDecimal yaAplicado = saldoAplicadoActivo(session, cargoId);
             BigDecimal importe = cargo.getImporte() == null
                     ? BigDecimal.ZERO : cargo.getImporte();
             if (yaAplicado.add(aplicacion.getMonto()).compareTo(importe) > 0) {
@@ -351,8 +494,9 @@ public class PagoService {
             }
 
             total = total.add(aplicacion.getMonto());
-            aplicacion.setPagoId(pago.getId());
-            session.persist(aplicacion);
+            session.persist(AplicacionPago.inicial(
+                    pago.getId(), cargoId, aplicacion.getMonto(),
+                    pago.getFechaPago(), tiempo.instante(), actor.getId()));
         }
 
         if (total.compareTo(montoContrato) > 0) {
@@ -360,6 +504,18 @@ public class PagoService {
                     "La distribución supera el monto del pago en la moneda del contrato.");
         }
         return montoContrato.subtract(total).setScale(2, RoundingMode.HALF_EVEN);
+    }
+
+    private static BigDecimal saldoAplicadoActivo(Session session, UUID cargoId) {
+        BigDecimal yaAplicado = session.createQuery("""
+                        select sum(ap.monto) from AplicacionPago ap left join Pago p on ap.pagoId = p.id
+                        where ap.cargoId = :cargoId
+                          and ap.revertidaEn is null
+                          and (ap.pagoId is null or p.estado <> 'Anulado')
+                        """, BigDecimal.class)
+                .setParameter("cargoId", cargoId)
+                .getSingleResult();
+        return yaAplicado == null ? BigDecimal.ZERO : yaAplicado;
     }
 
     private Contrato bloquearContrato(Session session, UUID contratoId) {
@@ -373,16 +529,37 @@ public class PagoService {
     private long reservarNumeroRecibo(Session session) {
         String producto = session.doReturningWork(
                 conexion -> conexion.getMetaData().getDatabaseProductName());
-        String consulta;
         if ("H2".equalsIgnoreCase(producto)) {
-            // H2 se usa para pruebas rápidas; producción reserva con la función transaccional de PostgreSQL.
-            consulta = "select coalesce(max(numero), 0) + 1 from recibo";
-        } else if ("PostgreSQL".equalsIgnoreCase(producto)) {
-            consulta = "select public.fn_reservar_numero()";
-        } else {
-            throw new IllegalStateException("La numeración de recibos requiere PostgreSQL.");
+            Long actual = session.createNativeQuery(
+                            "select siguiente_numero from consecutivo_recibo where id = 1 for update",
+                            Long.class)
+                    .uniqueResult();
+            if (actual == null) {
+                session.createNativeMutationQuery(
+                                "merge into consecutivo_recibo (id, siguiente_numero) key(id) values (1, 1)")
+                        .executeUpdate();
+                actual = session.createNativeQuery(
+                                "select siguiente_numero from consecutivo_recibo where id = 1 for update",
+                                Long.class)
+                        .uniqueResult();
+            }
+            Long maxRecibo = session.createNativeQuery(
+                            "select coalesce(max(numero), 0) from recibo", Long.class)
+                    .getSingleResult();
+            long reservado = (maxRecibo == null || maxRecibo == 0L)
+                    ? 1L
+                    : Math.max(actual == null ? 1L : actual, maxRecibo + 1L);
+            session.createNativeMutationQuery(
+                            "update consecutivo_recibo set siguiente_numero = :siguiente where id = 1")
+                    .setParameter("siguiente", reservado + 1L)
+                    .executeUpdate();
+            return reservado;
         }
-        return session.createNativeQuery(consulta, Long.class).getSingleResult();
+        if ("PostgreSQL".equalsIgnoreCase(producto)) {
+            return session.createNativeQuery("select public.fn_reservar_numero()", Long.class)
+                    .getSingleResult();
+        }
+        throw new IllegalStateException("La numeración de recibos requiere PostgreSQL.");
     }
 
     private Cargo bloquearCargo(Session session, UUID cargoId) {
@@ -391,6 +568,22 @@ public class PagoService {
                 .setParameter("id", cargoId)
                 .uniqueResult();
         return filaBloqueada == null ? null : session.find(Cargo.class, cargoId);
+    }
+
+    private Pago bloquearPago(Session session, UUID pagoId) {
+        Object filaBloqueada = session.createNativeQuery(
+                        "select id from pago where id = :id for update")
+                .setParameter("id", pagoId)
+                .uniqueResult();
+        return filaBloqueada == null ? null : session.find(Pago.class, pagoId);
+    }
+
+    private AplicacionPago bloquearAplicacion(Session session, UUID aplicacionId) {
+        Object filaBloqueada = session.createNativeQuery(
+                        "select id from aplicacion_pago where id = :id for update")
+                .setParameter("id", aplicacionId)
+                .uniqueResult();
+        return filaBloqueada == null ? null : session.find(AplicacionPago.class, aplicacionId);
     }
 
     private static void validarPago(Pago pago) {

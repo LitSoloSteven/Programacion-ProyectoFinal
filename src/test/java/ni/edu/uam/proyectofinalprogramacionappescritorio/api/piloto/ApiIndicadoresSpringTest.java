@@ -20,6 +20,7 @@ import java.util.Properties;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ApiIndicadoresSpringTest {
@@ -60,7 +61,10 @@ class ApiIndicadoresSpringTest {
             assertEquals(200, respuesta.statusCode());
             var datos = JsonParser.parseString(respuesta.body()).getAsJsonObject();
             assertEquals(0, datos.get("contratosVigentes").getAsInt());
-            for (String campo : new String[]{"cargosPendientes", "pagosRegistrados"}) {
+            assertEquals("0.00", datos.get("porcentajeOcupacion").getAsString());
+            assertFalse(datos.getAsJsonObject("tasaDisponible").get("disponible").getAsBoolean());
+            assertEquals("Sin tasa disponible", datos.getAsJsonObject("tasaDisponible").get("origen").getAsString());
+            for (String campo : new String[]{"cargosPendientes", "principalPendiente", "moraExigible", "pagosRegistrados"}) {
                 var totales = datos.getAsJsonArray(campo);
                 assertEquals(2, totales.size());
                 assertEquals("USD", totales.get(0).getAsJsonObject().get("moneda").getAsString());
@@ -71,6 +75,19 @@ class ApiIndicadoresSpringTest {
                     assertEquals("0.00", monto.getAsString());
                 }
             }
+
+            var conPeriodo = HttpRequest.newBuilder(URI.create(url + "/dashboard/metricas?periodo=2026-11"))
+                    .timeout(Duration.ofSeconds(10))
+                    .header("Authorization", "Bearer " + token).GET().build();
+            var respPeriodo = cliente.send(conPeriodo, HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, respPeriodo.statusCode());
+            assertEquals("2026-11",
+                    JsonParser.parseString(respPeriodo.body()).getAsJsonObject().get("periodo").getAsString());
+
+            var periodoInvalido = HttpRequest.newBuilder(URI.create(url + "/dashboard/metricas?periodo=invalido"))
+                    .timeout(Duration.ofSeconds(10))
+                    .header("Authorization", "Bearer " + token).GET().build();
+            assertEquals(400, cliente.send(periodoInvalido, HttpResponse.BodyHandlers.ofString()).statusCode());
         }
     }
 }

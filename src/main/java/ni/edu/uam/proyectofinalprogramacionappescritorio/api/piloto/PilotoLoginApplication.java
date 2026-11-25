@@ -7,7 +7,10 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.ComposicionAplicacion;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.ServicioLogin;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.RutasCatalogos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.RutasTasas;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.ActualizacionTasaH3;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.indicadores.RutasIndicadores;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.mantenimiento.RutasMantenimiento;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.ActualizacionMoraH2;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.RutasPagos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ApiConfig;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ControlIntentosLogin;
@@ -38,12 +41,17 @@ import java.util.function.Supplier;
 @SpringBootConfiguration(proxyBeanMethods = false)
 @EnableAutoConfiguration
 @Import({LoginController.class, CatalogosController.class, TasasController.class,
-        IndicadoresController.class, CobranzaController.class, RespuestasApi.class})
+        IndicadoresController.class, CobranzaController.class, MantenimientoController.class,
+        RespuestasApi.class})
 public class PilotoLoginApplication {
     public static ServletWebServerApplicationContext iniciarLocal() {
         ApiConfig config = ApiConfig.desdeArchivo(Path.of(".env"), System.getenv());
-        return (ServletWebServerApplicationContext) iniciar(config, () -> HibernateUtil.construir(
-                DatabaseConfig.desdeArchivo(Path.of(".env"), System.getenv())));
+        String llaveFx = "false".equalsIgnoreCase(System.getenv("LATCH_FX_CONSULTOR"))
+                ? null : System.getenv("LATCH_FX_API_KEY");
+        var contexto = (ServletWebServerApplicationContext) iniciar(config, () -> HibernateUtil.construir(
+                DatabaseConfig.desdeArchivo(Path.of(".env"), System.getenv())), llaveFx);
+        contexto.getBean(ActualizacionMoraH2.class).iniciar();
+        return contexto;
     }
 
     public static boolean puertoOcupado(Throwable error) {
@@ -54,6 +62,11 @@ public class PilotoLoginApplication {
     }
 
     static ConfigurableApplicationContext iniciar(ApiConfig config, Supplier<SessionFactory> factory) {
+        return iniciar(config, factory, null);
+    }
+
+    private static ConfigurableApplicationContext iniciar(
+            ApiConfig config, Supplier<SessionFactory> factory, String llaveFx) {
         SpringApplication app = new SpringApplication(PilotoLoginApplication.class);
         app.setRegisterShutdownHook(false);
         app.setDefaultProperties(Map.of("spring.web.resources.add-mappings", "false",
@@ -64,10 +77,18 @@ public class PilotoLoginApplication {
             contexto.registerBean(ApiConfig.class, () -> config);
             contexto.registerBean(SessionFactory.class, factory,
                     definicion -> definicion.setDestroyMethodName("close"));
+            contexto.registerBean(ActualizacionTasaH3.class,
+                    () -> ActualizacionTasaH3.crear(contexto.getBean(ComposicionAplicacion.class).transacciones(), llaveFx),
+                    definicion -> definicion.setDestroyMethodName("close"));
+            contexto.registerBean(ActualizacionMoraH2.class,
+                    () -> new ActualizacionMoraH2(contexto.getBean(ComposicionAplicacion.class).cobranza()),
+                    definicion -> definicion.setDestroyMethodName("close"));
         });
         // El personalizador de Spring Boot debe conservar el límite de ProtocoloApi.
-        return app.run("--server.http2.enabled=false", "--server.forward-headers-strategy=none",
+        var contexto = app.run("--server.http2.enabled=false", "--server.forward-headers-strategy=none",
                 "--server.tomcat.max-keep-alive-requests=1");
+        contexto.getBean(ActualizacionTasaH3.class).iniciar();
+        return contexto;
     }
 
     @Bean
@@ -110,8 +131,8 @@ public class PilotoLoginApplication {
     }
 
     @Bean
-    RutasTasas rutasTasas(ComposicionAplicacion composicion) {
-        return new RutasTasas(composicion.tasas());
+    RutasTasas rutasTasas(ComposicionAplicacion composicion, ActualizacionTasaH3 h3) {
+        return new RutasTasas(composicion.tasas(), h3);
     }
 
     @Bean
@@ -122,6 +143,11 @@ public class PilotoLoginApplication {
     @Bean
     RutasPagos rutasPagos(ComposicionAplicacion composicion) {
         return new RutasPagos(composicion.pagosApi());
+    }
+
+    @Bean
+    RutasMantenimiento rutasMantenimiento(ComposicionAplicacion composicion) {
+        return new RutasMantenimiento(composicion.mantenimiento());
     }
 
     @Bean

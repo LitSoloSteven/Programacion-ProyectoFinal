@@ -1,7 +1,12 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos;
 
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.ContratoCancelarRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.ContratoEstadoRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.ContratoRenovarRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.ContratoRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.ContratoTerminarRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.ContratoVersionRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.GarantiaLiquidacionRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.InquilinoEstadoRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.InquilinoRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PropiedadEstadoRequest;
@@ -185,6 +190,51 @@ public final class RutasCatalogos {
         ContratoEstadoRequest solicitud = leer(contexto, ContratoEstadoRequest.class);
         return RespuestaJson.ok(enSesion(contexto,
                 () -> servicio.cambiarEstadoContrato(id, solicitud.estado())));
+    }
+
+    public RespuestaJson activarContrato(PeticionApi contexto) throws Exception {
+        UUID id = identificador(contexto.parametro("id"));
+        ContratoVersionRequest solicitud = leer(contexto, ContratoVersionRequest.class);
+        long version = version(solicitud == null ? null : solicitud.version());
+        return RespuestaJson.ok(enSesion(contexto,
+                () -> servicio.activarContrato(id, version)));
+    }
+
+    public RespuestaJson cancelarContrato(PeticionApi contexto) throws Exception {
+        UUID id = identificador(contexto.parametro("id"));
+        ContratoCancelarRequest solicitud = leer(contexto, ContratoCancelarRequest.class);
+        long version = version(solicitud == null ? null : solicitud.version());
+        return RespuestaJson.ok(enSesion(contexto,
+                () -> servicio.cancelarBorradorContrato(id, version, solicitud)));
+    }
+
+    public RespuestaJson renovarContrato(PeticionApi contexto) throws Exception {
+        UUID id = identificador(contexto.parametro("id"));
+        ContratoRenovarRequest solicitud = leer(contexto, ContratoRenovarRequest.class);
+        return RespuestaJson.creado(enSesion(contexto,
+                () -> servicio.renovarContrato(id, solicitud)));
+    }
+
+    public RespuestaJson terminarContrato(PeticionApi contexto) throws Exception {
+        UUID id = identificador(contexto.parametro("id"));
+        ContratoTerminarRequest solicitud = leer(contexto, ContratoTerminarRequest.class);
+        long version = version(solicitud == null ? null : solicitud.version());
+        return RespuestaJson.ok(enSesion(contexto,
+                () -> servicio.terminarContratoConCierre(id, version, solicitud)));
+    }
+
+    public RespuestaJson obtenerGarantiaContrato(PeticionApi contexto) {
+        UUID id = identificador(contexto.parametro("id"));
+        return RespuestaJson.ok(enSesion(contexto,
+                () -> servicio.obtenerGarantiaContrato(id)));
+    }
+
+    public RespuestaJson liquidarGarantiaContrato(PeticionApi contexto) throws Exception {
+        UUID id = identificador(contexto.parametro("id"));
+        GarantiaLiquidacionRequest solicitud = leer(contexto, GarantiaLiquidacionRequest.class);
+        String clave = contexto.cabecera("Idempotency-Key");
+        return RespuestaJson.creado(enSesion(contexto,
+                () -> servicio.liquidarGarantiaContrato(id, clave, solicitud)));
     }
 
     // ------------------------------------------------------------------

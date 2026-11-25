@@ -19,8 +19,14 @@
             <Label styleClass="page-subtitle" text="Consulta y registro de obligaciones por contrato." />
         </VBox>
         <Button fx:id="btnRefrescar" onAction="#refrescarTabla" styleClass="button-secondary" text="Actualizar" />
+        <Button fx:id="btnCartera" onAction="#handleVerCartera"
+                minWidth="-Infinity" styleClass="button-secondary" text="Cartera" />
+        <Button fx:id="btnRevisarMora" onAction="#handleRevisarMora"
+                minWidth="-Infinity" styleClass="button-secondary" text="Revisar mora" />
+        <Button fx:id="btnGenerarRentas" onAction="#handleGenerarRentas"
+                minWidth="-Infinity" styleClass="button-secondary" text="Generar rentas" />
         <Button fx:id="btnGenerarReporte" onAction="#handleGenerarReporte"
-                minWidth="USE_PREF_SIZE" styleClass="button-secondary" text="Reporte" />
+                minWidth="-Infinity" styleClass="button-secondary" text="Reporte" />
         <Button fx:id="btnNuevo" onAction="#handleNuevo" styleClass="button-primary" text="Nuevo cargo" />
     </HBox>
     <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">

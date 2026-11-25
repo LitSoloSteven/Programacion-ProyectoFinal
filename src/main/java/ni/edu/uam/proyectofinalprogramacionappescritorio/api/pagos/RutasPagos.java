@@ -5,11 +5,15 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ExcepcionApi;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.Json;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.RespuestaJson;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.AnulacionRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.GeneracionMesRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.RevisionMoraRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ConflictoDatosException;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.Objects;
 import java.util.UUID;
@@ -90,6 +94,81 @@ public final class RutasPagos {
                 () -> servicio.estadoCuenta(contratoId, corte)));
     }
 
+    public RespuestaJson consultarCartera(PeticionApi contexto) {
+        LocalDate corte = fechaOpcional(contexto.consulta("corte"));
+        UUID contratoId = identificadorOpcional(contexto.consulta("contratoId"));
+        YearMonth periodo = periodoOpcional(contexto.consulta("periodo"));
+        String moneda = contexto.consulta("moneda");
+        String texto = contexto.consulta("texto");
+        try {
+            return RespuestaJson.ok(SesionUsuario.ejecutarComo(
+                    contexto.sesion().comoUsuario(),
+                    () -> servicio.consultarCartera(corte, contratoId, periodo, moneda, texto)));
+        } catch (IllegalArgumentException e) {
+            throw ExcepcionApi.entidadNoProcesable(e.getMessage());
+        }
+    }
+
+    public RespuestaJson previsualizarGeneracionMes(PeticionApi contexto) {
+        String rawPeriodo = contexto.consulta("periodo");
+        YearMonth periodo = (rawPeriodo == null || rawPeriodo.isBlank())
+                ? YearMonth.now(RelojService.ZONA_OPERATIVA)
+                : periodoOpcional(rawPeriodo);
+        return RespuestaJson.ok(SesionUsuario.ejecutarComo(
+                contexto.sesion().comoUsuario(),
+                () -> servicio.previsualizarGeneracionMes(periodo)));
+    }
+
+    public RespuestaJson generarMes(PeticionApi contexto) throws Exception {
+        GeneracionMesRequest solicitud = leer(contexto, GeneracionMesRequest.class);
+        if (solicitud.periodo() == null || solicitud.periodo().isBlank()) {
+            throw ExcepcionApi.entidadNoProcesable("El campo periodo es obligatorio.");
+        }
+        YearMonth periodo = periodoOpcional(solicitud.periodo());
+        return RespuestaJson.ok(SesionUsuario.ejecutarComo(
+                contexto.sesion().comoUsuario(),
+                () -> servicio.generarMes(periodo)));
+    }
+
+    public RespuestaJson revisarMora(PeticionApi contexto) throws Exception {
+        String cuerpo = contexto.leerCuerpo();
+        RevisionMoraRequest solicitud = (cuerpo == null || cuerpo.isBlank())
+                ? new RevisionMoraRequest(null)
+                : Json.leer(cuerpo, RevisionMoraRequest.class);
+        LocalDate fecha = fechaOpcional(solicitud.fecha());
+        return RespuestaJson.ok(SesionUsuario.ejecutarComo(
+                contexto.sesion().comoUsuario(),
+                () -> servicio.revisarMora(fecha)));
+    }
+
+    public RespuestaJson anularCargo(PeticionApi contexto) throws Exception {
+        UUID id = identificador(contexto.parametro("id"));
+        AnulacionRequest solicitud = leer(contexto, AnulacionRequest.class);
+        try {
+            return RespuestaJson.ok(SesionUsuario.ejecutarComo(
+                    contexto.sesion().comoUsuario(),
+                    () -> servicio.anularCargo(id, solicitud.motivo())));
+        } catch (ConflictoDatosException e) {
+            throw ExcepcionApi.conflicto(e.getMessage());
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            throw ExcepcionApi.entidadNoProcesable(e.getMessage());
+        }
+    }
+
+    public RespuestaJson revertirAplicacionCredito(PeticionApi contexto) throws Exception {
+        UUID id = identificador(contexto.parametro("id"));
+        AnulacionRequest solicitud = leer(contexto, AnulacionRequest.class);
+        try {
+            return RespuestaJson.ok(SesionUsuario.ejecutarComo(
+                    contexto.sesion().comoUsuario(),
+                    () -> servicio.revertirAplicacionCredito(id, solicitud.motivo())));
+        } catch (ConflictoDatosException e) {
+            throw ExcepcionApi.conflicto(e.getMessage());
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            throw ExcepcionApi.entidadNoProcesable(e.getMessage());
+        }
+    }
+
     private static <T> T leer(PeticionApi contexto, Class<T> tipo) throws Exception {
         return Json.leer(contexto.leerCuerpo(), tipo);
     }
@@ -150,7 +229,22 @@ public final class RutasPagos {
             return LocalDate.parse(valor.strip());
         } catch (DateTimeParseException e) {
             throw ExcepcionApi.solicitudInvalida(
-                    "El parámetro corte debe tener el formato AAAA-MM-DD.");
+                    "La fecha debe tener el formato AAAA-MM-DD.");
+        }
+    }
+
+    private static UUID identificadorOpcional(String valor) {
+        if (valor == null || valor.isBlank()) return null;
+        return identificador(valor.strip());
+    }
+
+    private static YearMonth periodoOpcional(String valor) {
+        if (valor == null || valor.isBlank()) return null;
+        try {
+            return YearMonth.parse(valor.strip());
+        } catch (DateTimeParseException e) {
+            throw ExcepcionApi.solicitudInvalida(
+                    "El período debe tener el formato AAAA-MM.");
         }
     }
 }

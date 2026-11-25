@@ -85,9 +85,10 @@ public final class CargoService {
             Map<UUID, BigDecimal> aplicadoPorCargo = new HashMap<>();
             for (Object[] fila : session.createQuery("""
                             select a.cargoId, sum(a.monto)
-                            from AplicacionPago a, Pago p
-                            where a.pagoId = p.id and a.cargoId in :ids
-                              and p.estado <> :anulado
+                            from AplicacionPago a left join Pago p on a.pagoId = p.id
+                            where a.cargoId in :ids
+                              and a.revertidaEn is null
+                              and (a.pagoId is null or p.estado <> :anulado)
                             group by a.cargoId
                             """, Object[].class)
                     .setParameter("ids", ids)
@@ -128,16 +129,30 @@ public final class CargoService {
         return tx.ejecutar(session -> {
             Usuario actor = permisos.exigir(session, SesionUsuario.getActual(),
                     Permiso.OPERAR_ALQUILERES);
-            reloj.comprobar(session);
+            RelojService.TiempoOperativo tiempo = reloj.comprobar(session);
             Cargo cargo;
             String accion;
             if (solicitud.id() == null) {
+                if ("Mora".equalsIgnoreCase(solicitud.tipo().strip())) {
+                    throw new IllegalArgumentException(
+                            "Los cargos de Mora se generan automáticamente tras vencer el plazo de gracia.");
+                }
+                if (session.createNativeQuery("select id from contrato where id = :id for update")
+                        .setParameter("id", solicitud.contratoId()).uniqueResult() == null) {
+                    throw new IllegalArgumentException("El contrato seleccionado ya no existe.");
+                }
                 cargo = new Cargo();
                 aplicar(cargo, solicitud);
+                cargo.setCreadoPor(actor.getId());
                 if ("Cancelado".equals(solicitud.estado())) {
                     permisos.exigir(session, SesionUsuario.getActual(), Permiso.ANULAR_CARGOS);
+                    cargo.anular("Registrado como anulado", actor.getId(), tiempo.instante());
                 }
                 session.persist(cargo);
+                session.flush();
+                if (!"Cancelado".equals(cargo.getEstadoPersistido())) {
+                    CobranzaService.aplicarCreditoDisponibleEnSesion(session, cargo, actor.getId(), tiempo);
+                }
                 accion = "CARGO_CREADO";
             } else {
                 cargo = session.find(Cargo.class, solicitud.id());
@@ -148,12 +163,12 @@ public final class CargoService {
                 }
                 if (tieneAplicacionesActivas(session, cargo.getId())
                         && (cargo.getImporte().compareTo(solicitud.importe()) != 0
-                        || !Objects.equals(cargo.getEstado(), solicitud.estado())
+                        || !Objects.equals(cargo.getEstadoPersistido(), solicitud.estado())
                         || !Objects.equals(cargo.getContratoId(), solicitud.contratoId()))) {
                     throw new IllegalStateException(
                             "No se puede cambiar el importe, estado o contrato de un cargo con pagos aplicados.");
                 }
-                if (!Objects.equals(cargo.getEstado(), solicitud.estado())
+                if (!Objects.equals(cargo.getEstadoPersistido(), solicitud.estado())
                         && "Cancelado".equals(solicitud.estado())) {
                     permisos.exigir(session, SesionUsuario.getActual(), Permiso.ANULAR_CARGOS);
                 }
@@ -168,19 +183,36 @@ public final class CargoService {
     }
 
     public void anular(UUID id) throws SQLException {
+        anular(id, "Anulación manual desde la interfaz");
+    }
+
+    public void anular(UUID id, String motivo) throws SQLException {
         Objects.requireNonNull(id, "Falta el identificador del cargo.");
+        if (motivo == null || motivo.isBlank()) {
+            throw new IllegalArgumentException("El motivo de anulación es obligatorio.");
+        }
+        String limpio = motivo.strip();
+        if (limpio.length() > 500) {
+            throw new IllegalArgumentException("El motivo de anulación no puede superar 500 caracteres.");
+        }
         tx.ejecutar(session -> {
             Usuario actor = permisos.exigir(session, SesionUsuario.getActual(),
                     Permiso.ANULAR_CARGOS);
-            reloj.comprobar(session);
-            Cargo cargo = session.find(Cargo.class, id);
+            RelojService.TiempoOperativo tiempo = reloj.comprobar(session);
+            Object fila = session.createNativeQuery("select id from cargo where id = :id for update")
+                    .setParameter("id", id)
+                    .uniqueResult();
+            Cargo cargo = fila == null ? null : session.find(Cargo.class, id);
             if (cargo == null) throw new IllegalArgumentException("El cargo ya no existe.");
-            if ("Cancelado".equals(cargo.getEstado())) return null;
+            if ("Cancelado".equals(cargo.getEstadoPersistido())
+                    || "Anulado".equals(cargo.getEstadoPersistido())) {
+                throw new ConflictoDatosException("El cargo ya está anulado.");
+            }
             if (tieneAplicacionesActivas(session, id)) {
                 throw new IllegalStateException(
                         "No se puede anular un cargo con pagos aplicados.");
             }
-            cargo.setEstado("Cancelado");
+            cargo.anular(limpio, actor.getId(), tiempo.instante());
             auditoria.registrar(session, actor, UUID.randomUUID(), "CARGO_ANULADO",
                     "cargo:" + id);
             return null;
@@ -221,9 +253,10 @@ public final class CargoService {
 
     private static boolean tieneAplicacionesActivas(Session session, UUID cargoId) {
         Long total = session.createQuery("""
-                        select count(a) from AplicacionPago a, Pago p
-                        where a.pagoId = p.id and a.cargoId = :cargoId
-                          and p.estado <> :anulado
+                        select count(a) from AplicacionPago a left join Pago p on a.pagoId = p.id
+                        where a.cargoId = :cargoId
+                          and a.revertidaEn is null
+                          and (a.pagoId is null or p.estado <> :anulado)
                         """, Long.class)
                 .setParameter("cargoId", cargoId)
                 .setParameter("anulado", "Anulado")

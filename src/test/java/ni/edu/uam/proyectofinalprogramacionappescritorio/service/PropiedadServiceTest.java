@@ -22,9 +22,11 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PropiedadServiceTest {
     private SessionFactory factory;
@@ -92,12 +94,70 @@ class PropiedadServiceTest {
     }
 
     @Test
-    void edicionNormalConservaDuenioAunqueLaGuardeUnAsistente() throws Exception {
-        guardarComo(asistente, edicion(null));
+    void asistenteNoPuedeCrearEditarNiDesactivarPropiedad() {
+        Propiedad nueva = new Propiedad();
+        nueva.setNombre("Propiedad no permitida");
+        nueva.setDireccion("Calle 99");
+        assertThrows(SecurityException.class, () -> guardarComo(asistente, nueva));
+        assertThrows(SecurityException.class, () -> guardarComo(asistente, edicion(null)));
+        assertThrows(SecurityException.class, () -> SesionUsuario.ejecutarComo(asistente, () -> {
+            try {
+                servicio.cambiarEstado(propiedadId, false);
+            } catch (SQLException e) {
+                throw new WrappedSqlException(e);
+            }
+        }));
 
         assertEquals(propietarioId, leerPropietarioId());
-        assertEquals("Casa actualizada", leerPropiedad().getNombre());
+        assertEquals("Casa original", leerPropiedad().getNombre());
+        assertTrue(leerPropiedad().isActiva());
         assertNull(tx.ejecutar(session -> session.find(Propietario.class, asistenteId)));
+    }
+
+    @Test
+    void noDesactivaPropiedadMientrasTengaUnidadesActivas() {
+        tx.ejecutar(session -> {
+            Unidad unidad = new Unidad();
+            unidad.setPropiedadId(propiedadId);
+            unidad.setCodigo("U-ACTIVA");
+            unidad.setEstado("Disponible");
+            unidad.setCanonReferencia(new BigDecimal("100.00"));
+            session.persist(unidad);
+            return null;
+        });
+
+        assertThrows(ConflictoDatosException.class, () -> SesionUsuario.ejecutarComo(propietario, () -> {
+            try {
+                servicio.cambiarEstado(propiedadId, false);
+            } catch (SQLException e) {
+                throw new WrappedSqlException(e);
+            }
+        }));
+        assertTrue(leerPropiedad().isActiva());
+    }
+
+    @Test
+    void desactivaPropiedadCuandoTodasSusUnidadesEstanInactivas() {
+        tx.ejecutar(session -> {
+            Unidad unidad = new Unidad();
+            unidad.setPropiedadId(propiedadId);
+            unidad.setCodigo("U-INACTIVA");
+            unidad.setEstado("Inactiva");
+            unidad.setCanonReferencia(new BigDecimal("100.00"));
+            session.persist(unidad);
+            return null;
+        });
+
+        SesionUsuario.ejecutarComo(propietario, () -> assertDoesNotThrow(
+                () -> servicio.cambiarEstado(propiedadId, false)));
+
+        assertFalse(leerPropiedad().isActiva());
+        long auditorias = tx.ejecutar(session -> session.createQuery(
+                        "select count(a) from Auditoria a where a.accion = 'DESACTIVAR_PROPIEDAD' and a.referencia = :ref",
+                        Long.class)
+                .setParameter("ref", "propiedad:" + propiedadId)
+                .getSingleResult());
+        assertEquals(1L, auditorias);
     }
 
     @Test

@@ -2,6 +2,7 @@ package ni.edu.uam.proyectofinalprogramacionappescritorio.cliente;
 
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.AutorizarTasaRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.ListaTasasResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.ReferenciaTasaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.TasaRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.TasaResponse;
 
@@ -48,5 +49,9 @@ public final class ClienteTasas {
             if (e.esNoEncontrado()) return Optional.empty();
             throw e;
         }
+    }
+
+    public ReferenciaTasaResponse referencia() {
+        return api.get("/api/v1/tasas/referencia", ReferenciaTasaResponse.class);
     }
 }

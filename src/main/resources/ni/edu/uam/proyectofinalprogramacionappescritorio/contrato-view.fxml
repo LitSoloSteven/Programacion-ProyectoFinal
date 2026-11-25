@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
@@ -10,30 +11,41 @@
 
 <VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
       fx:id="rootView" fx:controller="ni.edu.uam.proyectofinalprogramacionappescritorio.controller.ContratoController"
-      spacing="16.0" styleClass="view-container">
+      spacing="14.0" styleClass="view-container">
     <HBox alignment="CENTER_LEFT" spacing="16.0" styleClass="page-header">
         <VBox spacing="4.0" HBox.hgrow="ALWAYS">
             <Label fx:id="lblTitulo" styleClass="page-title" text="Contratos" />
-            <Label styleClass="page-subtitle" text="Vigencias, cánones y garantías de arrendamiento." />
+            <Label styleClass="page-subtitle" text="Vigencias, cánones, renovaciones y garantías de arrendamiento." />
         </VBox>
         <Button fx:id="btnRefrescar" onAction="#refrescarTabla" styleClass="button-secondary" text="Actualizar" />
         <Button fx:id="btnGenerarReporte" onAction="#handleGenerarReporte"
-                minWidth="USE_PREF_SIZE" styleClass="button-secondary" text="Reporte" />
+                minWidth="-Infinity" styleClass="button-secondary" text="Reporte" />
         <Button fx:id="btnReporteGarantias" onAction="#handleReporteGarantias"
-                minWidth="USE_PREF_SIZE" styleClass="button-secondary" text="Garantías" />
+                minWidth="-Infinity" styleClass="button-secondary" text="Garantías" />
         <Button fx:id="btnNuevo" onAction="#handleNuevo" styleClass="button-primary" text="Nuevo contrato" />
     </HBox>
     <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
-        <TextField fx:id="txtBuscar" prefWidth="360.0" promptText="Buscar por inquilino, unidad o estado" styleClass="search-field" />
+        <TextField fx:id="txtBuscar" prefWidth="240.0" promptText="Buscar por inquilino, unidad o estado" styleClass="search-field" />
+        <ComboBox fx:id="cmbFiltroUnidad" prefWidth="190.0" promptText="Unidad" styleClass="field" />
+        <ComboBox fx:id="cmbFiltroInquilino" prefWidth="180.0" promptText="Inquilino" styleClass="field" />
+        <ComboBox fx:id="cmbFiltroEstado" prefWidth="135.0" promptText="Estado" styleClass="field" />
         <Button fx:id="btnLimpiar" onAction="#limpiarFiltros" styleClass="button-secondary" text="Limpiar" />
         <Label fx:id="lblContador" styleClass="secondary-text" text="0 registros" HBox.hgrow="ALWAYS" />
+    </HBox>
+    <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
+        <Button fx:id="btnActivar" disable="true" onAction="#handleActivarContrato"
+                styleClass="button-primary" text="Activar" />
+        <Button fx:id="btnCancelarBorrador" disable="true" onAction="#handleCancelarBorrador"
+                styleClass="button-secondary" text="Cancelar borrador" />
+        <Button fx:id="btnRenovar" disable="true" onAction="#handleRenovarContrato"
+                styleClass="button-secondary" text="Renovar" />
         <Button fx:id="btnTerminar" disable="true" onAction="#handleTerminarContrato"
                 styleClass="button-secondary" text="Finalizar" />
         <HBox fx:id="garantiaTooltipHost">
             <Button fx:id="btnAjustarGarantia" disable="true" onAction="#handleAjustarGarantia"
-                    styleClass="button-secondary" text="Ajustar garantía" />
+                    styleClass="button-secondary" text="Garantía" />
         </HBox>
-        <Button fx:id="btnEstadoCuenta" disable="true" minWidth="USE_PREF_SIZE"
+        <Button fx:id="btnEstadoCuenta" disable="true" minWidth="-Infinity"
                 onAction="#handleEstadoCuenta" styleClass="button-secondary" text="Estado de cuenta" />
         <HBox fx:id="eliminarTooltipHost">
             <Button fx:id="btnEliminar" disable="true" onAction="#handleEliminar"

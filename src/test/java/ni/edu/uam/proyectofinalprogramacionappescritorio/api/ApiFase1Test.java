@@ -76,6 +76,29 @@ class ApiFase1Test {
     }
 
     @Test
+    void claveTemporalNoEmiteTokenHastaQueSeReemplaza() throws Exception {
+        Usuario usuario = crearUsuario(Rol.ASISTENTE);
+        tx.ejecutar(session -> {
+            session.find(Usuario.class, usuario.getId()).marcarCambioPasswordPendiente();
+            return null;
+        });
+        String temporal = new String(PASSWORD);
+        String definitiva = "ClavePersonalDefinitiva-2026";
+        String ruta = "/api/v1/auth/login";
+
+        var sinCambio = postJson(ruta, GSON.toJson(new LoginRequest(usuario.getNombre(), temporal)), null);
+        assertEquals(409, sinCambio.statusCode());
+        assertEquals("CAMBIO_PASSWORD_REQUERIDO", error(sinCambio).error().codigo());
+        assertFalse(GSON.fromJson(sinCambio.body(), com.google.gson.JsonObject.class).has("token"));
+
+        var cambio = postJson(ruta, GSON.toJson(new LoginRequest(usuario.getNombre(), temporal, definitiva)), null);
+        assertEquals(200, cambio.statusCode());
+        assertNotNull(GSON.fromJson(cambio.body(), LoginResponse.class).token());
+        assertEquals(401, postJson(ruta, GSON.toJson(new LoginRequest(usuario.getNombre(), temporal)), null).statusCode());
+        assertEquals(200, postJson(ruta, GSON.toJson(new LoginRequest(usuario.getNombre(), definitiva)), null).statusCode());
+    }
+
+    @Test
     void loginCorrectoEmiteTokenSinTocarSesionGlobal() throws Exception {
         Usuario usuario = crearUsuario(Rol.PROPIETARIO);
         LoginResponse respuesta = login(usuario);

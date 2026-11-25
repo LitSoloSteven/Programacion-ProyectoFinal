@@ -106,7 +106,19 @@ public class Contrato {
     private Inquilino inquilino;
 
     @Column(name = "terminado_el")
+    @Getter
+    @Setter
     private LocalDate terminadoEl;
+
+    @Column(name = "predecesor_id")
+    @Getter
+    @Setter
+    private UUID predecesorId;
+
+    @Column(name = "motivo_cierre", length = 500)
+    @Getter
+    @Setter
+    private String motivoCierre;
 
     public Contrato() {
         this.moneda = "USD";
@@ -226,5 +238,29 @@ public class Contrato {
 
     public void terminar(LocalDate fecha) {
         transicionarA("Terminado", fecha);
+    }
+
+    public void terminar(LocalDate fecha, String motivo) {
+        if (motivo == null || motivo.isBlank()) {
+            throw new IllegalArgumentException("El motivo de terminación es obligatorio.");
+        }
+        String limpio = motivo.strip();
+        if (limpio.length() > 500) {
+            throw new IllegalArgumentException("El motivo de terminación no puede superar 500 caracteres.");
+        }
+        transicionarA("Terminado", fecha);
+        this.motivoCierre = limpio;
+    }
+
+    public void cancelar(String motivo) {
+        if (motivo == null || motivo.isBlank()) {
+            throw new IllegalArgumentException("El motivo de cancelación es obligatorio.");
+        }
+        String limpio = motivo.strip();
+        if (limpio.length() > 500) {
+            throw new IllegalArgumentException("El motivo de cancelación no puede superar 500 caracteres.");
+        }
+        transicionarA("Cancelado", null);
+        this.motivoCierre = limpio;
     }
 }

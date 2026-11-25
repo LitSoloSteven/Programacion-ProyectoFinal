@@ -34,14 +34,19 @@ public final class ServicioLogin {
         }
 
         char[] password = solicitud.password().toCharArray();
+        char[] nueva = solicitud.nuevaPassword() == null ? null : solicitud.nuevaPassword().toCharArray();
         SesionUsuario sesion;
         try {
-            sesion = autenticacion.autenticar(solicitud.usuario(), password, false, origen);
+            sesion = autenticacion.autenticar(solicitud.usuario(), password, false, origen, nueva);
+        } catch (AutenticacionService.CambioPasswordRequerido e) {
+            intentos.registrarExito(solicitud.usuario(), origen);
+            throw new ExcepcionApi(409, "CAMBIO_PASSWORD_REQUERIDO", e.getMessage());
         } catch (IllegalArgumentException e) {
             intentos.registrarFallo(solicitud.usuario(), origen);
             throw ExcepcionApi.credencialesInvalidas();
         } finally {
             Arrays.fill(password, '\0');
+            if (nueva != null) Arrays.fill(nueva, '\0');
         }
         intentos.registrarExito(solicitud.usuario(), origen);
         TokenService.TokenEmitido emitido = tokens.emitir(

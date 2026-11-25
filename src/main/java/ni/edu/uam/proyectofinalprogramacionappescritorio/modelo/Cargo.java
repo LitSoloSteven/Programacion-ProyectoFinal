@@ -9,6 +9,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoMoneda;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Locale;
 import java.util.UUID;
@@ -29,6 +30,10 @@ public class Cargo {
     @Getter
     @Setter
     private UUID contratoId;
+    @Column(name = "cargo_origen_id")
+    @Getter
+    @Setter
+    private UUID cargoOrigenId;
     @Transient
     @Setter
     private String contratoInfo;
@@ -58,6 +63,19 @@ public class Cargo {
     private String concepto;
     @Column(length = 24, nullable = false)
     private String estado;
+    @Column(name = "anulado_en")
+    @Getter
+    private Instant anuladoEn;
+    @Column(name = "anulado_por")
+    @Getter
+    private Long anuladoPor;
+    @Column(name = "motivo_anulacion", length = 500)
+    @Getter
+    private String motivoAnulacion;
+    @Column(name = "creado_por")
+    @Getter
+    @Setter
+    private Long creadoPor;
     @Version
     @Getter
     @Setter
@@ -100,6 +118,10 @@ public class Cargo {
         return contrato == null ? contratoInfo : contrato.toString();
     }
 
+    public String getMonedaContrato() {
+        return contrato == null ? null : contrato.getMoneda();
+    }
+
     public String getEstado() {
         return estadoDerivado == null ? estado : estadoDerivado;
     }
@@ -111,6 +133,24 @@ public class Cargo {
     public void setEstado(String estado) {
         this.estado = estado;
         this.estadoDerivado = null;
+    }
+
+    /**
+     * Anula el cargo de forma trazable conservando su importe histórico (RF-M05-09).
+     */
+    public void anular(String motivo, Long usuarioId, Instant instante) {
+        if (motivo == null || motivo.isBlank()) {
+            throw new IllegalArgumentException("El motivo de anulación es obligatorio.");
+        }
+        String limpio = motivo.strip();
+        if (limpio.length() > 500) {
+            throw new IllegalArgumentException("El motivo de anulación no puede superar 500 caracteres.");
+        }
+        this.estado = "Cancelado";
+        this.estadoDerivado = "Anulado";
+        this.motivoAnulacion = limpio;
+        this.anuladoPor = java.util.Objects.requireNonNull(usuarioId, "Falta el usuario que anula.");
+        this.anuladoEn = java.util.Objects.requireNonNull(instante, "Falta el instante de anulación.");
     }
 
     public void establecerEstadoDerivado(BigDecimal montoAplicado, LocalDate fechaCorte) {

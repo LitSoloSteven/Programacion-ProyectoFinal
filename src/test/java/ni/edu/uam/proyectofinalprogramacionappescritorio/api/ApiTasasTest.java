@@ -6,11 +6,13 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.dto.LoginRespo
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ErrorApi;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.piloto.ServidorSpringPrueba;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.ListaTasasResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.ReferenciaTasaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.TasaRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.TasaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Rol;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.ReferenciaTipoCambio;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Usuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.PostgresTestSupport;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
@@ -23,6 +25,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -120,6 +123,44 @@ class ApiTasasTest {
 
         assertEquals(401, respuesta.statusCode());
         assertEquals("NO_AUTENTICADO", error(respuesta).error().codigo());
+    }
+
+    @Test
+    void consultaReferenciaComercialHistoricaSinAutorizarlaParaPagos() throws Exception {
+        String ruta = "/api/v1/tasas/referencia";
+        assertEquals(401, get(ruta, null).statusCode());
+        String token = login(nombreAsistente);
+        assertEquals("NO_DISPONIBLE",
+                GSON.fromJson(get(ruta, token).body(), ReferenciaTasaResponse.class).estado());
+
+        var tx = new HibernateTransactions(factory);
+        Instant ayer = Instant.now().minusSeconds(86400);
+        UUID id = tx.ejecutar(sesion -> {
+            var referencia = new ReferenciaTipoCambio(new BigDecimal("36.62430000"), ayer,
+                    ayer.plusSeconds(3600), ayer, "a".repeat(64));
+            sesion.persist(referencia);
+            return referencia.getId();
+        });
+        try {
+            var consulta = get(ruta, token);
+            assertEquals(200, consulta.statusCode());
+            var referencia = GSON.fromJson(consulta.body(), ReferenciaTasaResponse.class);
+            var efectiva = RelojService.fechaOperativa(ayer);
+            assertEquals("HISTORICA", referencia.estado());
+            assertEquals("36.62430000", referencia.nioPorUsd());
+            assertEquals("ExchangeRate-API / AYR Tech", referencia.fuente());
+            assertEquals(efectiva.toString(), referencia.fechaEfectiva());
+            assertNotNull(referencia.consultadaEn());
+            assertTrue(referencia.antiguedadSegundos() >= 86399);
+            assertEquals(404, get("/api/v1/tasas/vigente?fecha=" + efectiva, token).statusCode());
+            assertTrue(GSON.fromJson(get("/api/v1/tasas", token).body(), ListaTasasResponse.class)
+                    .tasas().isEmpty());
+        } finally {
+            tx.ejecutar(sesion -> {
+                sesion.remove(sesion.find(ReferenciaTipoCambio.class, id));
+                return null;
+            });
+        }
     }
 
     @Test

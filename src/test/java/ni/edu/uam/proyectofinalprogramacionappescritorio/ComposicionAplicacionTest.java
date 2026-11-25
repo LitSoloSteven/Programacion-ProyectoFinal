@@ -54,7 +54,21 @@ class ComposicionAplicacionTest {
             assertTrue(servidor.tieneRuta(RequestMethod.GET, "/api/v1/pagos"));
             assertTrue(servidor.tieneRuta(RequestMethod.GET, "/api/v1/propiedades"));
             assertTrue(servidor.tieneRuta(RequestMethod.POST, "/api/v1/auth/login"));
-            assertEquals(36, servidor.operacionesApi());
+            assertTrue(servidor.tieneRuta(RequestMethod.GET, "/api/v1/contratos/{id}/garantia"));
+            assertTrue(servidor.tieneRuta(RequestMethod.POST, "/api/v1/contratos/{id}/terminar"));
+            assertTrue(servidor.tieneRuta(RequestMethod.GET, "/api/v1/cargos/cartera"));
+            assertTrue(servidor.tieneRuta(RequestMethod.GET, "/api/v1/cargos/generacion-mes/vista-previa"));
+            assertTrue(servidor.tieneRuta(RequestMethod.POST, "/api/v1/cargos/generacion-mes"));
+            assertTrue(servidor.tieneRuta(RequestMethod.POST, "/api/v1/cargos/revisar-mora"));
+            assertTrue(servidor.tieneRuta(RequestMethod.POST, "/api/v1/cargos/{id}/anulacion"));
+            assertTrue(servidor.tieneRuta(RequestMethod.POST, "/api/v1/pagos/aplicaciones/{id}/reversion"));
+            assertTrue(servidor.tieneRuta(RequestMethod.GET, "/api/v1/mantenimiento/solicitudes"));
+            assertTrue(servidor.tieneRuta(RequestMethod.POST, "/api/v1/mantenimiento/solicitudes"));
+            assertTrue(servidor.tieneRuta(RequestMethod.PUT, "/api/v1/mantenimiento/solicitudes/{id}"));
+            assertTrue(servidor.tieneRuta(RequestMethod.POST, "/api/v1/mantenimiento/solicitudes/{id}/estado"));
+            assertTrue(servidor.tieneRuta(RequestMethod.GET, "/api/v1/mantenimiento/gastos"));
+            assertTrue(servidor.tieneRuta(RequestMethod.POST, "/api/v1/mantenimiento/gastos"));
+            assertEquals(55, servidor.operacionesApi());
         }
     }
 }

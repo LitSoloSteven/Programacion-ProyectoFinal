@@ -38,6 +38,14 @@ class FxmlControladoresTest {
                 for (int i = 0; i < nodos.getLength(); i++) {
                     Node nodo = nodos.item(i);
                     if (!(nodo instanceof Element elemento)) continue;
+                    for (String medida : List.of("minWidth", "minHeight", "prefWidth", "prefHeight",
+                            "maxWidth", "maxHeight")) {
+                        String valor = elemento.getAttribute(medida);
+                        if ("USE_PREF_SIZE".equals(valor) || "USE_COMPUTED_SIZE".equals(valor)) {
+                            errores.add(archivo.getFileName() + ": " + medida + "=" + valor
+                                    + " debe resolverse como double en FXMLLoader");
+                        }
+                    }
                     String id = elemento.getAttributeNS(FX_NS, "id");
                     if (!id.isBlank() && !tieneCampo(controlador, id)) {
                         errores.add(archivo.getFileName() + ": fx:id=" + id

@@ -51,8 +51,7 @@ public class SolicitudIdempotente {
     @Column(name = "codigo_estado")
     private Integer codigoEstado;
 
-    @Lob
-    @Column(name = "respuesta_json")
+    @Column(name = "respuesta_json", columnDefinition = "text")
     private String respuestaJson;
 
     @Column(name = "completado_en")

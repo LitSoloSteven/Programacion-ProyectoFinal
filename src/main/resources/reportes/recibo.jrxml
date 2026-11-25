@@ -4,8 +4,12 @@
 
     <parameter name="TITULO_SISTEMA" class="java.lang.String"/>
     <parameter name="GENERADO_POR" class="java.lang.String"/>
+    <parameter name="EMISOR_INFO" class="java.lang.String"/>
     <parameter name="NUMERO_RECIBO" class="java.lang.String"/>
     <parameter name="ESTADO_RECIBO" class="java.lang.String"/>
+    <parameter name="TASA_INFO" class="java.lang.String"/>
+    <parameter name="APLICACIONES_INFO" class="java.lang.String"/>
+    <parameter name="CREDITO_INFO" class="java.lang.String"/>
 
     <field name="numero" class="java.lang.Long"/>
     <field name="pagoId" class="java.util.UUID"/>
@@ -44,7 +48,7 @@
     </title>
 
     <detail>
-        <band height="360">
+        <band height="430">
             <element kind="rectangle" x="0" y="4" width="535" height="30" backcolor="#E2E8F0">
                 <printWhenExpression><![CDATA[Boolean.TRUE.equals($F{anulado})]]></printWhenExpression>
                 <pen lineWidth="1.5" lineColor="#0F172A"/>
@@ -127,33 +131,54 @@
                 <pen lineWidth="0.5"/>
             </element>
 
-            <element kind="rectangle" x="0" y="246" width="535" height="72" backcolor="#F1F5F9">
+            <element kind="staticText" x="10" y="232" width="130" height="18" forecolor="#475569" vTextAlign="Middle" fontSize="8.5" bold="true">
+                <text><![CDATA[Tasa aplicada]]></text>
+            </element>
+            <element kind="textField" x="145" y="232" width="380" height="18" forecolor="#1E293B" hTextAlign="Right" vTextAlign="Middle" fontSize="8.5">
+                <expression><![CDATA[$P{TASA_INFO} == null || $P{TASA_INFO}.isBlank() ? "Misma moneda" : $P{TASA_INFO}]]></expression>
+            </element>
+
+            <element kind="staticText" x="10" y="254" width="130" height="18" forecolor="#475569" vTextAlign="Middle" fontSize="8.5" bold="true">
+                <text><![CDATA[Crédito a favor]]></text>
+            </element>
+            <element kind="textField" x="145" y="254" width="380" height="18" forecolor="#1E293B" hTextAlign="Right" vTextAlign="Middle" fontSize="8.5">
+                <expression><![CDATA[$P{CREDITO_INFO} == null || $P{CREDITO_INFO}.isBlank() ? "0.00" : $P{CREDITO_INFO}]]></expression>
+            </element>
+
+            <element kind="staticText" x="10" y="276" width="130" height="18" forecolor="#475569" vTextAlign="Middle" fontSize="8.5" bold="true">
+                <text><![CDATA[Cargos aplicados]]></text>
+            </element>
+            <element kind="textField" x="145" y="276" width="380" height="28" forecolor="#1E293B" hTextAlign="Right" vTextAlign="Middle" fontSize="8.5" textAdjust="StretchHeight">
+                <expression><![CDATA[$P{APLICACIONES_INFO} == null || $P{APLICACIONES_INFO}.isBlank() ? "—" : $P{APLICACIONES_INFO}]]></expression>
+            </element>
+
+            <element kind="rectangle" x="0" y="318" width="535" height="72" backcolor="#F1F5F9">
                 <pen lineWidth="0.5" lineColor="#E2E8F0"/>
             </element>
-            <element kind="staticText" x="10" y="254" width="90" height="16" forecolor="#475569" vTextAlign="Middle" fontSize="8.5" bold="true">
+            <element kind="staticText" x="10" y="326" width="90" height="16" forecolor="#475569" vTextAlign="Middle" fontSize="8.5" bold="true">
                 <text><![CDATA[ID Pago]]></text>
             </element>
-            <element kind="textField" x="105" y="254" width="420" height="16" forecolor="#334155" vTextAlign="Middle" fontSize="8.5">
+            <element kind="textField" x="105" y="326" width="420" height="16" forecolor="#334155" vTextAlign="Middle" fontSize="8.5">
                 <expression><![CDATA[$F{pagoId} == null ? "—" : $F{pagoId}.toString()]]></expression>
             </element>
-            <element kind="staticText" x="10" y="274" width="90" height="16" forecolor="#475569" vTextAlign="Middle" fontSize="8.5" bold="true">
+            <element kind="staticText" x="10" y="346" width="90" height="16" forecolor="#475569" vTextAlign="Middle" fontSize="8.5" bold="true">
                 <text><![CDATA[ID Contrato]]></text>
             </element>
-            <element kind="textField" x="105" y="274" width="420" height="16" forecolor="#334155" vTextAlign="Middle" fontSize="8.5">
+            <element kind="textField" x="105" y="346" width="420" height="16" forecolor="#334155" vTextAlign="Middle" fontSize="8.5">
                 <expression><![CDATA[$F{contratoId} == null ? "—" : $F{contratoId}.toString()]]></expression>
             </element>
-            <element kind="staticText" x="10" y="294" width="90" height="16" forecolor="#475569" vTextAlign="Middle" fontSize="8.5" bold="true">
+            <element kind="staticText" x="10" y="366" width="90" height="16" forecolor="#475569" vTextAlign="Middle" fontSize="8.5" bold="true">
                 <text><![CDATA[Emitido por]]></text>
             </element>
-            <element kind="textField" x="105" y="294" width="420" height="16" forecolor="#334155" vTextAlign="Middle" fontSize="8.5">
-                <expression><![CDATA[$P{GENERADO_POR} == null || $P{GENERADO_POR}.isBlank() ? "Sistema" : $P{GENERADO_POR}]]></expression>
+            <element kind="textField" x="105" y="366" width="420" height="16" forecolor="#334155" vTextAlign="Middle" fontSize="8.5" textAdjust="StretchHeight">
+                <expression><![CDATA[$P{EMISOR_INFO} != null && !$P{EMISOR_INFO}.isBlank() ? $P{EMISOR_INFO} : ($P{GENERADO_POR} == null || $P{GENERADO_POR}.isBlank() ? "Sistema" : $P{GENERADO_POR})]]></expression>
             </element>
         </band>
     </detail>
 
     <pageFooter height="22">
-        <element kind="textField" x="0" y="2" width="413" height="18" forecolor="#64748B" vTextAlign="Middle" fontSize="8.5">
-            <expression><![CDATA["Latch · Documento generado automáticamente"]]></expression>
+        <element kind="textField" x="0" y="2" width="413" height="18" forecolor="#64748B" vTextAlign="Middle" fontSize="8.0">
+            <expression><![CDATA["Latch · Comprobante administrativo — No es factura fiscal"]]></expression>
         </element>
         <element kind="textField" x="413" y="2" width="90" height="18" forecolor="#64748B" hTextAlign="Right" vTextAlign="Middle" fontSize="8.5">
             <expression><![CDATA["Página " + $V{PAGE_NUMBER} + " de "]]></expression>

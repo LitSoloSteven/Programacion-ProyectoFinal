@@ -64,6 +64,39 @@ public final class ClienteCatalogos {
         api.patch(ruta("contratos") + "/" + id, new ContratoEstadoRequest("Terminado"), Void.class);
     }
 
+    public Contrato activarContrato(UUID id, long version) {
+        return contrato(api.post(ruta("contratos") + "/" + id + "/activar",
+                new ContratoVersionRequest(version), ContratoResponse.class));
+    }
+
+    public Contrato cancelarBorrador(UUID id, long version, String motivo) {
+        return contrato(api.post(ruta("contratos") + "/" + id + "/cancelar",
+                new ContratoCancelarRequest(version, motivo), ContratoResponse.class));
+    }
+
+    public Contrato renovarContrato(UUID anteriorId, ContratoRenovarRequest solicitud) {
+        return contrato(api.post(ruta("contratos") + "/" + anteriorId + "/renovar",
+                solicitud, ContratoResponse.class));
+    }
+
+    public Contrato terminarContratoConCierre(UUID id, ContratoTerminarRequest solicitud) {
+        return contrato(api.post(ruta("contratos") + "/" + id + "/terminar",
+                solicitud, ContratoResponse.class));
+    }
+
+    public GarantiaResumenResponse obtenerGarantia(UUID contratoId) {
+        return api.get(ruta("contratos") + "/" + contratoId + "/garantia",
+                GarantiaResumenResponse.class);
+    }
+
+    public GarantiaResumenResponse liquidarGarantia(UUID contratoId, UUID liquidacionId,
+                                                    GarantiaLiquidacionRequest solicitud) {
+        return api.postConCabecera(
+                ruta("contratos") + "/" + contratoId + "/garantia/movimientos",
+                solicitud, GarantiaResumenResponse.class,
+                "Idempotency-Key", liquidacionId.toString());
+    }
+
     private void guardar(String recurso, UUID id, Object cuerpo) {
         String ruta = ruta(recurso);
         if (id == null) {
@@ -116,10 +149,18 @@ public final class ClienteCatalogos {
     }
 
     private static Contrato contrato(ContratoResponse datos) {
-        return new Contrato(UUID.fromString(datos.id()), UUID.fromString(datos.unidadId()), datos.unidadInfo(),
+        Contrato fila = new Contrato(UUID.fromString(datos.id()), UUID.fromString(datos.unidadId()), datos.unidadInfo(),
                 UUID.fromString(datos.inquilinoId()), datos.inquilinoNombre(), LocalDate.parse(datos.inicio()),
                 LocalDate.parse(datos.fin()), decimal(datos.canon()), datos.moneda(), datos.diaPago(),
                 decimal(datos.depositoPactado()), datos.estado(), datos.version());
+        if (datos.predecesorId() != null && !datos.predecesorId().isBlank()) {
+            fila.setPredecesorId(UUID.fromString(datos.predecesorId()));
+        }
+        if (datos.terminadoEl() != null && !datos.terminadoEl().isBlank()) {
+            fila.setTerminadoEl(LocalDate.parse(datos.terminadoEl()));
+        }
+        fila.setMotivoCierre(datos.motivoCierre());
+        return fila;
     }
 
     private static Timestamp instante(String valor) {

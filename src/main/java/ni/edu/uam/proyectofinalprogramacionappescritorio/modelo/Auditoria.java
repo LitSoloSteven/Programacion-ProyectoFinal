@@ -56,6 +56,11 @@ public class Auditoria {
         return new Auditoria(null, instante, correlacion, "LOGIN_FALLIDO", referencia, true);
     }
 
+    public static Auditoria eventoSistema(Instant instante, UUID correlacion,
+                                          String accion, String referencia) {
+        return new Auditoria(null, instante, correlacion, accion, referencia, true);
+    }
+
     private static String texto(String valor, int maximo) {
         if (valor == null || valor.isBlank() || valor.length() > maximo) {
             throw new IllegalArgumentException("Acción o referencia de auditoría inválida.");

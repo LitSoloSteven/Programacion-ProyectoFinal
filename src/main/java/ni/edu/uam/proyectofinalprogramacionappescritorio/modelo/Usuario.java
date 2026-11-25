@@ -24,6 +24,8 @@ public class Usuario {
     private String rol;
     @Column(nullable = false)
     private boolean activo = true;
+    @Column(name = "debe_cambiar_password", nullable = false)
+    private boolean debeCambiarPassword = false;
     @Version
     private long version;
 
@@ -41,9 +43,26 @@ public class Usuario {
         return nombre.strip().toLowerCase(Locale.ROOT);
     }
 
+    public void activar() { activo = true; }
     public void desactivar() { activo = false; }
     public void cambiarRol(String rol) {
         if (!Rol.esValido(rol)) throw new IllegalArgumentException("Rol inválido.");
         this.rol = rol;
+    }
+
+    public void marcarCambioPasswordPendiente() {
+        this.debeCambiarPassword = true;
+    }
+
+    public void completarCambioPassword(String nuevoPasswordHash) {
+        actualizarPasswordHash(nuevoPasswordHash);
+        this.debeCambiarPassword = false;
+    }
+
+    public void actualizarPasswordHash(String nuevoPasswordHash) {
+        if (nuevoPasswordHash == null || nuevoPasswordHash.isBlank() || nuevoPasswordHash.length() > 255) {
+            throw new IllegalArgumentException("Huella de contraseña inválida.");
+        }
+        this.passwordHash = nuevoPasswordHash;
     }
 }

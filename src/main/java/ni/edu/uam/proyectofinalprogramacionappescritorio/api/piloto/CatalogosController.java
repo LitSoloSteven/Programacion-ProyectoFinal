@@ -114,4 +114,34 @@ public class CatalogosController {
     public ResponseEntity<String> cambiarEstadoContrato(HttpServletRequest peticion) throws Exception {
         return RespuestasApi.json(rutas.cambiarEstadoContrato(PeticionSpring.desde(peticion)));
     }
+
+    @PostMapping({"/api/v1/contratos/{id}/activar", "/api/v1/contratos/{id}/activar/"})
+    public ResponseEntity<String> activarContrato(HttpServletRequest peticion) throws Exception {
+        return RespuestasApi.json(rutas.activarContrato(PeticionSpring.desde(peticion)));
+    }
+
+    @PostMapping({"/api/v1/contratos/{id}/cancelar", "/api/v1/contratos/{id}/cancelar/"})
+    public ResponseEntity<String> cancelarContrato(HttpServletRequest peticion) throws Exception {
+        return RespuestasApi.json(rutas.cancelarContrato(PeticionSpring.desde(peticion)));
+    }
+
+    @PostMapping({"/api/v1/contratos/{id}/renovar", "/api/v1/contratos/{id}/renovar/"})
+    public ResponseEntity<String> renovarContrato(HttpServletRequest peticion) throws Exception {
+        return RespuestasApi.json(rutas.renovarContrato(PeticionSpring.desde(peticion)));
+    }
+
+    @PostMapping({"/api/v1/contratos/{id}/terminar", "/api/v1/contratos/{id}/terminar/"})
+    public ResponseEntity<String> terminarContrato(HttpServletRequest peticion) throws Exception {
+        return RespuestasApi.json(rutas.terminarContrato(PeticionSpring.desde(peticion)));
+    }
+
+    @GetMapping({"/api/v1/contratos/{id}/garantia", "/api/v1/contratos/{id}/garantia/"})
+    public ResponseEntity<String> obtenerGarantiaContrato(HttpServletRequest peticion) {
+        return RespuestasApi.json(rutas.obtenerGarantiaContrato(PeticionSpring.desde(peticion)));
+    }
+
+    @PostMapping({"/api/v1/contratos/{id}/garantia/movimientos", "/api/v1/contratos/{id}/garantia/movimientos/"})
+    public ResponseEntity<String> liquidarGarantiaContrato(HttpServletRequest peticion) throws Exception {
+        return RespuestasApi.json(rutas.liquidarGarantiaContrato(PeticionSpring.desde(peticion)));
+    }
 }

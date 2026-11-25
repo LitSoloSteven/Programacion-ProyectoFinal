@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.DatePicker?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:id="rootView" fx:controller="ni.edu.uam.proyectofinalprogramacionappescritorio.controller.AdminController"
+      spacing="16.0" styleClass="view-container">
+    <HBox alignment="CENTER_LEFT" spacing="16.0" styleClass="page-header">
+        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+            <Label fx:id="lblTitulo" styleClass="page-title" text="Administración y auditoría" />
+            <Label styleClass="page-subtitle" text="Cuentas de usuario, parámetros operativos con historial, perfil emisor y bitácora." />
+        </VBox>
+    </HBox>
+    <TabPane tabClosingPolicy="UNAVAILABLE" VBox.vgrow="ALWAYS">
+        <Tab text="Cuentas">
+            <VBox spacing="12.0" styleClass="view-container">
+                <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
+                    <Button fx:id="btnRefrescarUsuarios" onAction="#refrescarUsuarios" styleClass="button-secondary" text="Actualizar" />
+                    <Button fx:id="btnCrearUsuario" onAction="#handleCrearUsuario" styleClass="button-primary" text="Nuevo usuario" />
+                    <Button fx:id="btnCambiarRol" disable="true" onAction="#handleCambiarRol" styleClass="button-secondary" text="Cambiar rol" />
+                    <Button fx:id="btnActivarDesactivar" disable="true" onAction="#handleAlternarActivo" styleClass="button-secondary" text="Desactivar" />
+                    <Button fx:id="btnRestablecerClave" disable="true" onAction="#handleRestablecerPassword" styleClass="button-destructive" text="Restablecer clave" />
+                </HBox>
+                <Label fx:id="lblErrorUsuarios" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
+                <TableView fx:id="tblUsuarios" styleClass="data-table" VBox.vgrow="ALWAYS">
+                    <placeholder><Label text="No hay usuarios registrados." /></placeholder>
+                    <columns>
+                        <TableColumn fx:id="colUsuarioNombre" minWidth="200.0" prefWidth="240.0" text="Usuario" />
+                        <TableColumn fx:id="colUsuarioRol" minWidth="140.0" prefWidth="160.0" text="Rol" />
+                        <TableColumn fx:id="colUsuarioEstado" minWidth="120.0" prefWidth="130.0" text="Estado" />
+                        <TableColumn fx:id="colUsuarioCambioClave" minWidth="180.0" prefWidth="200.0" text="Cambio de clave" />
+                    </columns>
+                </TableView>
+            </VBox>
+        </Tab>
+        <Tab text="Parámetros y emisor">
+            <VBox spacing="12.0" styleClass="view-container">
+                <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
+                    <TextField fx:id="txtEmisorNombre" prefWidth="190.0" promptText="Nombre del emisor" styleClass="search-field" />
+                    <TextField fx:id="txtEmisorIdentificacion" prefWidth="140.0" promptText="RUC / Cédula" styleClass="search-field" />
+                    <TextField fx:id="txtEmisorDireccion" prefWidth="180.0" promptText="Dirección" styleClass="search-field" />
+                    <TextField fx:id="txtEmisorTelefono" prefWidth="120.0" promptText="Teléfono" styleClass="search-field" />
+                    <TextField fx:id="txtEmisorCorreo" prefWidth="160.0" promptText="Correo" styleClass="search-field" />
+                    <TextField fx:id="txtEmisorMotivo" prefWidth="160.0" promptText="Motivo del cambio" styleClass="search-field" />
+                    <Button fx:id="btnGuardarEmisor" onAction="#handleGuardarEmisor" styleClass="button-primary" text="Guardar emisor" />
+                </HBox>
+                <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
+                    <Label fx:id="lblEstadoEmisor" styleClass="secondary-text" text="" wrapText="true" HBox.hgrow="ALWAYS" />
+                    <Label fx:id="lblLogotipoEstado" styleClass="secondary-text" text="Sin logotipo configurado" />
+                    <Button fx:id="btnAdjuntarLogotipo" onAction="#handleAdjuntarLogotipo" styleClass="button-secondary" text="Adjuntar logotipo (PNG/JPEG)" />
+                    <Button fx:id="btnQuitarLogotipo" disable="true" onAction="#handleQuitarLogotipo" styleClass="button-destructive" text="Quitar logotipo" />
+                </HBox>
+                <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
+                    <TextField fx:id="txtParamClave" prefWidth="200.0" promptText="Clave (ej. dias.gracia.mora)" styleClass="search-field" />
+                    <TextField fx:id="txtParamValor" prefWidth="200.0" promptText="Valor" styleClass="search-field" />
+                    <TextField fx:id="txtParamMotivo" prefWidth="240.0" promptText="Motivo del registro" styleClass="search-field" />
+                    <Button fx:id="btnRegistrarParametro" onAction="#handleRegistrarParametro" styleClass="button-primary" text="Registrar parámetro" />
+                    <Button fx:id="btnRefrescarParametros" onAction="#refrescarParametros" styleClass="button-secondary" text="Actualizar historial" />
+                </HBox>
+                <Label fx:id="lblErrorParametro" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
+                <TableView fx:id="tblParametros" styleClass="data-table" VBox.vgrow="ALWAYS">
+                    <placeholder><Label text="Sin registros históricos de parámetros." /></placeholder>
+                    <columns>
+                        <TableColumn fx:id="colParamClave" minWidth="160.0" prefWidth="180.0" text="Clave" />
+                        <TableColumn fx:id="colParamValor" minWidth="220.0" prefWidth="260.0" text="Valor" />
+                        <TableColumn fx:id="colParamVigenteDesde" minWidth="170.0" prefWidth="180.0" text="Vigente desde" />
+                        <TableColumn fx:id="colParamMotivo" minWidth="200.0" prefWidth="240.0" text="Motivo" />
+                        <TableColumn fx:id="colParamCreadoPor" minWidth="130.0" prefWidth="150.0" text="Registrado por" />
+                    </columns>
+                </TableView>
+            </VBox>
+        </Tab>
+        <Tab text="Auditoría">
+            <VBox spacing="12.0" styleClass="view-container">
+                <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
+                    <TextField fx:id="txtAuditoriaUsuario" prefWidth="180.0" promptText="Usuario" styleClass="search-field" />
+                    <TextField fx:id="txtAuditoriaAccion" prefWidth="200.0" promptText="Acción" styleClass="search-field" />
+                    <DatePicker fx:id="dpAuditoriaDesde" promptText="Desde" />
+                    <DatePicker fx:id="dpAuditoriaHasta" promptText="Hasta" />
+                    <Button fx:id="btnConsultarAuditoria" onAction="#consultarAuditoria" styleClass="button-primary" text="Consultar" />
+                </HBox>
+                <Label fx:id="lblErrorAuditoria" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
+                <TableView fx:id="tblAuditoria" styleClass="data-table" VBox.vgrow="ALWAYS">
+                    <placeholder><Label text="No hay eventos para los filtros indicados." /></placeholder>
+                    <columns>
+                        <TableColumn fx:id="colAuditoriaInstante" minWidth="170.0" prefWidth="180.0" text="Instante (Managua)" />
+                        <TableColumn fx:id="colAuditoriaActor" minWidth="140.0" prefWidth="160.0" text="Actor" />
+                        <TableColumn fx:id="colAuditoriaAccion" minWidth="190.0" prefWidth="210.0" text="Acción" />
+                        <TableColumn fx:id="colAuditoriaReferencia" minWidth="240.0" prefWidth="280.0" text="Referencia" />
+                        <TableColumn fx:id="colAuditoriaCorrelacion" minWidth="220.0" prefWidth="250.0" text="Correlación" />
+                    </columns>
+                </TableView>
+            </VBox>
+        </Tab>
+        <Tab text="Respaldo y restauración">
+            <ScrollPane fitToWidth="true">
+                <VBox spacing="12.0" styleClass="view-container">
+                    <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
+                        <Label fx:id="lblEstadoRespaldo" styleClass="secondary-text" text="Consultando estado de respaldo..." wrapText="true" HBox.hgrow="ALWAYS" />
+                        <Button fx:id="btnRefrescarRespaldo" onAction="#refrescarEstadoRespaldo" styleClass="button-secondary" text="Actualizar estado" />
+                    </HBox>
+                    <Label styleClass="secondary-text" text="Crear respaldo cifrado AES-256-GCM (base de datos + adjuntos + manifiesto SHA-256)" wrapText="true" />
+                    <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
+                        <TextField fx:id="txtCarpetaRespaldo" prefWidth="280.0" promptText="Carpeta de destino del respaldo" styleClass="search-field" HBox.hgrow="ALWAYS" />
+                        <Button fx:id="btnElegirCarpetaRespaldo" onAction="#handleElegirCarpetaRespaldo" styleClass="button-secondary" text="Elegir carpeta..." />
+                        <PasswordField fx:id="pwdClaveRespaldo" prefWidth="190.0" promptText="Contraseña (12–128 car.)" styleClass="search-field" />
+                        <PasswordField fx:id="pwdConfirmarClaveRespaldo" prefWidth="190.0" promptText="Confirmar contraseña" styleClass="search-field" />
+                        <Button fx:id="btnCrearRespaldo" onAction="#handleCrearRespaldo" styleClass="button-primary" text="Crear respaldo" />
+                    </HBox>
+                    <Label styleClass="secondary-text" text="Verificar paquete y restaurar en entorno aislado (exige modo mantenimiento y copia previa)" wrapText="true" />
+                    <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
+                        <TextField fx:id="txtArchivoRespaldo" prefWidth="280.0" promptText="Archivo .lbackup a verificar o restaurar" styleClass="search-field" HBox.hgrow="ALWAYS" />
+                        <Button fx:id="btnElegirArchivoRespaldo" onAction="#handleElegirArchivoRespaldo" styleClass="button-secondary" text="Elegir paquete..." />
+                        <PasswordField fx:id="pwdClaveRestaurar" prefWidth="200.0" promptText="Contraseña de respaldo" styleClass="search-field" />
+                        <Button fx:id="btnVerificarRespaldo" onAction="#handleVerificarRespaldo" styleClass="button-secondary" text="Verificar integridad" />
+                    </HBox>
+                    <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
+                        <TextField fx:id="txtDestinoJdbcRestaurar" prefWidth="280.0" promptText="URL JDBC aislada (ej. jdbc:postgresql://localhost:5432/latch_restore)" styleClass="search-field" HBox.hgrow="ALWAYS" />
+                        <TextField fx:id="txtDestinoUsuarioRestaurar" prefWidth="150.0" promptText="Usuario destino" styleClass="search-field" />
+                        <PasswordField fx:id="pwdDestinoClaveRestaurar" prefWidth="150.0" promptText="Clave destino" styleClass="search-field" />
+                    </HBox>
+                    <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
+                        <TextField fx:id="txtDestinoAdjuntosRestaurar" prefWidth="280.0" promptText="Carpeta destino aislada para adjuntos" styleClass="search-field" HBox.hgrow="ALWAYS" />
+                        <Button fx:id="btnElegirDestinoAdjuntos" onAction="#handleElegirDestinoAdjuntos" styleClass="button-secondary" text="Elegir carpeta adjuntos..." />
+                        <CheckBox fx:id="chkModoMantenimiento" text="Modo mantenimiento activo (sin sesiones operativas)" />
+                        <Button fx:id="btnRestaurarAislado" onAction="#handleRestaurarAislado" styleClass="button-destructive" text="Restaurar en destino aislado" />
+                    </HBox>
+                    <Label fx:id="lblErrorRespaldo" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
+                    <Label fx:id="lblResultadoRespaldo" managed="false" minHeight="18.0" styleClass="secondary-text" text="" visible="false" wrapText="true" />
+                </VBox>
+            </ScrollPane>
+        </Tab>
+    </TabPane>
+</VBox>

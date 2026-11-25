@@ -330,6 +330,7 @@ class ApiSeguridadTest {
         String cuerpo = respuesta.body().toLowerCase();
         assertFalse(cuerpo.contains("password"));
         assertFalse(cuerpo.contains("pbkdf2"));
+        assertFalse(cuerpo.contains("argon2"));
         assertFalse(cuerpo.contains("clavesintetica"));
 
         LoginResponse sesion = GSON.fromJson(respuesta.body(), LoginResponse.class);

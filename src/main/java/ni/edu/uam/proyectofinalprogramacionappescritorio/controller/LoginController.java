@@ -8,9 +8,15 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.dto.LoginResponse;
@@ -18,8 +24,8 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteAuth;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TemaAplicacion;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TemaAplicacion;
 
 import java.io.IOException;
 
@@ -28,17 +34,63 @@ import java.io.IOException;
  * como sesión de JavaFX para que los servicios existentes sigan funcionando.
  */
 public class LoginController {
+    @FXML private Region auroraFondo;
     @FXML private TextField txtUsuario;
     @FXML private PasswordField txtPassword;
     @FXML private Label lblErrorUsuario;
     @FXML private Label lblErrorPassword;
+    @FXML private Label lblAvisoPreferencia;
     @FXML private Button btnIngresar;
+    @FXML private Button btnTemaLogin;
+    @FXML private CheckBox chkSinEfectosLogin;
 
     @FXML
     public void initialize() {
         Iconos.asignar(btnIngresar, Iconos.Nombre.ENTRAR, 16);
         ocultarError(lblErrorUsuario);
         ocultarError(lblErrorPassword);
+        if (lblAvisoPreferencia != null) {
+            lblAvisoPreferencia.setVisible(false);
+            lblAvisoPreferencia.setManaged(false);
+        }
+        if (btnTemaLogin != null) {
+            Iconos.asignar(btnTemaLogin, Iconos.Nombre.TEMA, 14);
+        }
+        TemaAplicacion.registrarObservadorAviso(mensaje -> {
+            if (lblAvisoPreferencia != null) {
+                lblAvisoPreferencia.setText(mensaje);
+                lblAvisoPreferencia.setVisible(true);
+                lblAvisoPreferencia.setManaged(true);
+            }
+        });
+        actualizarControlesTema();
+    }
+
+    @FXML
+    public void handleCambiarTemaLogin() {
+        TemaAplicacion.Tema nuevo = TemaAplicacion.getTema() == TemaAplicacion.Tema.OSCURO
+                ? TemaAplicacion.Tema.CLARO : TemaAplicacion.Tema.OSCURO;
+        TemaAplicacion.establecerTema(nuevo);
+        actualizarControlesTema();
+    }
+
+    @FXML
+    public void handleSinEfectosLogin() {
+        if (chkSinEfectosLogin == null) return;
+        TemaAplicacion.establecerSinEfectos(chkSinEfectosLogin.isSelected());
+        actualizarControlesTema();
+    }
+
+    private void actualizarControlesTema() {
+        boolean oscuro = TemaAplicacion.getTema() == TemaAplicacion.Tema.OSCURO;
+        if (btnTemaLogin != null) {
+            btnTemaLogin.setText(oscuro ? "Tema claro" : "Tema oscuro");
+            btnTemaLogin.setTooltip(new Tooltip("Cambiar a tema " + (oscuro ? "claro" : "oscuro")));
+        }
+        if (chkSinEfectosLogin != null) {
+            chkSinEfectosLogin.setSelected(TemaAplicacion.isSinEfectos());
+            chkSinEfectosLogin.setTooltip(new Tooltip("Desactiva animaciones y luces decorativas en ambos temas"));
+        }
     }
 
     @FXML
@@ -63,12 +115,16 @@ public class LoginController {
             return;
         }
 
+        iniciarSesion(event, nombre, password, null);
+    }
+
+    private void iniciarSesion(ActionEvent event, String nombre, String password, String nuevaPassword) {
         btnIngresar.setDisable(true);
         btnIngresar.setText("Ingresando…");
         Task<LoginResponse> tarea = new Task<>() {
             @Override
             protected LoginResponse call() {
-                return new ClienteAuth(ClienteLatch.api()).login(nombre, password);
+                return new ClienteAuth(ClienteLatch.api()).login(nombre, password, nuevaPassword);
             }
         };
         tarea.setOnSucceeded(evento -> {
@@ -76,16 +132,27 @@ public class LoginController {
                 LoginResponse respuesta = tarea.getValue();
                 SesionUsuario.establecer(SesionUsuario.paraSesionAutenticada(
                         respuesta.usuarioId(), respuesta.nombre(), respuesta.rol()));
+                TemaAplicacion.cargarPreferenciasUsuario(respuesta.usuarioId());
                 abrirDashboard(event);
             } catch (RuntimeException e) {
                 SesionUsuario.cerrarSesion();
+                TemaAplicacion.limpiarUsuarioActivo();
                 mostrarError(lblErrorPassword, "No fue posible validar la sesión. Inténtalo nuevamente.");
             } finally {
                 finalizarIntento();
             }
         });
         tarea.setOnFailed(evento -> {
-            mostrarError(lblErrorPassword, mensaje(tarea.getException()));
+            Throwable error = tarea.getException();
+            if (error instanceof ErrorClienteException cliente
+                    && "CAMBIO_PASSWORD_REQUERIDO".equals(cliente.getCodigo())) {
+                String nueva = pedirNuevaPassword(event, cliente.getMessage());
+                if (nueva != null) {
+                    iniciarSesion(event, nombre, password, nueva);
+                    return;
+                }
+            }
+            mostrarError(lblErrorPassword, mensaje(error));
             finalizarIntento();
             txtPassword.requestFocus();
         });
@@ -95,6 +162,35 @@ public class LoginController {
             btnIngresar.setDisable(false);
             btnIngresar.setText("Ingresar");
             mostrarError(lblErrorPassword, "No se pudo iniciar sesión. Inténtalo nuevamente.");
+        }
+    }
+
+    private String pedirNuevaPassword(ActionEvent event, String indicacion) {
+        PasswordField nueva = new PasswordField();
+        PasswordField confirmacion = new PasswordField();
+        Label etiquetaNueva = new Label("Nueva contraseña");
+        etiquetaNueva.setLabelFor(nueva);
+        Label etiquetaConfirmacion = new Label("Confirmar contraseña");
+        etiquetaConfirmacion.setLabelFor(confirmacion);
+        Dialog<ButtonType> dialogo = new Dialog<>();
+        dialogo.initOwner(((Node) event.getSource()).getScene().getWindow());
+        dialogo.setTitle("Cambiar contraseña");
+        dialogo.setHeaderText(indicacion);
+        dialogo.getDialogPane().setContent(new VBox(8, etiquetaNueva, nueva,
+                etiquetaConfirmacion, confirmacion));
+        dialogo.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        Node aceptar = dialogo.getDialogPane().lookupButton(ButtonType.OK);
+        aceptar.disableProperty().bind(nueva.textProperty().length().lessThan(12)
+                .or(nueva.textProperty().length().greaterThan(128))
+                .or(nueva.textProperty().isNotEqualTo(confirmacion.textProperty())));
+        TemaAplicacion.aplicar(dialogo.getDialogPane());
+        dialogo.setOnShown(e -> nueva.requestFocus());
+        try {
+            return dialogo.showAndWait().filter(ButtonType.OK::equals)
+                    .map(opcion -> nueva.getText()).orElse(null);
+        } finally {
+            nueva.clear();
+            confirmacion.clear();
         }
     }
 
@@ -127,6 +223,7 @@ public class LoginController {
             stage.show();
         } catch (IOException e) {
             SesionUsuario.cerrarSesion();
+            TemaAplicacion.limpiarUsuarioActivo();
             mostrarError(lblErrorPassword, "No se pudo abrir el panel principal. Inténtalo nuevamente.");
         }
     }

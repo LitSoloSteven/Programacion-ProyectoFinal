@@ -63,4 +63,29 @@ public class Garantia {
         }
         saldoActual = saldo;
     }
+
+    /**
+     * Deriva el estado de la garantía según RN-26: importe cero es Retenido;
+     * con remanente y devoluciones es Devuelto parcial; con remanente sin
+     * devolución es Retenido; agotada con devolución es Devuelto; agotada solo
+     * con aplicaciones/deducciones es Aplicado.
+     */
+    public static String derivarEstado(BigDecimal montoInicial, BigDecimal saldoActual,
+                                       BigDecimal totalDevuelto) {
+        if (montoInicial == null || montoInicial.signum() == 0) {
+            return "Retenido";
+        }
+        BigDecimal saldo = saldoActual == null ? BigDecimal.ZERO : saldoActual;
+        BigDecimal devuelto = totalDevuelto == null ? BigDecimal.ZERO : totalDevuelto;
+        if (saldo.signum() > 0 && devuelto.signum() > 0) {
+            return "Devuelto parcial";
+        }
+        if (saldo.signum() > 0) {
+            return "Retenido";
+        }
+        if (devuelto.signum() > 0) {
+            return "Devuelto";
+        }
+        return "Aplicado";
+    }
 }

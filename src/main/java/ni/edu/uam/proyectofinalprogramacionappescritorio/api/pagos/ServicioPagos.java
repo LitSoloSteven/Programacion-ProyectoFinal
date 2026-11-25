@@ -5,21 +5,31 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.Json;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.AplicacionResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PaginaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.CargoListaResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.CarteraResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.EstadoCuentaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoDetalleResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoListaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoRegistroResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PrevisualizacionLoteResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.ReciboResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.ResultadoLoteResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.ResultadoRevisionH2Response;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.CarteraResumenDTO;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.PrevisualizacionLoteDTO;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.ReciboDTO;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.ResultadoLoteDTO;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.ResultadoRevisionH2DTO;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.AplicacionPago;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Cargo;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Garantia;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.MovimientoGarantia;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Pago;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Recibo;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.SolicitudIdempotente;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.CobranzaService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ConflictoDatosException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.CargoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PagoService;
@@ -35,10 +45,12 @@ import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -70,6 +82,7 @@ public final class ServicioPagos {
     private final HibernateTransactions tx;
     private final PagoService pagos;
     private final CargoService cargos;
+    private final CobranzaService cobranza;
     private final PermisoService permisos = new PermisoService();
     private final Clock reloj;
 
@@ -78,18 +91,29 @@ public final class ServicioPagos {
     }
 
     public ServicioPagos(HibernateTransactions tx, Clock reloj) {
-        this(tx, new PagoService(tx), new CargoService(tx), reloj);
+        this(tx, new PagoService(tx), new CargoService(tx), new CobranzaService(tx), reloj);
     }
 
     public ServicioPagos(HibernateTransactions tx, PagoService pagos, CargoService cargos) {
-        this(tx, pagos, cargos, Clock.systemUTC());
+        this(tx, pagos, cargos, new CobranzaService(tx), Clock.systemUTC());
+    }
+
+    public ServicioPagos(HibernateTransactions tx, PagoService pagos, CargoService cargos,
+                         CobranzaService cobranza) {
+        this(tx, pagos, cargos, cobranza, Clock.systemUTC());
     }
 
     public ServicioPagos(HibernateTransactions tx, PagoService pagos, CargoService cargos,
                          Clock reloj) {
+        this(tx, pagos, cargos, new CobranzaService(tx), reloj);
+    }
+
+    public ServicioPagos(HibernateTransactions tx, PagoService pagos, CargoService cargos,
+                         CobranzaService cobranza, Clock reloj) {
         this.tx = Objects.requireNonNull(tx, "Faltan las transacciones de la API.");
         this.pagos = Objects.requireNonNull(pagos, "Falta el servicio de pagos.");
         this.cargos = Objects.requireNonNull(cargos, "Falta el servicio de cargos.");
+        this.cobranza = Objects.requireNonNull(cobranza, "Falta el servicio de cobranza.");
         this.reloj = Objects.requireNonNull(reloj, "Falta el reloj de la API.");
     }
 
@@ -100,6 +124,7 @@ public final class ServicioPagos {
 
     public PagoService pagoService() { return pagos; }
     public CargoService cargoService() { return cargos; }
+    public CobranzaService cobranzaService() { return cobranza; }
 
     public PaginaResponse<PagoListaResponse> listarPagos(int pagina, int tamano, String texto) {
         validarPaginacion(pagina, tamano);
@@ -180,8 +205,9 @@ public final class ServicioPagos {
         BigDecimal aplicado = aplicaciones.stream()
                 .map(AplicacionPago::getMonto)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal credito = nz(pago.getMontoContrato()).subtract(aplicado)
-                .setScale(2, RoundingMode.HALF_EVEN);
+        BigDecimal credito = "Anulado".equals(pago.getEstado())
+                ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_EVEN)
+                : nz(pago.getMontoContrato()).subtract(aplicado).setScale(2, RoundingMode.HALF_EVEN);
         return aDetalle(pago, recibo, aplicaciones, credito);
     }
 
@@ -251,10 +277,15 @@ public final class ServicioPagos {
             Map<UUID, Pago> pagosPorId = new HashMap<>();
             for (Pago pago : listaPagos) pagosPorId.put(pago.getId(), pago);
 
+            Instant finCorte = fechaCorte.plusDays(1)
+                    .atStartOfDay(RelojService.ZONA_OPERATIVA).toInstant();
+
             Set<UUID> cargosVigentes = new HashSet<>();
             for (Cargo cargo : cargos) {
-                if (!"Cancelado".equals(cargo.getEstadoPersistido())
-                        && !"Anulado".equals(cargo.getEstadoPersistido())) {
+                boolean anuladoAlCorte = ("Cancelado".equals(cargo.getEstadoPersistido())
+                        || "Anulado".equals(cargo.getEstadoPersistido()))
+                        && (cargo.getAnuladoEn() == null || cargo.getAnuladoEn().isBefore(finCorte));
+                if (!anuladoAlCorte) {
                     cargosVigentes.add(cargo.getId());
                 }
             }
@@ -269,13 +300,36 @@ public final class ServicioPagos {
                         .getResultList();
                 for (AplicacionPago aplicacion : aplicaciones) {
                     Pago pago = pagosPorId.get(aplicacion.getPagoId());
-                    if (pago == null || "Anulado".equals(pago.getEstado())) continue;
+                    if (pago == null) continue;
+                    boolean pagoAnuladoAlCorte = "Anulado".equals(pago.getEstado())
+                            && (pago.getAnuladoEn() == null || pago.getAnuladoEn().isBefore(finCorte));
+                    if (pagoAnuladoAlCorte) continue;
+                    if (aplicacion.getRevertidaEn() != null
+                            && aplicacion.getRevertidaEn().isBefore(finCorte)) continue;
+                    if (aplicacion.getFechaAplicacion() != null
+                            && aplicacion.getFechaAplicacion().isAfter(fechaCorte)) continue;
                     aplicadoPorCargo.merge(aplicacion.getCargoId(),
                             aplicacion.getMonto(), BigDecimal::add);
                     if (cargosVigentes.contains(aplicacion.getCargoId())) {
                         aplicadoIncluidoPorPago.merge(aplicacion.getPagoId(),
                                 aplicacion.getMonto(), BigDecimal::add);
                     }
+                }
+            }
+            if (!cargos.isEmpty()) {
+                List<UUID> cargoIds = cargos.stream().map(Cargo::getId).toList();
+                for (AplicacionPago aplicacion : session.createQuery("""
+                                select a from AplicacionPago a, MovimientoGarantia m
+                                where a.movimientoId = m.id
+                                  and a.cargoId in :cargos
+                                  and a.revertidaEn is null
+                                  and m.fechaMovimiento <= :corte
+                                """, AplicacionPago.class)
+                        .setParameter("cargos", cargoIds)
+                        .setParameter("corte", fechaCorte)
+                        .getResultList()) {
+                    aplicadoPorCargo.merge(aplicacion.getCargoId(),
+                            aplicacion.getMonto(), BigDecimal::add);
                 }
             }
 
@@ -364,6 +418,112 @@ public final class ServicioPagos {
         return respuesta;
     }
 
+    public CarteraResponse consultarCartera(LocalDate corte, UUID contratoId,
+                                            YearMonth periodo, String moneda, String texto) {
+        CarteraResumenDTO resumen = cobranza.consultarCartera(corte, contratoId, periodo, moneda, texto);
+        List<CarteraResponse.Item> items = resumen.items().stream()
+                .map(item -> new CarteraResponse.Item(
+                        item.cargoId().toString(),
+                        item.contratoId().toString(),
+                        item.contratoInfo(),
+                        item.moneda(),
+                        item.tipo(),
+                        item.periodo().toString(),
+                        item.fechaEmision().toString(),
+                        item.venceEl().toString(),
+                        item.concepto(),
+                        decimal(item.importe()),
+                        decimal(item.aplicado()),
+                        decimal(item.saldo()),
+                        item.estado(),
+                        item.diasVencidos(),
+                        item.tramo()))
+                .toList();
+        List<CarteraResponse.TotalMoneda> totales = resumen.totalesPorMoneda().stream()
+                .map(t -> new CarteraResponse.TotalMoneda(
+                        t.moneda(),
+                        t.cantidadCargos(),
+                        decimal(t.alDia()),
+                        decimal(t.tramo1a30()),
+                        decimal(t.tramo31a60()),
+                        decimal(t.tramo61a90()),
+                        decimal(t.tramoMasDe90()),
+                        decimal(t.totalSaldo())))
+                .toList();
+        return new CarteraResponse(resumen.corte().toString(), items, totales);
+    }
+
+    public PrevisualizacionLoteResponse previsualizarGeneracionMes(YearMonth periodo) {
+        PrevisualizacionLoteDTO previa = cobranza.previsualizarGeneracionMes(periodo);
+        List<PrevisualizacionLoteResponse.Item> items = previa.items().stream()
+                .map(i -> new PrevisualizacionLoteResponse.Item(
+                        i.contratoId().toString(),
+                        i.contratoInfo(),
+                        i.moneda(),
+                        decimal(i.canon()),
+                        i.periodo().toString(),
+                        i.venceEl().toString(),
+                        i.yaExistente(),
+                        decimal(i.creditoDisponible()),
+                        decimal(i.creditoAplicable()),
+                        decimal(i.saldoResultante())))
+                .toList();
+        return new PrevisualizacionLoteResponse(
+                previa.periodo(), previa.totalElegibles(), previa.porGenerar(), previa.omitidos(), items);
+    }
+
+    public ResultadoLoteResponse generarMes(YearMonth periodo) {
+        try (var ejecucion = ni.edu.uam.proyectofinalprogramacionappescritorio.util.RegistroTareaUnica.H1
+                .iniciar("Generación mensual de rentas (H1)")) {
+            ResultadoLoteDTO resultado = cobranza.generarMes(periodo, ejecucion::estaCancelada, null, null);
+            return new ResultadoLoteResponse(
+                    resultado.periodo(),
+                    resultado.totalElegibles(),
+                    resultado.confirmados(),
+                    resultado.omitidos(),
+                    resultado.fallidos(),
+                    resultado.pendientes(),
+                    resultado.cancelado(),
+                    resultado.mensaje(),
+                    resultado.cargosGenerados().stream().map(UUID::toString).toList());
+        } catch (IllegalStateException conflicto) {
+            throw new ConflictoDatosException(conflicto.getMessage());
+        }
+    }
+
+    public ResultadoRevisionH2Response revisarMora(LocalDate fecha) {
+        try (var ejecucion = ni.edu.uam.proyectofinalprogramacionappescritorio.util.RegistroTareaUnica.H2
+                .iniciar("Revisión de vencimientos y mora (H2)")) {
+            ResultadoRevisionH2DTO resultado = cobranza.revisarMoraYVencimientos(fecha, ejecucion::estaCancelada);
+            return new ResultadoRevisionH2Response(
+                    resultado.fechaEvaluacion().toString(),
+                    resultado.contratosEvaluados(),
+                    resultado.marcadosPorVencer(),
+                    resultado.marcadosVencido(),
+                    resultado.morasGeneradas(),
+                    resultado.incidentes(),
+                    resultado.cargosMoraGenerados().stream().map(UUID::toString).toList());
+        } catch (IllegalStateException conflicto) {
+            throw new ConflictoDatosException(conflicto.getMessage());
+        }
+    }
+
+    public Map<String, String> anularCargo(UUID cargoId, String motivo) {
+        String limpio = textoRequerido(motivo, "motivo de anulación", 500);
+        try {
+            cargos.anular(cargoId, limpio);
+        } catch (SQLException e) {
+            throw new IllegalStateException("No se pudo anular el cargo.", e);
+        }
+        return Map.of("cargoId", cargoId.toString(), "estado", "Anulado");
+    }
+
+    public AplicacionResponse revertirAplicacionCredito(UUID aplicacionId, String motivo) {
+        String limpio = textoRequerido(motivo, "motivo de reversión", 500);
+        AplicacionPago revertida = pagos.revertirAplicacionCredito(aplicacionId, limpio);
+        return new AplicacionResponse(revertida.getCargoId().toString(), decimal(revertida.getMonto()));
+    }
+
     private PagoRegistroResponse registrarEnSesion(Session session, String clave,
                                                    String huella, DatosPago datos) {
         SesionUsuario sesion = SesionUsuario.getActual();
@@ -395,7 +555,7 @@ public final class ServicioPagos {
                 .map(d -> new AplicacionPago(null, d.cargoId(), d.monto()))
                 .toList();
         PagoService.RegistroPago resultado = pagos.registrarPagoEnSesion(
-                session, pago, aplicaciones, tiempo);
+                session, pago, aplicaciones, tiempo, datos.aplicacionAutomatica());
 
         PagoRegistroResponse respuesta = new PagoRegistroResponse(
                 resultado.pago().getId().toString(),
@@ -504,8 +664,13 @@ public final class ServicioPagos {
                         monto(fila.monto(), "monto de distribución")));
             }
         }
+        boolean aplicacionAutomatica = Boolean.TRUE.equals(solicitud.aplicacionAutomatica());
+        if (aplicacionAutomatica && !distribucion.isEmpty()) {
+            throw ExcepcionApi.entidadNoProcesable(
+                    "La aplicación automática no puede combinarse con distribución manual.");
+        }
         return new DatosPago(contratoId, fechaPago, moneda, monto, metodo,
-                referencia, notas, List.copyOf(distribucion));
+                referencia, notas, List.copyOf(distribucion), aplicacionAutomatica);
     }
 
     private static String claveUuid(String valor) {
@@ -527,7 +692,8 @@ public final class ServicioPagos {
         String canonica = datos.contratoId() + "|" + datos.fechaPago() + "|"
                 + datos.moneda() + "|" + datos.monto().toPlainString() + "|"
                 + datos.metodo() + "|" + nulo(datos.referencia()) + "|"
-                + nulo(datos.notas()) + "|" + distribucion;
+                + nulo(datos.notas()) + "|" + distribucion
+                + (datos.aplicacionAutomatica() ? "|AUTO" : "");
         try {
             byte[] resumen = MessageDigest.getInstance("SHA-256")
                     .digest(canonica.getBytes(StandardCharsets.UTF_8));
@@ -609,7 +775,8 @@ public final class ServicioPagos {
 
     private record DatosPago(UUID contratoId, LocalDate fechaPago, String moneda,
                              BigDecimal monto, String metodo, String referencia,
-                             String notas, List<Distribucion> distribucion) { }
+                             String notas, List<Distribucion> distribucion,
+                             boolean aplicacionAutomatica) { }
 
     private record Distribucion(UUID cargoId, BigDecimal monto) { }
 }

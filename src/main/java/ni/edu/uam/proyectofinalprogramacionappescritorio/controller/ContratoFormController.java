@@ -42,7 +42,7 @@ public class ContratoFormController {
     @FXML public void initialize() {
         cmbMoneda.setItems(FXCollections.observableArrayList("USD", "NIO"));
         cmbMoneda.getSelectionModel().selectFirst();
-        cmbEstado.setItems(FXCollections.observableArrayList("Vigente", "Borrador", "Por vencer", "Vencido", "Terminado", "Cancelado"));
+        cmbEstado.setItems(FXCollections.observableArrayList("Borrador", "Vigente", "Por vencer", "Vencido", "Terminado", "Cancelado"));
         cmbEstado.getSelectionModel().selectFirst();
         txtDiaPago.setText("5");
         cmbUnidad.valueProperty().addListener((obs, anterior, unidad) -> {

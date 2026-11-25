@@ -1,7 +1,12 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos;
 
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.ContratoCancelarRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.ContratoRenovarRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.ContratoRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.ContratoResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.ContratoTerminarRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.GarantiaLiquidacionRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.GarantiaResumenResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.InquilinoRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.InquilinoResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PaginaResponse;
@@ -11,6 +16,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.Unida
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.UnidadResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ExcepcionApi;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.config.HibernateTransactions;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.ResumenGarantiaDTO;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Garantia;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Inquilino;
@@ -19,10 +25,12 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propietario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Unidad;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ConflictoDatosException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ContratoService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.GarantiaService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.InquilinoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.Permiso;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PermisoService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PropiedadService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.UnidadService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ParserMonto;
@@ -72,20 +80,28 @@ public final class ServicioCatalogos {
     private final UnidadService unidades;
     private final InquilinoService inquilinos;
     private final ContratoService contratos;
+    private final GarantiaService garantias;
 
     public ServicioCatalogos(HibernateTransactions tx) {
         this(tx, new PropiedadService(tx), new UnidadService(tx),
-                new InquilinoService(tx), new ContratoService(tx));
+                new InquilinoService(tx), new ContratoService(tx), new GarantiaService(tx));
     }
 
     public ServicioCatalogos(HibernateTransactions tx, PropiedadService propiedades,
                              UnidadService unidades, InquilinoService inquilinos,
                              ContratoService contratos) {
+        this(tx, propiedades, unidades, inquilinos, contratos, new GarantiaService(tx));
+    }
+
+    public ServicioCatalogos(HibernateTransactions tx, PropiedadService propiedades,
+                             UnidadService unidades, InquilinoService inquilinos,
+                             ContratoService contratos, GarantiaService garantias) {
         this.tx = Objects.requireNonNull(tx, "Faltan las transacciones de la API.");
         this.propiedades = Objects.requireNonNull(propiedades, "Falta el servicio de propiedades.");
         this.unidades = Objects.requireNonNull(unidades, "Falta el servicio de unidades.");
         this.inquilinos = Objects.requireNonNull(inquilinos, "Falta el servicio de inquilinos.");
         this.contratos = Objects.requireNonNull(contratos, "Falta el servicio de contratos.");
+        this.garantias = Objects.requireNonNull(garantias, "Falta el servicio de garantías.");
     }
 
     public <T> T enTransaccion(Supplier<T> operacion) {
@@ -97,6 +113,7 @@ public final class ServicioCatalogos {
     public UnidadService unidadService() { return unidades; }
     public InquilinoService inquilinoService() { return inquilinos; }
     public ContratoService contratoService() { return contratos; }
+    public GarantiaService garantiaService() { return garantias; }
 
     // ------------------------------------------------------------------
     // Propiedades
@@ -137,6 +154,7 @@ public final class ServicioCatalogos {
     }
 
     public PropiedadResponse crearPropiedad(PropiedadRequest solicitud) {
+        exigirPermiso(Permiso.GESTIONAR_PROPIEDADES);
         String nombre = textoRequerido(solicitud.nombre(), "nombre", 120);
         String direccion = textoRequerido(solicitud.direccion(), "direccion", 300);
         String[] propietario = datosPropietario(solicitud);
@@ -153,6 +171,7 @@ public final class ServicioCatalogos {
 
     public PropiedadResponse actualizarPropiedad(UUID id, long version,
                                                  PropiedadRequest solicitud) {
+        exigirPermiso(Permiso.GESTIONAR_PROPIEDADES);
         obtenerPropiedad(id);
         String nombre = textoRequerido(solicitud.nombre(), "nombre", 120);
         String direccion = textoRequerido(solicitud.direccion(), "direccion", 300);
@@ -170,6 +189,7 @@ public final class ServicioCatalogos {
     }
 
     public PropiedadResponse cambiarEstadoPropiedad(UUID id, Boolean activa) {
+        exigirPermiso(Permiso.GESTIONAR_PROPIEDADES);
         obtenerPropiedad(id);
         if (activa == null) {
             throw ExcepcionApi.entidadNoProcesable("El campo activa es obligatorio.");
@@ -228,11 +248,12 @@ public final class ServicioCatalogos {
     }
 
     public UnidadResponse crearUnidad(UnidadRequest solicitud) {
+        exigirPermiso(Permiso.GESTIONAR_UNIDADES);
         DatosUnidad datos = validarUnidad(solicitud);
         Unidad unidad = new Unidad();
         aplicar(unidad, datos);
         tx.ejecutar(session -> {
-            permisos.exigir(session, SesionUsuario.getActual(), Permiso.OPERAR_ALQUILERES);
+            permisos.exigir(session, SesionUsuario.getActual(), Permiso.GESTIONAR_UNIDADES);
             Propiedad propiedad = session.find(Propiedad.class, datos.propiedadId());
             if (propiedad == null) throw ExcepcionApi.noEncontrado();
             unidad.setPropiedad(propiedad);
@@ -257,6 +278,7 @@ public final class ServicioCatalogos {
     }
 
     public UnidadResponse cambiarEstadoUnidad(UUID id, String estado) {
+        exigirPermiso(Permiso.GESTIONAR_UNIDADES);
         obtenerUnidad(id);
         String nuevo = textoRequerido(estado, "estado", 24);
         exigirEstadoUnidad(nuevo);
@@ -319,6 +341,7 @@ public final class ServicioCatalogos {
     }
 
     public InquilinoResponse cambiarEstadoInquilino(UUID id, Boolean activo) {
+        exigirPermiso(Permiso.DESACTIVAR_INQUILINO);
         obtenerInquilino(id);
         if (activo == null) {
             throw ExcepcionApi.entidadNoProcesable("El campo activo es obligatorio.");
@@ -350,12 +373,29 @@ public final class ServicioCatalogos {
             where.append("c.inquilinoId = :inquilinoId");
             parametros.put("inquilinoId", inquilinoId);
         }
-        return paginar(Contrato.class, "c",
-                "Contrato c join fetch c.unidad join fetch c.inquilino"
-                        + " left join fetch c.garantiaSeguimiento",
-                "Contrato c",
-                where.toString(), parametros, "c.inicio desc",
-                pagina, tamano, ServicioCatalogos::aContrato);
+        String filtro = where.isEmpty() ? "" : " where " + where;
+        return tx.ejecutar(s -> {
+            exigirLectura(s);
+            Query<Long> conteo = s.createQuery(
+                    "select count(c) from Contrato c" + filtro, Long.class);
+            aplicarParametros(conteo, parametros);
+            long total = conteo.uniqueResult();
+
+            Query<Contrato> consulta = s.createQuery(
+                    "select c from Contrato c join fetch c.unidad join fetch c.inquilino"
+                            + " left join fetch c.garantiaSeguimiento" + filtro
+                            + " order by c.inicio desc",
+                    Contrato.class);
+            aplicarParametros(consulta, parametros);
+            consulta.setFirstResult((pagina - 1) * tamano);
+            consulta.setMaxResults(tamano);
+            List<Contrato> lista = consulta.getResultList();
+            Map<UUID, BigDecimal> devuelto = devueltoPorGarantia(s, lista);
+            List<ContratoResponse> elementos = lista.stream()
+                    .map(c -> aContrato(c, devuelto))
+                    .toList();
+            return new PaginaResponse<>(pagina, tamano, total, elementos);
+        });
     }
 
     public ContratoResponse obtenerContrato(UUID id) {
@@ -367,7 +407,8 @@ public final class ServicioCatalogos {
                             Contrato.class)
                     .setParameter("id", id)
                     .uniqueResult();
-            return contrato == null ? null : aContrato(contrato);
+            if (contrato == null) return null;
+            return aContrato(contrato, devueltoPorGarantia(s, List.of(contrato)));
         });
         if (respuesta == null) throw ExcepcionApi.noEncontrado();
         return respuesta;
@@ -411,6 +452,83 @@ public final class ServicioCatalogos {
         return obtenerContrato(id);
     }
 
+    public ContratoResponse activarContrato(UUID id, long version) {
+        obtenerContrato(id);
+        ejecutar(() -> contratos.activar(id, version));
+        return obtenerContrato(id);
+    }
+
+    public ContratoResponse cancelarBorradorContrato(UUID id, long version,
+                                                     ContratoCancelarRequest solicitud) {
+        obtenerContrato(id);
+        if (solicitud == null) {
+            throw ExcepcionApi.entidadNoProcesable("El cuerpo de la cancelación es obligatorio.");
+        }
+        String motivo = textoRequerido(solicitud.motivo(), "motivo", 500);
+        ejecutar(() -> contratos.cancelarBorrador(id, version, motivo));
+        return obtenerContrato(id);
+    }
+
+    public ContratoResponse renovarContrato(UUID id, ContratoRenovarRequest solicitud) {
+        obtenerContrato(id);
+        if (solicitud == null) {
+            throw ExcepcionApi.entidadNoProcesable("Las condiciones de renovación son obligatorias.");
+        }
+        LocalDate inicio = fecha(solicitud.inicio(), "inicio");
+        LocalDate fin = fecha(solicitud.fin(), "fin");
+        try {
+            ValidadorEntrada.validarRangoFechas(inicio, fin, 1);
+        } catch (IllegalArgumentException e) {
+            throw ExcepcionApi.entidadNoProcesable(e.getMessage());
+        }
+        BigDecimal canon = monto(solicitud.canon(), "canon", true, true);
+        String moneda = moneda(solicitud.moneda());
+        int diaPago = solicitud.diaPago() == null ? 5 : solicitud.diaPago();
+        if (diaPago < 1 || diaPago > 31) {
+            throw ExcepcionApi.entidadNoProcesable("El día de pago debe estar entre 1 y 31.");
+        }
+        BigDecimal deposito = monto(solicitud.depositoPactado(), "depositoPactado", false, false);
+        var comando = new ContratoService.SolicitudRenovacion(
+                inicio, fin, canon, moneda, diaPago, deposito);
+        UUID sucesorId = ejecutarResultado(() -> contratos.renovar(id, comando));
+        return obtenerContrato(sucesorId);
+    }
+
+    public ContratoResponse terminarContratoConCierre(UUID id, long version,
+                                                      ContratoTerminarRequest solicitud) {
+        obtenerContrato(id);
+        if (solicitud == null) {
+            throw ExcepcionApi.entidadNoProcesable("Los datos de terminación son obligatorios.");
+        }
+        LocalDate fechaTerminacion = fecha(solicitud.fechaTerminacion(), "fechaTerminacion");
+        String motivo = textoRequerido(solicitud.motivo(), "motivo", 500);
+        UUID sucesorId = uuidOpcional(solicitud.activarSucesorId(), "activarSucesorId");
+        GarantiaService.SolicitudLiquidacion liquidacion = null;
+        if (solicitud.liquidacion() != null
+                && solicitud.liquidacion().movimientos() != null
+                && !solicitud.liquidacion().movimientos().isEmpty()) {
+            liquidacion = validarLiquidacion(id, null, solicitud.liquidacion());
+        }
+        var comando = new ContratoService.SolicitudTerminacion(
+                fechaTerminacion, motivo, sucesorId, liquidacion);
+        ejecutar(() -> contratos.terminar(id, version, comando));
+        return obtenerContrato(id);
+    }
+
+    public GarantiaResumenResponse obtenerGarantiaContrato(UUID id) {
+        obtenerContrato(id);
+        ResumenGarantiaDTO resumen = ejecutarResultado(() -> garantias.consultarPorContrato(id));
+        return aGarantia(resumen);
+    }
+
+    public GarantiaResumenResponse liquidarGarantiaContrato(UUID id, String idempotencyKey,
+                                                            GarantiaLiquidacionRequest solicitud) {
+        obtenerContrato(id);
+        GarantiaService.SolicitudLiquidacion comando = validarLiquidacion(id, idempotencyKey, solicitud);
+        ResumenGarantiaDTO resumen = ejecutarResultado(() -> garantias.liquidar(comando));
+        return aGarantia(resumen);
+    }
+
     // ------------------------------------------------------------------
     // Lectura paginada
     // ------------------------------------------------------------------
@@ -445,6 +563,13 @@ public final class ServicioCatalogos {
 
     private void exigirLectura(Session session) {
         permisos.exigir(session, SesionUsuario.getActual(), Permiso.OPERAR_ALQUILERES);
+    }
+
+    private void exigirPermiso(String permiso) {
+        tx.ejecutar(s -> {
+            permisos.exigir(s, SesionUsuario.getActual(), permiso);
+            return null;
+        });
     }
 
     private static void separar(StringBuilder where) {
@@ -496,8 +621,12 @@ public final class ServicioCatalogos {
                 i.getVersion());
     }
 
-    private static ContratoResponse aContrato(Contrato c) {
+    private static ContratoResponse aContrato(Contrato c, Map<UUID, BigDecimal> devueltoPorGarantia) {
         Garantia garantia = c.getGarantiaSeguimiento();
+        String garantiaEstado = garantia == null ? null : Garantia.derivarEstado(
+                garantia.getMontoInicial(),
+                garantia.getSaldoActual(),
+                devueltoPorGarantia.getOrDefault(garantia.getId(), BigDecimal.ZERO));
         return new ContratoResponse(
                 c.getId().toString(),
                 c.getUnidadId() == null ? null : c.getUnidadId().toString(),
@@ -512,7 +641,63 @@ public final class ServicioCatalogos {
                 decimal(c.getDepositoPactado()),
                 garantia == null ? null : decimal(garantia.getSaldoActual()),
                 c.getEstado(),
-                c.getVersion());
+                c.getVersion(),
+                c.getPredecesorId() == null ? null : c.getPredecesorId().toString(),
+                c.getTerminadoEl() == null ? null : c.getTerminadoEl().toString(),
+                c.getMotivoCierre(),
+                garantiaEstado);
+    }
+
+    private static Map<UUID, BigDecimal> devueltoPorGarantia(Session session, List<Contrato> contratos) {
+        List<UUID> garantiaIds = contratos.stream()
+                .map(Contrato::getGarantiaSeguimiento)
+                .filter(Objects::nonNull)
+                .map(Garantia::getId)
+                .distinct()
+                .toList();
+        if (garantiaIds.isEmpty()) return Map.of();
+        Map<UUID, BigDecimal> totales = new LinkedHashMap<>();
+        for (Object[] fila : session.createQuery("""
+                        select m.garantiaId, sum(m.importe)
+                        from MovimientoGarantia m
+                        where m.garantiaId in :ids and m.tipo = 'Devolucion'
+                        group by m.garantiaId
+                        """, Object[].class)
+                .setParameter("ids", garantiaIds)
+                .getResultList()) {
+            totales.put((UUID) fila[0], (BigDecimal) fila[1]);
+        }
+        return totales;
+    }
+
+    private static GarantiaResumenResponse aGarantia(ResumenGarantiaDTO dto) {
+        List<GarantiaResumenResponse.MovimientoGarantiaResponse> movimientos = dto.movimientos().stream()
+                .map(m -> new GarantiaResumenResponse.MovimientoGarantiaResponse(
+                        m.id().toString(),
+                        m.cargoId() == null ? null : m.cargoId().toString(),
+                        m.cargoResumen(),
+                        m.liquidacionId().toString(),
+                        m.orden(),
+                        m.tipo(),
+                        decimal(m.importe()),
+                        m.fechaMovimiento().toString(),
+                        m.metodo(),
+                        m.concepto(),
+                        RelojService.presentar(m.creadoEn()),
+                        m.creadoPor()))
+                .toList();
+        return new GarantiaResumenResponse(
+                dto.garantiaId().toString(),
+                dto.contratoId().toString(),
+                dto.moneda(),
+                decimal(dto.montoInicial()),
+                decimal(dto.totalAplicado()),
+                decimal(dto.totalDeducido()),
+                decimal(dto.totalDevuelto()),
+                decimal(dto.saldoActual()),
+                dto.estadoDerivado(),
+                dto.conciliado(),
+                movimientos);
     }
 
     private static String instante(Timestamp valor) {
@@ -623,7 +808,7 @@ public final class ServicioCatalogos {
         LocalDate inicio = fecha(solicitud.inicio(), "inicio");
         LocalDate fin = fecha(solicitud.fin(), "fin");
         try {
-            ValidadorEntrada.validarRangoFechas(inicio, fin, 0);
+            ValidadorEntrada.validarRangoFechas(inicio, fin, 1);
         } catch (IllegalArgumentException e) {
             throw ExcepcionApi.entidadNoProcesable(e.getMessage());
         }
@@ -799,17 +984,73 @@ public final class ServicioCatalogos {
         contrato.setEstado(datos.estado());
     }
 
+    private static UUID uuidOpcional(String valor, String campo) {
+        if (valor == null || valor.isBlank()) return null;
+        return uuid(valor, campo);
+    }
+
+    private GarantiaService.SolicitudLiquidacion validarLiquidacion(UUID contratoId,
+                                                                    String idempotencyKey,
+                                                                    GarantiaLiquidacionRequest solicitud) {
+        if (solicitud == null) {
+            throw ExcepcionApi.entidadNoProcesable("El cuerpo de la liquidación es obligatorio.");
+        }
+        UUID claveCabecera = uuidOpcional(idempotencyKey, "Idempotency-Key");
+        UUID claveCuerpo = uuidOpcional(solicitud.liquidacionId(), "liquidacionId");
+        if (claveCabecera != null && claveCuerpo != null && !claveCabecera.equals(claveCuerpo)) {
+            throw ExcepcionApi.solicitudInvalida(
+                    "La cabecera Idempotency-Key no coincide con liquidacionId.");
+        }
+        UUID liquidacionId = claveCabecera != null ? claveCabecera : claveCuerpo;
+        if (liquidacionId == null) {
+            throw ExcepcionApi.entidadNoProcesable(
+                    "La cabecera Idempotency-Key o liquidacionId es obligatoria.");
+        }
+        if (solicitud.movimientos() == null || solicitud.movimientos().isEmpty()) {
+            throw ExcepcionApi.entidadNoProcesable("Debe incluir al menos un movimiento de garantía.");
+        }
+        List<GarantiaService.ItemMovimiento> items = new java.util.ArrayList<>(solicitud.movimientos().size());
+        for (var fila : solicitud.movimientos()) {
+            if (fila == null) {
+                throw ExcepcionApi.entidadNoProcesable("La liquidación contiene un movimiento vacío.");
+            }
+            String tipo = textoRequerido(fila.tipo(), "tipo", 24);
+            UUID cargoId = uuidOpcional(fila.cargoId(), "cargoId");
+            BigDecimal importe = monto(fila.importe(), "importe", true, true);
+            LocalDate fechaMov = fila.fechaMovimiento() == null || fila.fechaMovimiento().isBlank()
+                    ? null : fecha(fila.fechaMovimiento(), "fechaMovimiento");
+            String metodo = textoOpcional(fila.metodo(), "metodo", 24);
+            String concepto = textoRequerido(fila.concepto(), "concepto", 300);
+            items.add(new GarantiaService.ItemMovimiento(
+                    tipo, cargoId, importe, fechaMov, metodo, concepto));
+        }
+        return new GarantiaService.SolicitudLiquidacion(contratoId, liquidacionId, List.copyOf(items));
+    }
+
     /**
      * Ejecuta una escritura de dominio traduciendo sus excepciones a la
      * respuesta HTTP correspondiente sin exponer detalles internos.
      */
     private static void ejecutar(Operacion operacion) {
-        try {
+        ejecutarResultado(() -> {
             operacion.ejecutar();
+            return null;
+        });
+    }
+
+    private static <T> T ejecutarResultado(OperacionResultado<T> operacion) {
+        try {
+            return operacion.ejecutar();
         } catch (ConflictoDatosException e) {
             throw ExcepcionApi.conflicto(e.getMessage());
         } catch (IllegalArgumentException e) {
             throw ExcepcionApi.entidadNoProcesable(e.getMessage());
+        } catch (IllegalStateException e) {
+            Throwable causa = e.getCause();
+            String mensaje = causa instanceof IllegalStateException
+                    && causa.getMessage() != null && !causa.getMessage().isBlank()
+                    ? causa.getMessage() : e.getMessage();
+            throw ExcepcionApi.entidadNoProcesable(mensaje);
         } catch (SQLException e) {
             throw ExcepcionApi.interno();
         }
@@ -818,6 +1059,11 @@ public final class ServicioCatalogos {
     @FunctionalInterface
     private interface Operacion {
         void ejecutar() throws SQLException;
+    }
+
+    @FunctionalInterface
+    private interface OperacionResultado<T> {
+        T ejecutar() throws SQLException;
     }
 
     private record DatosUnidad(UUID propiedadId, String codigo, String descripcion,

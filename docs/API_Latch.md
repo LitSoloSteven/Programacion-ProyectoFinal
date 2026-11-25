@@ -41,6 +41,11 @@ Content-Type: application/json
 - Las rutas protegidas validan el token antes de devolver `404` o `405`; sin
   sesión válida, esos casos responden `401`.
 - El mensaje de credenciales inválidas es idéntico exista o no el usuario.
+- Si la contraseña temporal es válida y la cuenta tiene un cambio obligatorio,
+  el login devuelve `409 CAMBIO_PASSWORD_REQUERIDO` sin emitir token. Repetir
+  el mismo POST con `password` (la temporal) y `nuevaPassword` (12–128
+  caracteres, distinta de la temporal). El token se emite después de guardar
+  la nueva contraseña y registrar el cambio. La contraseña anterior deja de servir.
 
 ## Convenciones de la petición
 
@@ -82,6 +87,7 @@ Cuerpo uniforme:
 | 404 | `NO_ENCONTRADO`, `TASA_NO_DISPONIBLE` | Recurso inexistente |
 | 405 | `METODO_NO_PERMITIDO` | Método HTTP no registrado para la ruta |
 | 409 | `CONFLICTO` | Duplicado, versión desactualizada o idempotencia incompatible |
+| 409 | `CAMBIO_PASSWORD_REQUERIDO` | Contraseña temporal válida. Repetir el login con la nueva contraseña |
 | 413 | `CUERPO_DEMASIADO_GRANDE` | Cuerpo > 256 KiB |
 | 415 | `CONTENIDO_NO_SOPORTADO` | `Content-Type` distinto de JSON |
 | 422 | `ENTIDAD_NO_PROCESABLE` | Regla de negocio incumplida |
@@ -97,6 +103,7 @@ Cuerpo uniforme:
 | POST | `/api/v1/auth/logout` | autenticado |
 | GET | `/api/v1/tasas` | `CONSULTAR_REPORTES` |
 | GET | `/api/v1/tasas/vigente?fecha=AAAA-MM-DD` | `CONSULTAR_REPORTES` |
+| GET | `/api/v1/tasas/referencia` | `CONSULTAR_REPORTES` |
 | GET | `/api/v1/tasas/{id}` | `CONSULTAR_REPORTES` |
 | POST | `/api/v1/tasas` | `OPERAR_ALQUILERES` |
 | POST | `/api/v1/tasas/{id}/autorizar` | `AUTORIZAR_TASA` (solo propietario) |
@@ -117,14 +124,32 @@ Cuerpo uniforme:
 | POST | `/api/v1/contratos` | `OPERAR_ALQUILERES` |
 | PUT | `/api/v1/contratos/{id}` | `OPERAR_ALQUILERES` |
 | PATCH | `/api/v1/contratos/{id}` | `OPERAR_ALQUILERES` |
+| POST | `/api/v1/contratos/{id}/activar` | `OPERAR_ALQUILERES` |
+| POST | `/api/v1/contratos/{id}/cancelar` | `OPERAR_ALQUILERES` |
+| POST | `/api/v1/contratos/{id}/renovar` | `OPERAR_ALQUILERES` |
+| POST | `/api/v1/contratos/{id}/terminar` | `OPERAR_ALQUILERES` (`LIQUIDAR_GARANTIA` si hay depósito > 0 o movimientos) |
+| GET | `/api/v1/contratos/{id}/garantia` | `OPERAR_ALQUILERES` |
+| POST | `/api/v1/contratos/{id}/garantia/movimientos` | `LIQUIDAR_GARANTIA` + `Idempotency-Key` / `liquidacionId` |
 | POST | `/api/v1/validaciones` | `OPERAR_ALQUILERES` |
 | POST | `/api/v1/pagos` | `OPERAR_ALQUILERES` + `Idempotency-Key` |
 | GET | `/api/v1/pagos?pagina=1&tamano=50&texto=...` | `OPERAR_ALQUILERES` |
 | GET | `/api/v1/cargos?pagina=1&tamano=50&texto=...` | `OPERAR_ALQUILERES` |
+| GET | `/api/v1/cargos/cartera?corte=AAAA-MM-DD&contratoId=...&periodo=AAAA-MM&moneda=...&texto=...` | `OPERAR_ALQUILERES` |
+| GET | `/api/v1/cargos/generacion-mes/vista-previa?periodo=AAAA-MM` | `OPERAR_ALQUILERES` |
+| POST | `/api/v1/cargos/generacion-mes` | `OPERAR_ALQUILERES` |
+| POST | `/api/v1/cargos/revisar-mora` | `OPERAR_ALQUILERES` |
+| POST | `/api/v1/cargos/{id}/anulacion` | `ANULAR_CARGOS` (solo propietario) |
 | GET | `/api/v1/pagos/{id}` | `OPERAR_ALQUILERES` |
 | GET | `/api/v1/recibos/{numero}` | `OPERAR_ALQUILERES` |
 | POST | `/api/v1/pagos/{id}/anulacion` | `ANULAR_PAGOS` (solo propietario) |
+| POST | `/api/v1/pagos/aplicaciones/{id}/reversion` | `ANULAR_PAGOS` (solo propietario) |
 | GET | `/api/v1/contratos/{id}/estado-cuenta?corte=AAAA-MM-DD` | `OPERAR_ALQUILERES` |
+| GET | `/api/v1/mantenimiento/solicitudes` | `OPERAR_ALQUILERES` |
+| POST | `/api/v1/mantenimiento/solicitudes` | `OPERAR_ALQUILERES` |
+| PUT | `/api/v1/mantenimiento/solicitudes/{id}` | `OPERAR_ALQUILERES` |
+| POST | `/api/v1/mantenimiento/solicitudes/{id}/estado` | `OPERAR_ALQUILERES` |
+| GET | `/api/v1/mantenimiento/gastos` | `OPERAR_ALQUILERES` |
+| POST | `/api/v1/mantenimiento/gastos` | `OPERAR_ALQUILERES` |
 | GET | `/api/v1/dashboard/metricas` | `CONSULTAR_REPORTES` |
 
 Las rutas `PUT` requieren el campo `version` del registro leído; si otro usuario
@@ -157,6 +182,14 @@ incluir el campo correspondiente (`activa`, `activo` o `estado`); si falta o
 su valor no es válido, la API responde `422` y conserva el estado actual.
 
 ## Tasas de cambio
+
+La referencia comercial se consulta con `GET /api/v1/tasas/referencia`. La ruta
+devuelve `200` con `estado` (`INFORMATIVA`, `HISTORICA`, `CONSULTANDO` o
+`NO_DISPONIBLE`). Si hay referencia incluye `fuente`, `nioPorUsd` como texto
+de ocho decimales, `fechaEfectiva`, `consultadaEn` con desplazamiento de
+Managua y `antiguedadSegundos`. Puede incluir un `aviso` sobre el último
+incidente de H3. La consulta lee la caché. La operación de pago usa la tasa
+autorizada para su fecha efectiva.
 
 Las tasas son inmutables. Registrar una tasa crea una instantánea
 **informativa**; autorizarla crea una nueva instantánea **autorizada** y
@@ -209,7 +242,9 @@ Content-Type: application/json
   existe, `422` y **no se escribe nada**.
 - La distribución es opcional y va **en la moneda del contrato**. Se valida que
   cada cargo exista, pertenezca al contrato, no esté cancelado y no supere su
-  saldo. No se permiten cargos repetidos.
+  saldo. No se permiten cargos repetidos. También puede enviarse
+  `"aplicacionAutomatica": true` (sin `distribucion`) para abonar primero los
+  cargos vencidos más antiguos (por `venceEl` e `id`).
 - `credito = montoContrato − Σ aplicaciones`.
 - El recibo y la auditoría se crean en la misma transacción.
 
@@ -225,7 +260,27 @@ concepto/tipo en cargos. La respuesta tiene `pagina`, `tamano`, `total` y
 `GET /api/v1/recibos/{numero}` devuelve el recibo con importes como texto.
 
 `POST /api/v1/pagos/{id}/anulacion` exige `{ "motivo": "…" }`, solo lo puede
-hacer el propietario, no se puede repetir (`409`) y queda auditado.
+hacer el propietario, no se puede repetir (`409`) y queda auditado. Si el pago
+tiene crédito aplicado a cargos posteriores activos, exige revertir primero esas
+aplicaciones mediante `POST /api/v1/pagos/aplicaciones/{id}/reversion` con
+`{ "motivo": "…" }`.
+
+### Generación mensual, mora y cartera (M05)
+
+- `GET /api/v1/cargos/generacion-mes/vista-previa?periodo=AAAA-MM` devuelve la
+  vista previa sin persistir cargos (canon, vencimiento ajustado, omisiones y
+  crédito aplicable).
+- `POST /api/v1/cargos/generacion-mes` recibe `{ "periodo": "AAAA-MM" }` y
+  genera rentas con una transacción por contrato, aplicando automáticamente
+  crédito disponible en la misma moneda.
+- `POST /api/v1/cargos/revisar-mora` recibe `{}` o `{ "fecha": "AAAA-MM-DD" }`
+  y ejecuta la revisión H2 de vencimientos contractuales (`Por vencer` /
+  `Vencido`) y mora única sobre principal vencido tras la gracia.
+- `GET /api/v1/cargos/cartera` admite `corte`, `contratoId`, `periodo`, `moneda`
+  y `texto`; agrupa saldos por tramos (`Al día`, `1 a 30`, `31 a 60`, `61 a 90`,
+  `Más de 90`) con totales separados por moneda.
+- `POST /api/v1/cargos/{id}/anulacion` exige `{ "motivo": "…" }`, solo lo
+  puede hacer el propietario y rechaza (`422`) cargos con aplicaciones activas.
 
 ### Estado de cuenta
 
@@ -235,20 +290,51 @@ Devuelve cargos con importe/aplicado/saldo, pagos con aplicado/crédito,
 totales y garantía, todo en la moneda del contrato. Los cargos cancelados no
 entran en los totales y los pagos anulados no aportan aplicado ni crédito.
 
+## Mantenimiento y gastos (M08)
+
+- `GET /api/v1/mantenimiento/solicitudes` admite `propiedadId`, `unidadId`,
+  `prioridad` (`Baja`, `Media`, `Alta`) y `estado` (`Abierta`, `En proceso`,
+  `Resuelta`, `Cancelada`).
+- `POST /api/v1/mantenimiento/solicitudes` crea una solicitud `Abierta` por
+  unidad (sin exigir unidad disponible ni cambiar su estado).
+- `PUT /api/v1/mantenimiento/solicitudes/{id}` requiere `version`; responde `409`
+  ante conflicto optimista y `422 ERR-066` si la solicitud ya está en estado
+  terminal.
+- `POST /api/v1/mantenimiento/solicitudes/{id}/estado` aplica la máquina RN-27
+  (`Abierta` → `En proceso` | `Cancelada`; `En proceso` → `Resuelta` |
+  `Cancelada`). Repetir el estado actual es idempotente; otra transición responde
+  `422 ERR-066`. `Cancelada` exige `motivo` y conserva gastos confirmados;
+  `Resuelta` exige detalle de trabajo y `fechaCierre`.
+- `GET /api/v1/mantenimiento/gastos` admite `propiedadId`, `desde`, `hasta` y
+  `moneda` (`USD` o `NIO`) y devuelve `totalUsd` y `totalNio` separados.
+- `POST /api/v1/mantenimiento/gastos` registra un gasto efectivo de propiedad
+  sin crear cargos al inquilino ni modificar garantías. Si `solicitudId`
+  pertenece a una unidad de otra propiedad, responde `422 ERR-065`.
+
 ## Indicadores
 
-`GET /api/v1/dashboard/metricas`
+`GET /api/v1/dashboard/metricas` (acepta `?periodo=AAAA-MM` opcional para filtrar cargos por cobrar y pagos registrados por período).
 
 ```json
 {
-  "propiedades": 1, "unidades": 1, "inquilinos": 1, "contratosVigentes": 1,
+  "propiedades": 1, "unidades": 1, "unidadesActivas": 1, "unidadesOcupadas": 1,
+  "porcentajeOcupacion": "100.00", "instanteGeneracion": "2026-11-25T09:30:00-06:00",
+  "periodo": "2026-11", "inquilinos": 1, "contratosVigentes": 1,
+  "contratosPorVencer": 0, "contratosVencidos": 0,
   "cargosPendientes": [ { "moneda": "USD", "cantidad": 2, "total": "1000.00" } ],
-  "pagosRegistrados": [ { "moneda": "USD", "cantidad": 1, "total": "1000.00" } ]
+  "principalPendiente": [ { "moneda": "USD", "cantidad": 2, "total": "1000.00" } ],
+  "moraExigible": [ { "moneda": "USD", "cantidad": 0, "total": "0.00" } ],
+  "pagosRegistrados": [ { "moneda": "USD", "cantidad": 1, "total": "1000.00" } ],
+  "tasaDisponible": {
+    "disponible": true, "estado": "AUTORIZADA", "valor": "36.62430000",
+    "origen": "Autorizada · Banco Central", "fechaEfectiva": "2026-11-25",
+    "antiguedadSegundos": 120, "autorizadaParaPagos": true
+  }
 }
 ```
 
-Los totales siempre van separados por moneda y como texto decimal; nunca se
-suman USD con NIO.
+Los totales, porcentajes y tasas siempre van separados por moneda y como texto decimal; nunca se
+suman USD con NIO. Si `?periodo` no usa el formato `AAAA-MM`, responde `400 SOLICITUD_INVALIDA`.
 
 ## Validaciones
 
@@ -278,6 +364,7 @@ El cliente está en `cliente/`:
 | `ClienteAuth` | Login y logout |
 | `ClienteCatalogos` | Paginación, altas, edición y cambios de estado de catálogos |
 | `ClientePagos` | Cargos, historial, registro de pago, detalle, recibo y anulación |
+| `ClienteMantenimiento` | Solicitudes de mantenimiento, transiciones y gastos de propiedad |
 | `ClienteTasas` | Consulta y registro de tasas |
 | `ClienteValidaciones` | Validaciones |
 | `ErrorClienteException` | Error controlado con código y mensaje del servidor |

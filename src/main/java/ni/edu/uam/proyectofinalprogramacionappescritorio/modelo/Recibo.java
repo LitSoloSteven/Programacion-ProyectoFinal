@@ -26,7 +26,15 @@ public class Recibo {
     @Getter
     private String contratoInfo;
 
+    @Column(name = "emisor_info", columnDefinition = "text", updatable = false)
+    @Getter
+    private String emisorInfo;
+
     public Recibo(long numero, Pago pago, String contratoInfo) {
+        this(numero, pago, contratoInfo, null);
+    }
+
+    public Recibo(long numero, Pago pago, String contratoInfo, String emisorInfo) {
         if (numero <= 0) {
             throw new IllegalArgumentException("El número del recibo debe ser positivo.");
         }
@@ -34,12 +42,13 @@ public class Recibo {
         this.pago = Objects.requireNonNull(pago, "Falta el pago del recibo.");
         this.contratoInfo = Objects.requireNonNull(contratoInfo,
                 "Falta el resumen del contrato.");
+        this.emisorInfo = emisorInfo == null || emisorInfo.isBlank() ? null : emisorInfo.strip();
     }
 
     public ReciboDTO presentar() {
         return new ReciboDTO(numero, pago.getId(), pago.getContratoId(), pago.getFechaPago(),
                 contratoInfo, pago.getMontoOriginal(), pago.getMonedaOriginal(),
                 pago.getMontoContrato(), pago.getMonedaContrato(), pago.getMetodo(),
-                pago.getReferencia(), "Anulado".equals(pago.getEstado()));
+                pago.getReferencia(), "Anulado".equals(pago.getEstado()), emisorInfo);
     }
 }

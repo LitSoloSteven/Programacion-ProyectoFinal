@@ -62,6 +62,13 @@ public class UnidadFormController {
         marcarLimpio();
     }
 
+    public void aplicarModoAsistente(boolean soloCondiciones) {
+        cmbPropiedad.setDisable(soloCondiciones);
+        txtCodigo.setDisable(soloCondiciones);
+        cmbTipo.setDisable(soloCondiciones);
+        cmbEstado.setDisable(soloCondiciones);
+    }
+
     public boolean validar() {
         limpiarErrores();
         boolean valido = true;

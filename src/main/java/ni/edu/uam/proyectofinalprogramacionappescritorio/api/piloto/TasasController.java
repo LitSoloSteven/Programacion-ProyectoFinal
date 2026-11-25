@@ -26,6 +26,13 @@ public class TasasController {
                 ? rutas.vigente(contexto) : rutas.obtener(contexto));
     }
 
+    @GetMapping({"/api/v1/tasas/referencia", "/api/v1/tasas/referencia/"})
+    public ResponseEntity<String> referencia(HttpServletRequest peticion) {
+        var contexto = PeticionSpring.desde(peticion);
+        return RespuestasApi.json(contexto.parametro("id") == null
+                ? rutas.referencia(contexto) : rutas.obtener(contexto));
+    }
+
     @GetMapping({"/api/v1/tasas/{id}", "/api/v1/tasas/{id}/"})
     public ResponseEntity<String> obtener(HttpServletRequest peticion) throws Exception {
         return RespuestasApi.json(rutas.obtener(PeticionSpring.desde(peticion)));

@@ -11,6 +11,9 @@ public final class Permiso {
     public static final String ANULAR_PAGOS = "ANULAR_PAGOS";
     public static final String ANULAR_CARGOS = "ANULAR_CARGOS";
     public static final String LIQUIDAR_GARANTIA = "LIQUIDAR_GARANTIA";
+    public static final String GESTIONAR_PROPIEDADES = "GESTIONAR_PROPIEDADES";
+    public static final String GESTIONAR_UNIDADES = "GESTIONAR_UNIDADES";
+    public static final String DESACTIVAR_INQUILINO = "DESACTIVAR_INQUILINO";
 
     private Permiso() {}
 
@@ -19,6 +22,7 @@ public final class Permiso {
                 || CONSULTAR_AUDITORIA.equals(permiso) || OPERAR_ALQUILERES.equals(permiso)
                 || CONSULTAR_REPORTES.equals(permiso) || AUTORIZAR_TASA.equals(permiso)
                 || ANULAR_PAGOS.equals(permiso) || ANULAR_CARGOS.equals(permiso)
-                || LIQUIDAR_GARANTIA.equals(permiso);
+                || LIQUIDAR_GARANTIA.equals(permiso) || GESTIONAR_PROPIEDADES.equals(permiso)
+                || GESTIONAR_UNIDADES.equals(permiso) || DESACTIVAR_INQUILINO.equals(permiso);
     }
 }

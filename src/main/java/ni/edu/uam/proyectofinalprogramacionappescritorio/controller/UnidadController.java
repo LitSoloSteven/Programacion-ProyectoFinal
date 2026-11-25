@@ -35,6 +35,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AccionesTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AtajosLista;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.DialogoFormulario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.DialogosAdjuntos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PanelEstadoTabla;
@@ -93,7 +94,12 @@ public class UnidadController {
             btnGenerarReporte.setTooltip(new Tooltip("Vista previa y exportación PDF del catálogo de unidades"));
         }
         Iconos.asignar(btnNuevo, Iconos.Nombre.MAS, 16);
-        btnNuevo.disableProperty().bind(btnRefrescar.disableProperty());
+        if (permisoEliminar) {
+            btnNuevo.disableProperty().bind(btnRefrescar.disableProperty());
+        } else {
+            btnNuevo.setDisable(true);
+            btnNuevo.setTooltip(new Tooltip("Solo el propietario puede registrar unidades."));
+        }
         Iconos.asignar(btnLimpiar, Iconos.Nombre.CERRAR, 14);
         Iconos.asignar(btnEliminar, Iconos.Nombre.ELIMINAR, 16);
         Tooltip.install(eliminarTooltipHost, new Tooltip(permisoEliminar
@@ -109,8 +115,9 @@ public class UnidadController {
         colCanon.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getCanonFormateado()));
         colCanon.setCellFactory(FormatoTabla.numerica());
         colDescripcion.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getDescripcion()));
-        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>(
-                "Editar unidad", this::abrirEdicion, Iconos.Nombre.EDITAR)));
+        AccionesTabla.configurar(colAcciones, List.of(
+                new AccionesTabla.Accion<>("Editar unidad", this::abrirEdicion, Iconos.Nombre.EDITAR),
+                new AccionesTabla.Accion<>("Fotografía", this::abrirFotografia, Iconos.Nombre.VER)));
         tblUnidades.getSelectionModel().selectedItemProperty().addListener((obs, anterior, actual) -> {
             seleccionada = actual;
             btnEliminar.setDisable(actual == null || !permisoEliminar);
@@ -121,6 +128,14 @@ public class UnidadController {
         cargarDatos();
     }
 
+    public void aplicarFiltroInicial(String texto) {
+        if (texto == null || texto.isBlank() || txtBuscar == null) {
+            return;
+        }
+        txtBuscar.setText(texto.strip());
+        aplicarFiltro(texto.strip());
+    }
+
     private void aplicarFiltro(String texto) {
         String filtro = texto == null ? "" : texto.strip().toLowerCase(Locale.ROOT);
         filtrados.setPredicate(unidad -> filtro.isEmpty()
@@ -129,8 +144,8 @@ public class UnidadController {
         lblContador.setText(filtrados.size() + (filtrados.size() == 1 ? " registro" : " registros"));
         tblUnidades.setPlaceholder(PanelEstadoTabla.crear(filtro.isEmpty() ? "Aún no hay unidades" : "No hay coincidencias",
                 filtro.isEmpty() ? "Las unidades registradas aparecerán aquí." : "Prueba con otro término o limpia la búsqueda.",
-                filtro.isEmpty() ? "Nueva unidad" : "Limpiar búsqueda",
-                filtro.isEmpty() ? this::handleNuevo : this::limpiarFiltros));
+                filtro.isEmpty() ? (permisoEliminar ? "Nueva unidad" : null) : "Limpiar búsqueda",
+                filtro.isEmpty() ? (permisoEliminar ? this::handleNuevo : null) : this::limpiarFiltros));
     }
 
     public void cargarDatos() {
@@ -161,17 +176,31 @@ public class UnidadController {
 
     @FXML public void refrescarTabla() { cargarDatos(); }
     @FXML public void handleNuevo() {
-        if (!btnNuevo.isDisabled()) abrirFormulario(null);
+        if (permisoEliminar && !btnNuevo.isDisabled()) abrirFormulario(null);
     }
     private void abrirEdicion(Unidad unidad) { abrirFormulario(unidad); }
 
+    private void abrirFotografia(Unidad unidad) {
+        if (unidad == null || unidad.getId() == null) return;
+        Window propietario = tblUnidades.getScene() == null ? null : tblUnidades.getScene().getWindow();
+        DialogosAdjuntos.mostrarFotoUnidad(
+                propietario,
+                unidad.toString(),
+                HelloApplication.instancia().getComposicion().adjuntos(),
+                unidad.getId());
+    }
+
     private void abrirFormulario(Unidad existente) {
+        if (existente == null && !permisoEliminar) return;
         try {
             FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource("unidad-form.fxml"));
             Node contenido = loader.load();
             UnidadFormController formulario = loader.getController();
             formulario.establecerPropiedades(propiedadesDisponibles);
-            if (existente != null) formulario.cargar(existente);
+            if (existente != null) {
+                formulario.cargar(existente);
+                formulario.aplicarModoAsistente(!permisoEliminar);
+            }
             Window propietario = tblUnidades.getScene() == null ? null : tblUnidades.getScene().getWindow();
             boolean nueva = existente == null;
             Dialog<ButtonType> dialogo = DialogoFormulario.crear(nueva ? "Nueva unidad" : "Editar unidad",

@@ -47,4 +47,34 @@ public class CobranzaController {
     public ResponseEntity<String> estadoCuenta(HttpServletRequest peticion) throws Exception {
         return RespuestasApi.json(rutas.estadoCuenta(PeticionSpring.desde(peticion)));
     }
+
+    @GetMapping({"/api/v1/cargos/cartera", "/api/v1/cargos/cartera/"})
+    public ResponseEntity<String> consultarCartera(HttpServletRequest peticion) throws Exception {
+        return RespuestasApi.json(rutas.consultarCartera(PeticionSpring.desde(peticion)));
+    }
+
+    @GetMapping({"/api/v1/cargos/generacion-mes/vista-previa", "/api/v1/cargos/generacion-mes/vista-previa/"})
+    public ResponseEntity<String> previsualizarGeneracionMes(HttpServletRequest peticion) throws Exception {
+        return RespuestasApi.json(rutas.previsualizarGeneracionMes(PeticionSpring.desde(peticion)));
+    }
+
+    @PostMapping({"/api/v1/cargos/generacion-mes", "/api/v1/cargos/generacion-mes/"})
+    public ResponseEntity<String> generarMes(HttpServletRequest peticion) throws Exception {
+        return RespuestasApi.json(rutas.generarMes(PeticionSpring.desde(peticion)));
+    }
+
+    @PostMapping({"/api/v1/cargos/revisar-mora", "/api/v1/cargos/revisar-mora/"})
+    public ResponseEntity<String> revisarMora(HttpServletRequest peticion) throws Exception {
+        return RespuestasApi.json(rutas.revisarMora(PeticionSpring.desde(peticion)));
+    }
+
+    @PostMapping({"/api/v1/cargos/{id}/anulacion", "/api/v1/cargos/{id}/anulacion/"})
+    public ResponseEntity<String> anularCargo(HttpServletRequest peticion) throws Exception {
+        return RespuestasApi.json(rutas.anularCargo(PeticionSpring.desde(peticion)));
+    }
+
+    @PostMapping({"/api/v1/pagos/aplicaciones/{id}/reversion", "/api/v1/pagos/aplicaciones/{id}/reversion/"})
+    public ResponseEntity<String> revertirAplicacionCredito(HttpServletRequest peticion) throws Exception {
+        return RespuestasApi.json(rutas.revertirAplicacionCredito(PeticionSpring.desde(peticion)));
+    }
 }

@@ -16,6 +16,8 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.EstadoCue
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.TasaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.DocumentoReporte;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.ReciboDTO;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.TablaReporteXlsx;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ExportadorXlsx;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoTasa;
 
 import java.io.InputStream;
@@ -25,12 +27,15 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -109,7 +114,8 @@ public final class ReporteService {
         parametros.put("TOTAL_NETO_NIO", formatearMonto(totalNetoNio));
 
         JasperPrint jasperPrint = llenarReporte(PLANTILLA_PAGOS_TABLA, parametros, filas);
-        return new DocumentoReporte(titulo, "Reporte-Pagos.pdf", jasperPrint);
+        TablaReporteXlsx tabla = construirTablaPagos(titulo, usuarioActual, filas, totalNetoUsd, totalNetoNio, pagosAnulados);
+        return new DocumentoReporte(titulo, "Reporte-Pagos.pdf", jasperPrint, tabla);
     }
 
     public byte[] generarPdfPago(UUID pagoId) {
@@ -117,34 +123,96 @@ public final class ReporteService {
     }
 
     public DocumentoReporte generarDocumentoRecibo(UUID pagoId) {
+        return generarDocumentoRecibo(pagoId, null);
+    }
+
+    public DocumentoReporte generarDocumentoRecibo(UUID pagoId, BooleanSupplier cancelado) {
+        ConsultasReporteHelper.verificarCancelacion(cancelado);
         Objects.requireNonNull(pagoId, "Falta el identificador del pago.");
 
-        ReciboDTO datosRecibo = tx.ejecutar(session -> {
+        record DatosReciboCompleto(
+                ReciboDTO dto,
+                String tasaInfo,
+                String aplicacionesInfo,
+                String creditoInfo) {}
+
+        DatosReciboCompleto datos = tx.ejecutar(session -> {
             permisos.exigir(session, SesionUsuario.getActual(), Permiso.CONSULTAR_REPORTES);
             Recibo recibo = session.createQuery("""
                             from Recibo r
                             join fetch r.pago p
+                            left join fetch p.tipoCambio tc
+                            left join fetch tc.autorizadoPor
                             where p.id = :pagoId
                             """, Recibo.class)
                     .setParameter("pagoId", pagoId)
                     .uniqueResultOptional()
                     .orElseThrow(() -> new IllegalArgumentException(
                             "No se encontró un recibo asociado al pago indicado."));
-            return recibo.presentar();
+
+            Pago pago = recibo.getPago();
+            TipoCambio tc = pago.getTipoCambio();
+            String tasaInfo = tc == null
+                    ? "Misma moneda"
+                    : FormatoTasa.formatear(tc.getNioPorUsd()) + " NIO/USD (" + tc.getFuente() + ", " + tc.getFecha() + ")";
+
+            List<AplicacionPago> aplicaciones = session.createQuery("""
+                            from AplicacionPago a
+                            where a.pagoId = :pagoId and a.revertidaEn is null
+                            order by a.fechaAplicacion asc, a.id asc
+                            """, AplicacionPago.class)
+                    .setParameter("pagoId", pagoId)
+                    .getResultList();
+
+            BigDecimal totalAplicado = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_EVEN);
+            List<String> detallesApp = new ArrayList<>();
+            if (!aplicaciones.isEmpty()) {
+                List<UUID> cargoIds = aplicaciones.stream().map(AplicacionPago::getCargoId).distinct().toList();
+                Map<UUID, Cargo> cargosPorId = new HashMap<>();
+                if (!cargoIds.isEmpty()) {
+                    for (Cargo cargo : session.createQuery("from Cargo c where c.id in :ids", Cargo.class)
+                            .setParameter("ids", cargoIds).getResultList()) {
+                        cargosPorId.put(cargo.getId(), cargo);
+                    }
+                }
+                for (AplicacionPago app : aplicaciones) {
+                    totalAplicado = totalAplicado.add(app.getMonto()).setScale(2, RoundingMode.HALF_EVEN);
+                    Cargo cargo = cargosPorId.get(app.getCargoId());
+                    String nombreCargo = cargo != null ? cargo.getConcepto() : "Cargo";
+                    detallesApp.add(nombreCargo + " (" + formatearMonto(app.getMonto()) + " " + pago.getMonedaContrato() + ")");
+                }
+            }
+
+            BigDecimal credito = "Anulado".equalsIgnoreCase(pago.getEstado())
+                    ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_EVEN)
+                    : (pago.getMontoContrato() == null ? BigDecimal.ZERO : pago.getMontoContrato())
+                    .subtract(totalAplicado).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_EVEN);
+            String creditoInfo = formatearMonto(credito) + " " + pago.getMonedaContrato();
+            String aplicacionesInfo = detallesApp.isEmpty() ? "Sin aplicaciones directas" : String.join("; ", detallesApp);
+
+            return new DatosReciboCompleto(recibo.presentar(), tasaInfo, aplicacionesInfo, creditoInfo);
         });
 
+        ConsultasReporteHelper.verificarCancelacion(cancelado);
+
+        ReciboDTO datosRecibo = datos.dto();
         SesionUsuario usuarioActual = SesionUsuario.getActual();
         Map<String, Object> parametros = new HashMap<>();
         parametros.put("TITULO_SISTEMA", "LATCH — Comprobante de Recibo");
         parametros.put("GENERADO_POR", usuarioActual != null ? usuarioActual.getNombre() : "Sistema");
+        parametros.put("EMISOR_INFO", datosRecibo.getEmisorInfo());
         parametros.put("NUMERO_RECIBO", String.valueOf(datosRecibo.getNumero()));
         parametros.put("ESTADO_RECIBO", datosRecibo.isAnulado() ? "ANULADO" : "VIGENTE");
+        parametros.put("TASA_INFO", datos.tasaInfo());
+        parametros.put("APLICACIONES_INFO", datos.aplicacionesInfo());
+        parametros.put("CREDITO_INFO", datos.creditoInfo());
 
         JasperPrint jasperPrint = llenarReporte(PLANTILLA_RECIBO, parametros, List.of(datosRecibo));
         return new DocumentoReporte(
                 "LATCH — Recibo #" + datosRecibo.getNumero(),
                 "Recibo-" + datosRecibo.getNumero() + ".pdf",
-                jasperPrint);
+                jasperPrint,
+                null);
     }
 
     /**
@@ -216,7 +284,8 @@ public final class ReporteService {
         parametros.put("PORCENTAJE_OCUPACION", String.format(Locale.ROOT, "%.1f%%", datosResumen.porcentajeOcupacion()));
 
         JasperPrint jasperPrint = llenarReporte(PLANTILLA_CONTRATOS_OCUPACION, parametros, datosResumen.filas());
-        return new DocumentoReporte(titulo, "Resumen-Contratos-Ocupacion.pdf", jasperPrint);
+        TablaReporteXlsx tabla = construirTablaContratosOcupacion(titulo, usuarioActual, datosResumen);
+        return new DocumentoReporte(titulo, "Resumen-Contratos-Ocupacion.pdf", jasperPrint, tabla);
     }
 
     private FilaPagoReporte mapearFila(Pago pago) {
@@ -338,6 +407,35 @@ public final class ReporteService {
         } catch (Exception e) {
             throw new IllegalStateException("Error inesperado al exportar el reporte.", e);
         }
+    }
+
+    public byte[] exportarXlsx(DocumentoReporte documento) {
+        Objects.requireNonNull(documento, "Falta el documento del reporte.");
+        if (!documento.admiteXlsx()) {
+            throw new IllegalArgumentException("Este reporte solo admite exportación a PDF.");
+        }
+        return ExportadorXlsx.exportarBytes(documento.datosXlsx());
+    }
+
+    public byte[] exportarXlsx(TablaReporteXlsx tabla) {
+        Objects.requireNonNull(tabla, "Faltan los datos tabulares del reporte XLSX.");
+        return ExportadorXlsx.exportarBytes(tabla);
+    }
+
+    HibernateTransactions tx() {
+        return tx;
+    }
+
+    PermisoService permisos() {
+        return permisos;
+    }
+
+    static String formatearMontoStatic(BigDecimal monto) {
+        return formatearMonto(monto);
+    }
+
+    static BigDecimal parsearImporteStatic(String texto) {
+        return parsearImporteFormateado(texto);
     }
 
     private record ResumenOcupacion(
@@ -554,7 +652,8 @@ public final class ReporteService {
         parametros.put("UNIDADES_OCUPADAS", ocupadas);
 
         JasperPrint jasperPrint = llenarReporte(PLANTILLA_PROPIEDADES_UNIDADES, parametros, filas);
-        return new DocumentoReporte(titulo, "Reporte-Propiedades-Unidades.pdf", jasperPrint);
+        TablaReporteXlsx tabla = construirTablaPropiedades(titulo, usuarioActual, filas, totalUnidades, ocupadas);
+        return new DocumentoReporte(titulo, "Reporte-Propiedades-Unidades.pdf", jasperPrint, tabla);
     }
 
     public byte[] generarReporteCargosCarteraDesdeListaPdf(
@@ -620,7 +719,9 @@ public final class ReporteService {
         parametros.put("TOTAL_MORA_NIO", formatearMonto(totalMoraNio));
 
         JasperPrint jasperPrint = llenarReporte(PLANTILLA_CARGOS_CARTERA, parametros, filas);
-        return new DocumentoReporte(titulo, "Reporte-Cargos-Cartera-Mora.pdf", jasperPrint);
+        TablaReporteXlsx tabla = construirTablaCargosLista(
+                titulo, usuarioActual, fechaCorte, filas, totalSaldoUsd, totalSaldoNio, totalMoraUsd, totalMoraNio);
+        return new DocumentoReporte(titulo, "Reporte-Cargos-Cartera-Mora.pdf", jasperPrint, tabla);
     }
 
     private FilaCargoCarteraReporte mapearFilaCargoLista(
@@ -817,7 +918,8 @@ public final class ReporteService {
         parametros.put("INQUILINOS_INACTIVOS", inactivos);
 
         JasperPrint jasperPrint = llenarReporte(PLANTILLA_INQUILINOS, parametros, filas);
-        return new DocumentoReporte(titulo, "Reporte-Inquilinos.pdf", jasperPrint);
+        TablaReporteXlsx tabla = construirTablaInquilinos(titulo, usuarioActual, filas, activos, inactivos);
+        return new DocumentoReporte(titulo, "Reporte-Inquilinos.pdf", jasperPrint, tabla);
     }
 
     private FilaInquilinoReporte mapearFilaInquilino(Inquilino inquilino) {
@@ -925,7 +1027,8 @@ public final class ReporteService {
         parametros.put("TOTAL_CANON_NIO", formatearMonto(totalCanonNio));
 
         JasperPrint jasperPrint = llenarReporte(PLANTILLA_UNIDADES, parametros, filas);
-        return new DocumentoReporte(titulo, "Reporte-Unidades.pdf", jasperPrint);
+        TablaReporteXlsx tabla = construirTablaUnidades(titulo, usuarioActual, filas, disponibles, ocupadas, totalCanonUsd, totalCanonNio);
+        return new DocumentoReporte(titulo, "Reporte-Unidades.pdf", jasperPrint, tabla);
     }
 
     private FilaUnidadReporte mapearFilaUnidad(Unidad unidad) {
@@ -1095,7 +1198,9 @@ public final class ReporteService {
         parametros.put("GARANTIA_SALDO", formatearTextoNumerico(tieneGarantia ? garantia.saldoActual() : null));
 
         JasperPrint jasperPrint = llenarReporte(PLANTILLA_ESTADO_CUENTA, parametros, filas);
-        return new DocumentoReporte(titulo, "Estado-Cuenta-" + fechaCorte + ".pdf", jasperPrint);
+        TablaReporteXlsx tabla = ConsultasReporteHelper.tablaEstadoCuenta(
+                estadoCuenta, contratoDesc, usuarioActual != null ? usuarioActual.getNombre() : "Sistema");
+        return new DocumentoReporte(titulo, "Estado-Cuenta-" + fechaCorte + ".pdf", jasperPrint, tabla);
     }
 
     private static String textoOVacio(String valor, String respaldo) {
@@ -1211,7 +1316,8 @@ public final class ReporteService {
         parametros.put("TASAS_PENDIENTES", pendientes);
 
         JasperPrint jasperPrint = llenarReporte(PLANTILLA_TASAS_CAMBIO, parametros, filas);
-        return new DocumentoReporte(titulo, "Reporte-Tasas-Cambio.pdf", jasperPrint);
+        TablaReporteXlsx tabla = construirTablaTasasCambio(titulo, usuarioActual, filas, autorizadas, pendientes);
+        return new DocumentoReporte(titulo, "Reporte-Tasas-Cambio.pdf", jasperPrint, tabla);
     }
 
     public DocumentoReporte generarDocumentoResumenDashboard(MetricasResponse metricas) {
@@ -1245,7 +1351,9 @@ public final class ReporteService {
         parametros.put("CONTRATOS_VIGENTES", metricas.contratosVigentes());
 
         JasperPrint jasperPrint = llenarReporte(PLANTILLA_DASHBOARD_RESUMEN, parametros, filas);
-        return new DocumentoReporte(titulo, "Resumen-Panel-Latch.pdf", jasperPrint);
+        TablaReporteXlsx tabla = ConsultasReporteHelper.tablaDashboard(
+                metricas, instante, usuarioActual != null ? usuarioActual.getNombre() : "Sistema");
+        return new DocumentoReporte(titulo, "Resumen-Panel-Latch.pdf", jasperPrint, tabla);
     }
 
     private static FilaResumenDashboard filaDashboard(String indicador,
@@ -1337,7 +1445,406 @@ public final class ReporteService {
         parametros.put("TOTAL_SALDO_NIO", formatearMonto(totalSaldoNio));
 
         JasperPrint jasperPrint = llenarReporte(PLANTILLA_GARANTIAS_DEPOSITOS, parametros, filas);
-        return new DocumentoReporte(titulo, "Reporte-Garantias-Depositos.pdf", jasperPrint);
+        TablaReporteXlsx tabla = construirTablaGarantiasBasica(
+                titulo, usuarioActual, filas, totalPactadoUsd, totalSaldoUsd, totalPactadoNio, totalSaldoNio);
+        return new DocumentoReporte(titulo, "Reporte-Garantias-Depositos.pdf", jasperPrint, tabla);
+    }
+
+    // --- Catálogo completo REP-02 a REP-10 (consulta directa en BD con permisos y cancelación cooperativa) ---
+
+    public DocumentoReporte generarDocumentoEstadoCuenta(UUID contratoId, LocalDate fechaCorte) {
+        return generarDocumentoEstadoCuenta(contratoId, fechaCorte, null);
+    }
+
+    public DocumentoReporte generarDocumentoEstadoCuenta(UUID contratoId,
+                                                         LocalDate fechaCorte,
+                                                         BooleanSupplier cancelado) {
+        ConsultasReporteHelper.verificarCancelacion(cancelado);
+        Objects.requireNonNull(contratoId, "Selecciona un contrato para generar su estado de cuenta.");
+        record EstadoConDesc(EstadoCuentaResponse estado, String descripcion) {}
+        EstadoConDesc datos = tx.ejecutar(session -> {
+            permisos.exigir(session, SesionUsuario.getActual(), Permiso.CONSULTAR_REPORTES);
+            EstadoCuentaResponse resp = ConsultasReporteHelper.consultarEstadoCuenta(session, contratoId, fechaCorte);
+            Contrato c = session.createQuery("""
+                            from Contrato c
+                            join fetch c.inquilino
+                            join fetch c.unidad u
+                            join fetch u.propiedad
+                            where c.id = :id
+                            """, Contrato.class)
+                    .setParameter("id", contratoId)
+                    .uniqueResult();
+            String desc = c != null ? c.toString() : contratoId.toString();
+            return new EstadoConDesc(resp, desc);
+        });
+        ConsultasReporteHelper.verificarCancelacion(cancelado);
+        return generarDocumentoEstadoCuenta(datos.estado(), datos.descripcion());
+    }
+
+    public DocumentoReporte generarDocumentoCarteraVencida(LocalDate fechaCorte,
+                                                           UUID propiedadId,
+                                                           UUID contratoId,
+                                                           String moneda) {
+        return generarDocumentoCarteraVencida(fechaCorte, propiedadId, contratoId, moneda, null);
+    }
+
+    public DocumentoReporte generarDocumentoCarteraVencida(LocalDate fechaCorte,
+                                                           UUID propiedadId,
+                                                           UUID contratoId,
+                                                           String moneda,
+                                                           BooleanSupplier cancelado) {
+        return ConsultasReporteHelper.generarCarteraVencida(this, fechaCorte, propiedadId, contratoId, moneda, cancelado);
+    }
+
+    public DocumentoReporte generarDocumentoIngresosYGastos(LocalDate desde,
+                                                             LocalDate hasta,
+                                                             UUID propiedadId,
+                                                             String moneda) {
+        return generarDocumentoIngresosYGastos(desde, hasta, propiedadId, moneda, null);
+    }
+
+    public DocumentoReporte generarDocumentoIngresosYGastos(LocalDate desde,
+                                                             LocalDate hasta,
+                                                             UUID propiedadId,
+                                                             String moneda,
+                                                             BooleanSupplier cancelado) {
+        return ConsultasReporteHelper.generarIngresosYGastos(this, desde, hasta, propiedadId, moneda, cancelado);
+    }
+
+    public DocumentoReporte generarDocumentoOcupacion(UUID propiedadId, String tipoUnidad) {
+        return generarDocumentoOcupacion(propiedadId, tipoUnidad, null);
+    }
+
+    public DocumentoReporte generarDocumentoOcupacion(UUID propiedadId,
+                                                      String tipoUnidad,
+                                                      BooleanSupplier cancelado) {
+        return ConsultasReporteHelper.generarOcupacion(this, propiedadId, tipoUnidad, cancelado);
+    }
+
+    public DocumentoReporte generarDocumentoContratosPorVencer(LocalDate fechaBase,
+                                                               Integer umbralDias,
+                                                               UUID propiedadId,
+                                                               String moneda) {
+        return generarDocumentoContratosPorVencer(fechaBase, umbralDias, propiedadId, moneda, null);
+    }
+
+    public DocumentoReporte generarDocumentoContratosPorVencer(LocalDate fechaBase,
+                                                               Integer umbralDias,
+                                                               UUID propiedadId,
+                                                               String moneda,
+                                                               BooleanSupplier cancelado) {
+        return ConsultasReporteHelper.generarContratosPorVencer(
+                this, fechaBase, umbralDias, propiedadId, moneda, cancelado);
+    }
+
+    public DocumentoReporte generarDocumentoHistorialPagos(UUID inquilinoId,
+                                                           UUID contratoId,
+                                                           LocalDate desde,
+                                                           LocalDate hasta,
+                                                           String moneda) {
+        return generarDocumentoHistorialPagos(inquilinoId, contratoId, desde, hasta, moneda, null);
+    }
+
+    public DocumentoReporte generarDocumentoHistorialPagos(UUID inquilinoId,
+                                                           UUID contratoId,
+                                                           LocalDate desde,
+                                                           LocalDate hasta,
+                                                           String moneda,
+                                                           BooleanSupplier cancelado) {
+        return ConsultasReporteHelper.generarHistorialPagos(
+                this, inquilinoId, contratoId, desde, hasta, moneda, cancelado);
+    }
+
+    public DocumentoReporte generarDocumentoLiquidacionGarantias(UUID contratoId,
+                                                                 LocalDate fechaCorte,
+                                                                 String moneda) {
+        return generarDocumentoLiquidacionGarantias(contratoId, fechaCorte, moneda, null);
+    }
+
+    public DocumentoReporte generarDocumentoLiquidacionGarantias(UUID contratoId,
+                                                                 LocalDate fechaCorte,
+                                                                 String moneda,
+                                                                 BooleanSupplier cancelado) {
+        return ConsultasReporteHelper.generarLiquidacionGarantias(this, contratoId, fechaCorte, moneda, cancelado);
+    }
+
+    public DocumentoReporte generarDocumentoMantenimiento(UUID propiedadId,
+                                                          UUID unidadId,
+                                                          LocalDate desde,
+                                                          LocalDate hasta,
+                                                          String estado,
+                                                          String prioridad,
+                                                          String moneda) {
+        return generarDocumentoMantenimiento(propiedadId, unidadId, desde, hasta, estado, prioridad, moneda, null);
+    }
+
+    public DocumentoReporte generarDocumentoMantenimiento(UUID propiedadId,
+                                                          UUID unidadId,
+                                                          LocalDate desde,
+                                                          LocalDate hasta,
+                                                          String estado,
+                                                          String prioridad,
+                                                          String moneda,
+                                                          BooleanSupplier cancelado) {
+        return ConsultasReporteHelper.generarMantenimiento(
+                this, propiedadId, unidadId, desde, hasta, estado, prioridad, moneda, cancelado);
+    }
+
+    public DocumentoReporte generarDocumentoTasasUtilizadas(LocalDate desde,
+                                                            LocalDate hasta,
+                                                            String origenFuente) {
+        return generarDocumentoTasasUtilizadas(desde, hasta, origenFuente, null);
+    }
+
+    public DocumentoReporte generarDocumentoTasasUtilizadas(LocalDate desde,
+                                                            LocalDate hasta,
+                                                            String origenFuente,
+                                                            BooleanSupplier cancelado) {
+        return ConsultasReporteHelper.generarTasasUtilizadas(this, desde, hasta, origenFuente, cancelado);
+    }
+
+    private static Map<String, String> metaBase(SesionUsuario usuario) {
+        Map<String, String> meta = new LinkedHashMap<>();
+        meta.put("Generado por", usuario != null ? usuario.getNombre() : "Sistema");
+        return meta;
+    }
+
+    private static TablaReporteXlsx construirTablaPagos(String titulo, SesionUsuario usuario,
+                                                        List<FilaPagoReporte> filas,
+                                                        BigDecimal netoUsd, BigDecimal netoNio, int anulados) {
+        Map<String, String> meta = metaBase(usuario);
+        meta.put("Registros", Integer.toString(filas.size()));
+        meta.put("Pagos anulados", Integer.toString(anulados));
+        List<TablaReporteXlsx.Columna> columnas = List.of(
+                new TablaReporteXlsx.Columna("Contrato", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Fecha pago", TablaReporteXlsx.Tipo.FECHA),
+                new TablaReporteXlsx.Columna("Monto original", TablaReporteXlsx.Tipo.MONTO),
+                new TablaReporteXlsx.Columna("Moneda original", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Monto contrato", TablaReporteXlsx.Tipo.MONTO),
+                new TablaReporteXlsx.Columna("Moneda contrato", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Método", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Referencia", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Estado", TablaReporteXlsx.Tipo.TEXTO)
+        );
+        List<List<Object>> filasXlsx = filas.stream()
+                .map(f -> List.<Object>of(
+                        f.getContrato(),
+                        f.getFechaPago() != null ? f.getFechaPago() : "—",
+                        f.getMontoOriginal() != null ? f.getMontoOriginal() : BigDecimal.ZERO,
+                        f.getMonedaOriginal(),
+                        f.getMontoContrato() != null ? f.getMontoContrato() : BigDecimal.ZERO,
+                        f.getMonedaContrato(),
+                        f.getMetodo(),
+                        f.getReferencia() == null ? "—" : f.getReferencia(),
+                        f.getEstado()))
+                .toList();
+        List<TablaReporteXlsx.Resumen> resumenes = List.of(
+                TablaReporteXlsx.Resumen.numerico("Total neto USD (excluye anulados)", "USD", netoUsd),
+                TablaReporteXlsx.Resumen.numerico("Total neto NIO (excluye anulados)", "NIO", netoNio)
+        );
+        return new TablaReporteXlsx("REP-07", "Pagos", titulo, meta, columnas, filasXlsx, resumenes);
+    }
+
+    private static TablaReporteXlsx construirTablaContratosOcupacion(String titulo, SesionUsuario usuario,
+                                                                     ResumenOcupacion r) {
+        Map<String, String> meta = metaBase(usuario);
+        meta.put("Ocupación", r.unidadesOcupadas() + " / " + r.totalUnidades()
+                + String.format(Locale.ROOT, " (%.1f%%)", r.porcentajeOcupacion()));
+        List<TablaReporteXlsx.Columna> columnas = List.of(
+                new TablaReporteXlsx.Columna("Inquilino", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Unidad", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Reserva unidad", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Estado contrato", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Inicio", TablaReporteXlsx.Tipo.FECHA),
+                new TablaReporteXlsx.Columna("Fin", TablaReporteXlsx.Tipo.FECHA),
+                new TablaReporteXlsx.Columna("Canon", TablaReporteXlsx.Tipo.MONTO),
+                new TablaReporteXlsx.Columna("Moneda", TablaReporteXlsx.Tipo.TEXTO)
+        );
+        List<List<Object>> filasXlsx = r.filas().stream()
+                .map(f -> List.<Object>of(
+                        f.getInquilino(), f.getUnidad(), f.getReservaUnidad(), f.getEstadoContrato(),
+                        f.getFechaInicio() != null ? f.getFechaInicio() : "—",
+                        f.getFechaFin() != null ? f.getFechaFin() : "—",
+                        f.getCanon() != null ? f.getCanon() : BigDecimal.ZERO,
+                        f.getMoneda()))
+                .toList();
+        return new TablaReporteXlsx("REP-05", "Contratos y ocupación", titulo, meta, columnas, filasXlsx, List.of());
+    }
+
+    private static TablaReporteXlsx construirTablaPropiedades(String titulo, SesionUsuario usuario,
+                                                              List<FilaPropiedadUnidadReporte> filas,
+                                                              int totalUnidades, int ocupadas) {
+        Map<String, String> meta = metaBase(usuario);
+        meta.put("Total unidades", Integer.toString(totalUnidades));
+        meta.put("Unidades ocupadas", Integer.toString(ocupadas));
+        List<TablaReporteXlsx.Columna> columnas = List.of(
+                new TablaReporteXlsx.Columna("Propiedad", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Dirección", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Estado propiedad", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Código unidad", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Tipo unidad", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Estado unidad", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Canon referencia", TablaReporteXlsx.Tipo.MONTO),
+                new TablaReporteXlsx.Columna("Moneda", TablaReporteXlsx.Tipo.TEXTO)
+        );
+        List<List<Object>> filasXlsx = filas.stream()
+                .map(f -> List.<Object>of(
+                        f.getPropiedad(), f.getDireccion(), f.getEstadoPropiedad(), f.getCodigoUnidad(),
+                        f.getTipoUnidad(), f.getEstadoUnidad(),
+                        f.getCanonReferencia() != null ? f.getCanonReferencia() : BigDecimal.ZERO,
+                        f.getMoneda()))
+                .toList();
+        return new TablaReporteXlsx("REP-05", "Propiedades", titulo, meta, columnas, filasXlsx, List.of());
+    }
+
+    private static TablaReporteXlsx construirTablaCargosLista(String titulo, SesionUsuario usuario,
+                                                              LocalDate corte, List<FilaCargoCarteraReporte> filas,
+                                                              BigDecimal saldoUsd, BigDecimal saldoNio,
+                                                              BigDecimal moraUsd, BigDecimal moraNio) {
+        Map<String, String> meta = metaBase(usuario);
+        meta.put("Fecha de corte", corte.toString());
+        List<TablaReporteXlsx.Columna> columnas = List.of(
+                new TablaReporteXlsx.Columna("Contrato", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Tipo", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Concepto", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Vence", TablaReporteXlsx.Tipo.FECHA),
+                new TablaReporteXlsx.Columna("Importe", TablaReporteXlsx.Tipo.MONTO),
+                new TablaReporteXlsx.Columna("Saldo pendiente", TablaReporteXlsx.Tipo.MONTO),
+                new TablaReporteXlsx.Columna("Moneda", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Días mora", TablaReporteXlsx.Tipo.ENTERO),
+                new TablaReporteXlsx.Columna("Estado", TablaReporteXlsx.Tipo.TEXTO)
+        );
+        List<List<Object>> filasXlsx = filas.stream()
+                .map(f -> List.<Object>of(
+                        f.getContrato(), f.getTipo(), f.getConcepto(),
+                        f.getVenceEl() != null ? f.getVenceEl() : "—",
+                        f.getImporte() != null ? f.getImporte() : BigDecimal.ZERO,
+                        f.getSaldoPendiente() != null ? f.getSaldoPendiente() : BigDecimal.ZERO,
+                        f.getMoneda(), f.getDiasMora(), f.getEstadoDerivado()))
+                .toList();
+        List<TablaReporteXlsx.Resumen> resumenes = List.of(
+                TablaReporteXlsx.Resumen.numerico("Saldo pendiente USD", "USD", saldoUsd),
+                TablaReporteXlsx.Resumen.numerico("Saldo pendiente NIO", "NIO", saldoNio),
+                TablaReporteXlsx.Resumen.numerico("Mora vencida USD", "USD", moraUsd),
+                TablaReporteXlsx.Resumen.numerico("Mora vencida NIO", "NIO", moraNio)
+        );
+        return new TablaReporteXlsx("REP-03", "Cargos y cartera", titulo, meta, columnas, filasXlsx, resumenes);
+    }
+
+    private static TablaReporteXlsx construirTablaInquilinos(String titulo, SesionUsuario usuario,
+                                                             List<FilaInquilinoReporte> filas,
+                                                             int activos, int inactivos) {
+        Map<String, String> meta = metaBase(usuario);
+        meta.put("Activos", Integer.toString(activos));
+        meta.put("Inactivos", Integer.toString(inactivos));
+        List<TablaReporteXlsx.Columna> columnas = List.of(
+                new TablaReporteXlsx.Columna("Nombre", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Identificación", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Teléfono", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Correo", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Contacto emergencia", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Estado", TablaReporteXlsx.Tipo.TEXTO)
+        );
+        List<List<Object>> filasXlsx = filas.stream()
+                .map(f -> List.<Object>of(
+                        f.getNombre(), f.getIdentificacion(), f.getTelefono(),
+                        f.getCorreo(), f.getContactoEmergencia(), f.getEstado()))
+                .toList();
+        return new TablaReporteXlsx("REP-07", "Inquilinos", titulo, meta, columnas, filasXlsx, List.of());
+    }
+
+    private static TablaReporteXlsx construirTablaUnidades(String titulo, SesionUsuario usuario,
+                                                           List<FilaUnidadReporte> filas,
+                                                           int disponibles, int ocupadas,
+                                                           BigDecimal canonUsd, BigDecimal canonNio) {
+        Map<String, String> meta = metaBase(usuario);
+        meta.put("Disponibles", Integer.toString(disponibles));
+        meta.put("Ocupadas", Integer.toString(ocupadas));
+        List<TablaReporteXlsx.Columna> columnas = List.of(
+                new TablaReporteXlsx.Columna("Propiedad", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Código", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Tipo", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Estado", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Canon referencia", TablaReporteXlsx.Tipo.MONTO),
+                new TablaReporteXlsx.Columna("Moneda", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Descripción", TablaReporteXlsx.Tipo.TEXTO)
+        );
+        List<List<Object>> filasXlsx = filas.stream()
+                .map(f -> List.<Object>of(
+                        f.getPropiedad(), f.getCodigo(), f.getTipo(), f.getEstado(),
+                        f.getCanonReferencia() != null ? f.getCanonReferencia() : BigDecimal.ZERO,
+                        f.getMoneda(), f.getDescripcion()))
+                .toList();
+        List<TablaReporteXlsx.Resumen> resumenes = List.of(
+                TablaReporteXlsx.Resumen.numerico("Total canon USD", "USD", canonUsd),
+                TablaReporteXlsx.Resumen.numerico("Total canon NIO", "NIO", canonNio)
+        );
+        return new TablaReporteXlsx("REP-05", "Unidades", titulo, meta, columnas, filasXlsx, resumenes);
+    }
+
+    private static TablaReporteXlsx construirTablaTasasCambio(String titulo, SesionUsuario usuario,
+                                                              List<FilaTasaReporte> filas,
+                                                              int autorizadas, int pendientes) {
+        Map<String, String> meta = metaBase(usuario);
+        meta.put("Autorizadas", Integer.toString(autorizadas));
+        meta.put("Pendientes", Integer.toString(pendientes));
+        List<TablaReporteXlsx.Columna> columnas = List.of(
+                new TablaReporteXlsx.Columna("Fecha", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Tasa NIO/USD", TablaReporteXlsx.Tipo.TASA),
+                new TablaReporteXlsx.Columna("Fuente", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Estado", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Autorizado por", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Registrado en", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Motivo", TablaReporteXlsx.Tipo.TEXTO)
+        );
+        List<List<Object>> filasXlsx = filas.stream()
+                .map(f -> List.<Object>of(
+                        f.getFecha(),
+                        parseTasaOBigDecimal(f.getTasaFormateada()),
+                        f.getFuente(), f.getEstado(), f.getAutorizadoPor(),
+                        f.getRegistradoEn(), f.getMotivo()))
+                .toList();
+        return new TablaReporteXlsx("REP-10", "Tasas de cambio", titulo, meta, columnas, filasXlsx, List.of());
+    }
+
+    private static Object parseTasaOBigDecimal(String texto) {
+        if (texto == null || texto.isBlank() || "—".equals(texto.strip())) {
+            return "—";
+        }
+        try {
+            return new BigDecimal(texto.strip().replace(",", ""));
+        } catch (NumberFormatException ignored) {
+            return texto;
+        }
+    }
+
+    private static TablaReporteXlsx construirTablaGarantiasBasica(String titulo, SesionUsuario usuario,
+                                                                   List<FilaGarantiaReporte> filas,
+                                                                   BigDecimal pactadoUsd, BigDecimal saldoUsd,
+                                                                   BigDecimal pactadoNio, BigDecimal saldoNio) {
+        Map<String, String> meta = metaBase(usuario);
+        meta.put("Total garantías", Integer.toString(filas.size()));
+        List<TablaReporteXlsx.Columna> columnas = List.of(
+                new TablaReporteXlsx.Columna("Inquilino", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Unidad / Propiedad", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Estado contrato", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Moneda", TablaReporteXlsx.Tipo.TEXTO),
+                new TablaReporteXlsx.Columna("Monto pactado", TablaReporteXlsx.Tipo.MONTO),
+                new TablaReporteXlsx.Columna("Saldo actual", TablaReporteXlsx.Tipo.MONTO)
+        );
+        List<List<Object>> filasXlsx = filas.stream()
+                .map(f -> List.<Object>of(
+                        f.getInquilino(), f.getUnidad(), f.getEstadoContrato(), f.getMoneda(),
+                        f.getMontoPactado() != null ? f.getMontoPactado() : BigDecimal.ZERO,
+                        f.getSaldoActual() != null ? f.getSaldoActual() : BigDecimal.ZERO))
+                .toList();
+        List<TablaReporteXlsx.Resumen> resumenes = List.of(
+                TablaReporteXlsx.Resumen.numerico("Pactado USD", "USD", pactadoUsd),
+                TablaReporteXlsx.Resumen.numerico("Saldo USD", "USD", saldoUsd),
+                TablaReporteXlsx.Resumen.numerico("Pactado NIO", "NIO", pactadoNio),
+                TablaReporteXlsx.Resumen.numerico("Saldo NIO", "NIO", saldoNio)
+        );
+        return new TablaReporteXlsx("REP-08", "Garantías", titulo, meta, columnas, filasXlsx, resumenes);
     }
 
     public static final class FilaTasaReporte {

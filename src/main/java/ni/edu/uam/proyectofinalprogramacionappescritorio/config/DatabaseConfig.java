@@ -88,14 +88,17 @@ public final class DatabaseConfig {
         return p;
     }
 
-    private static ConexionPostgres conexionPostgres(String url) {
+    public static DatosConexionPostgres parsearConexionPostgres(String url) {
+        if (url == null || url.isBlank()) throw urlInvalida();
         int inicioParametros = url.indexOf('?');
         String base = inicioParametros < 0 ? url : url.substring(0, inicioParametros);
         Matcher matcher = JDBC_URL.matcher(base);
         if (!matcher.matches() || (inicioParametros >= 0 && url.indexOf('?', inicioParametros + 1) >= 0)) {
             throw urlInvalida();
         }
-        validarPuerto(matcher.group("port"));
+        String puertoTexto = matcher.group("port");
+        int puerto = puertoTexto == null ? 5432 : Integer.parseInt(puertoTexto);
+        validarPuerto(puertoTexto);
 
         String sslmode = null;
         String sslrootcert = null;
@@ -141,7 +144,11 @@ public final class DatabaseConfig {
             urlConfigurada = base + "?sslmode=" + codificarParametro(sslmode)
                     + "&sslrootcert=" + codificarParametro(sslrootcert);
         }
-        return new ConexionPostgres(urlConfigurada);
+        return new DatosConexionPostgres(urlConfigurada, host, puerto, matcher.group("database"), sslmode, sslrootcert);
+    }
+
+    private static ConexionPostgres conexionPostgres(String url) {
+        return new ConexionPostgres(parsearConexionPostgres(url).url());
     }
 
     private static void validarPuerto(String puerto) {
@@ -192,6 +199,15 @@ public final class DatabaseConfig {
     }
 
     private record ConexionPostgres(String url) {}
+
+    public record DatosConexionPostgres(
+            String url,
+            String host,
+            int puerto,
+            String baseDatos,
+            String sslMode,
+            String sslRootCert
+    ) { }
 
     private static String requerida(Map<String, String> entorno, String clave) {
         String valor = entorno.get(clave);

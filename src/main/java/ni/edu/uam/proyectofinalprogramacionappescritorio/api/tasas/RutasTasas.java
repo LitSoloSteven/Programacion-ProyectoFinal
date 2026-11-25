@@ -30,9 +30,15 @@ import java.util.function.Supplier;
  */
 public final class RutasTasas {
     private final TipoCambioService servicio;
+    private final ActualizacionTasaH3 h3;
 
-    public RutasTasas(TipoCambioService servicio) {
+    public RutasTasas(TipoCambioService servicio, ActualizacionTasaH3 h3) {
         this.servicio = Objects.requireNonNull(servicio);
+        this.h3 = Objects.requireNonNull(h3);
+    }
+
+    public RespuestaJson referencia(PeticionApi contexto) {
+        return RespuestaJson.ok(h3.consultar(contexto.sesion().comoUsuario()));
     }
 
     public RespuestaJson listar(PeticionApi contexto) {

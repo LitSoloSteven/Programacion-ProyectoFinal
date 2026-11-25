@@ -14,8 +14,12 @@ public final class ClienteAuth {
     }
 
     public LoginResponse login(String usuario, String password) {
+        return login(usuario, password, null);
+    }
+
+    public LoginResponse login(String usuario, String password, String nuevaPassword) {
         LoginResponse respuesta = api.post("/api/v1/auth/login",
-                new LoginRequest(usuario, password), LoginResponse.class);
+                new LoginRequest(usuario, password, nuevaPassword), LoginResponse.class);
         api.establecerToken(respuesta.token());
         return respuesta;
     }

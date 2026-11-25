@@ -86,6 +86,10 @@ public class PropiedadController {
             btnGenerarReportePropiedades.setTooltip(new Tooltip("Vista previa y exportación PDF del inventario de propiedades y unidades"));
         }
         Iconos.asignar(btnNuevo, Iconos.Nombre.MAS, 16);
+        if (!permisoEliminar) {
+            btnNuevo.setDisable(true);
+            btnNuevo.setTooltip(new Tooltip("Solo el propietario puede registrar propiedades."));
+        }
         Iconos.asignar(btnLimpiar, Iconos.Nombre.CERRAR, 14);
         Iconos.asignar(btnEliminar, Iconos.Nombre.ELIMINAR, 16);
         Tooltip.install(eliminarTooltipHost, new Tooltip(permisoEliminar
@@ -100,8 +104,9 @@ public class PropiedadController {
         colEstado.setCellFactory(FormatoTabla.estado());
         colFecha.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyObjectWrapper<>(c.getValue().getCreadoEn()));
         colFecha.setCellFactory(FormatoTabla.fechaHora());
-        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>(
-                "Editar propiedad", this::abrirEdicion, Iconos.Nombre.EDITAR)));
+        AccionesTabla.configurar(colAcciones, permisoEliminar
+                ? List.of(new AccionesTabla.Accion<>("Editar propiedad", this::abrirEdicion, Iconos.Nombre.EDITAR))
+                : List.of());
         tblPropiedades.getSelectionModel().selectedItemProperty().addListener((obs, anterior, actual) -> {
             seleccionada = actual;
             btnEliminar.setDisable(actual == null || !permisoEliminar);
@@ -120,8 +125,8 @@ public class PropiedadController {
         lblContador.setText(filtrados.size() + (filtrados.size() == 1 ? " registro" : " registros"));
         tblPropiedades.setPlaceholder(PanelEstadoTabla.crear(filtro.isEmpty() ? "Aún no hay propiedades" : "No hay coincidencias",
                 filtro.isEmpty() ? "Las propiedades registradas aparecerán aquí." : "Prueba con otro término o limpia la búsqueda.",
-                filtro.isEmpty() ? "Nueva propiedad" : "Limpiar búsqueda",
-                filtro.isEmpty() ? this::handleNuevo : this::limpiarFiltros));
+                filtro.isEmpty() ? (permisoEliminar ? "Nueva propiedad" : null) : "Limpiar búsqueda",
+                filtro.isEmpty() ? (permisoEliminar ? this::handleNuevo : null) : this::limpiarFiltros));
     }
 
     public void cargarDatos() {
@@ -149,8 +154,8 @@ public class PropiedadController {
     }
 
     @FXML public void refrescarTabla() { cargarDatos(); }
-    @FXML public void handleNuevo() { abrirFormulario(null); }
-    private void abrirEdicion(Propiedad propiedad) { abrirFormulario(propiedad); }
+    @FXML public void handleNuevo() { if (permisoEliminar) abrirFormulario(null); }
+    private void abrirEdicion(Propiedad propiedad) { if (permisoEliminar) abrirFormulario(propiedad); }
 
     private void abrirFormulario(Propiedad existente) {
         try {

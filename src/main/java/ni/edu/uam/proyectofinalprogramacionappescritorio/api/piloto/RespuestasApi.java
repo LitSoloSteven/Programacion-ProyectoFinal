@@ -6,7 +6,9 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ExcepcionApi;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.Json;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.RespuestaJson;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ConflictoDatosException;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PropiedadIncompatibleException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojDesfasadoException;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.TransicionInvalidaException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -52,6 +54,10 @@ public class RespuestasApi {
     static ExcepcionApi traducir(Exception error) {
         return switch (error) {
             case ExcepcionApi e -> e;
+            case PropiedadIncompatibleException e ->
+                    new ExcepcionApi(422, PropiedadIncompatibleException.CODIGO, e.getMessage());
+            case TransicionInvalidaException e ->
+                    new ExcepcionApi(422, TransicionInvalidaException.CODIGO, e.getMessage());
             case IllegalArgumentException e ->
                     ExcepcionApi.solicitudInvalida("La solicitud contiene datos inválidos.");
             case SecurityException e -> ExcepcionApi.sinPermiso();

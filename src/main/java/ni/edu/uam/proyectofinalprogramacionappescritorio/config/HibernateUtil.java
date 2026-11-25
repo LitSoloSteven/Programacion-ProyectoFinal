@@ -33,11 +33,19 @@ public final class HibernateUtil {
                 .addAnnotatedClass(Configuracion.class)
                 .addAnnotatedClass(Propiedad.class).addAnnotatedClass(Unidad.class)
                 .addAnnotatedClass(Propietario.class).addAnnotatedClass(Garantia.class)
+                .addAnnotatedClass(MovimientoGarantia.class)
                 .addAnnotatedClass(Inquilino.class).addAnnotatedClass(Contrato.class)
                 .addAnnotatedClass(Cargo.class).addAnnotatedClass(Pago.class)
                 .addAnnotatedClass(TipoCambio.class).addAnnotatedClass(Recibo.class)
+                .addAnnotatedClass(ControlFx.class).addAnnotatedClass(ReferenciaTipoCambio.class)
                 .addAnnotatedClass(AplicacionPago.class)
-                .addAnnotatedClass(SolicitudIdempotente.class);
+                .addAnnotatedClass(ConsecutivoRecibo.class)
+                .addAnnotatedClass(SolicitudIdempotente.class)
+                .addAnnotatedClass(ParametroSistema.class)
+                .addAnnotatedClass(SolicitudMantenimiento.class)
+                .addAnnotatedClass(GastoPropiedad.class)
+                .addAnnotatedClass(DocumentoAdjunto.class)
+                .addAnnotatedClass(PuertaMantenimiento.class);
         for (Class<?> entidad : entidadesAdicionales) cfg.addAnnotatedClass(entidad);
         try {
             return cfg.buildSessionFactory();

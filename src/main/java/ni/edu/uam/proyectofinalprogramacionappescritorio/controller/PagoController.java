@@ -142,6 +142,15 @@ public class PagoController {
         cargarContratosYPagos();
     }
 
+    public void aplicarFiltroInicial(String texto) {
+        if (texto == null || texto.isBlank() || txtBuscar == null) {
+            return;
+        }
+        txtBuscar.setText(texto.strip());
+        paginaActual = 1;
+        cargarContratosYPagos();
+    }
+
     private void cargarContratosYPagos() {
         int pagina = paginaActual;
         String filtro = txtBuscar.getText();
@@ -217,6 +226,7 @@ public class PagoController {
             FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource("pago-form.fxml"));
             Node contenido = loader.load();
             PagoFormController formulario = loader.getController();
+            formulario.establecerClientePagos(clientePagos);
             formulario.establecerContratos(contratosDisponibles);
             Window propietario = tblPagos.getScene() == null ? null : tblPagos.getScene().getWindow();
             Dialog<ButtonType> dialogo = DialogoFormulario.crear("Registrar pago", contenido,
@@ -246,7 +256,7 @@ public class PagoController {
         PagoFormController.Datos datos = formulario.datos();
         PagoRequest solicitud = new PagoRequest(datos.contrato().getId().toString(),
                 datos.fecha().toString(), datos.moneda(), datos.monto().toPlainString(), datos.metodo(),
-                datos.referencia(), List.of(), datos.notas());
+                datos.referencia(), datos.distribucion(), datos.notas(), datos.aplicacionAutomatica());
         long usuarioId = SesionUsuario.getActual().getUsuarioId();
         botonAccion.setDisable(true);
         botonAccion.setText("Registrando pago…");

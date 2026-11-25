@@ -22,6 +22,7 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.TasaResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.ReferenciaTasaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteTasas;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
@@ -69,6 +70,7 @@ public class TasaController {
     @FXML private Label lblErrorConsulta;
     @FXML private Label lblSeleccion;
     @FXML private Label lblTitulo;
+    @FXML private Label lblReferencia;
     @FXML private TextField txtBuscar;
     @FXML private TableView<TasaResponse> tblTasas;
     @FXML private TableColumn<TasaResponse, String> colFecha;
@@ -135,7 +137,6 @@ public class TasaController {
     }
 
     @FXML public void cargarTasas() {
-        iniciarOperacion();
         long version = ++versionConsulta;
         Task<List<TasaResponse>> tarea = new Task<>() {
             @Override protected List<TasaResponse> call() { return cliente.listar(null, null, 200); }
@@ -155,6 +156,35 @@ public class TasaController {
                         "Revisa la conexión e inténtalo de nuevo.", "Reintentar", this::cargarTasas));
             }
         });
+        Task<ReferenciaTasaResponse> referencia = new Task<>() {
+            @Override protected ReferenciaTasaResponse call() { return cliente.referencia(); }
+        };
+        ejecutar(referencia, dato -> {
+            if (version == versionConsulta) lblReferencia.setText(textoReferencia(dato));
+        }, error -> {
+            if (version == versionConsulta) lblReferencia.setText("No se pudo consultar la referencia comercial.");
+        });
+    }
+
+    private static String textoReferencia(ReferenciaTasaResponse dato) {
+        if (dato == null) return "Sin referencia comercial disponible.";
+        String aviso = switch (dato.aviso() == null ? "" : dato.aviso()) {
+            case "CONFIGURACION" -> " · Actualización suspendida por credenciales";
+            case "CUOTA_AGOTADA", "LIMITE_MENSUAL" -> " · Cuota de consultas agotada";
+            case "CUOTA_TEMPORAL" -> " · Proveedor limitó las consultas temporalmente";
+            case "TRANSITORIO", "RESPUESTA_INVALIDA", "FUERA_DE_BANDA" -> " · Falló la última actualización";
+            default -> "";
+        };
+        if ("CONSULTANDO".equals(dato.estado())) return "Consultando la referencia comercial" + aviso;
+        if (dato.nioPorUsd() == null) return "Sin referencia comercial disponible" + aviso;
+        long segundos = dato.antiguedadSegundos();
+        String antiguedad = segundos < 60 ? "menos de 1 min"
+                : segundos < 3600 ? segundos / 60 + " min"
+                : segundos < 86400 ? segundos / 3600 + " h" : segundos / 86400 + " d";
+        String estado = "HISTORICA".equals(dato.estado()) ? "Referencia informativa histórica" : "Referencia informativa";
+        return estado + " · " + FormatoTasa.formatear(new BigDecimal(dato.nioPorUsd())) + " NIO por USD"
+                + " · " + dato.fuente() + " · Fecha efectiva " + fechaVisible(dato.fechaEfectiva())
+                + " · Consulta " + instanteVisible(dato.consultadaEn()) + " (hace " + antiguedad + ")" + aviso;
     }
 
     @FXML public void refrescarTabla() { cargarTasas(); }

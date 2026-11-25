@@ -5,6 +5,7 @@
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.DatePicker?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.RadioButton?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.ColumnConstraints?>
@@ -52,6 +53,22 @@
                         <ComboBox fx:id="cmbMetodo" maxWidth="Infinity" styleClass="field" />
                     </VBox>
                 </GridPane>
+                <Label styleClass="section-title" text="Aplicación a cargos" />
+                <VBox spacing="8.0">
+                    <HBox spacing="16.0">
+                        <RadioButton fx:id="rbAplicacionAutomatica" selected="true"
+                                     text="Automática (cargos vencidos más antiguos)" />
+                        <RadioButton fx:id="rbAplicacionManual"
+                                     text="Selección manual" />
+                    </HBox>
+                    <VBox fx:id="panelDistribucionManual" managed="false" spacing="6.0" visible="false">
+                        <Label fx:id="lblInfoCargos" styleClass="field-help"
+                               text="Selecciona los cargos del contrato y el monto en moneda contractual." wrapText="true" />
+                        <VBox fx:id="listaCargosContainer" spacing="6.0" />
+                    </VBox>
+                    <Label fx:id="lblErrorDistribucion" managed="false" minHeight="18.0"
+                           styleClass="field-error" text="" visible="false" wrapText="true" />
+                </VBox>
                 <Label styleClass="section-title" text="Comprobante" />
                 <VBox spacing="6.0">
                     <Label styleClass="field-label" text="Referencia" />
@@ -81,6 +98,8 @@
                     <Label fx:id="lblRevisionReferencia" styleClass="review-value" wrapText="true" GridPane.columnIndex="1" GridPane.rowIndex="4" />
                     <Label styleClass="field-label" text="Observaciones" GridPane.columnIndex="0" GridPane.rowIndex="5" />
                     <Label fx:id="lblRevisionNotas" styleClass="review-value" wrapText="true" GridPane.columnIndex="1" GridPane.rowIndex="5" />
+                    <Label styleClass="field-label" text="Aplicación" GridPane.columnIndex="0" GridPane.rowIndex="6" />
+                    <Label fx:id="lblRevisionAplicacion" styleClass="review-value" wrapText="true" GridPane.columnIndex="1" GridPane.rowIndex="6" />
                 </GridPane>
                 <HBox alignment="CENTER_LEFT">
                     <Button onAction="#mostrarEdicion" styleClass="button-secondary" text="Volver" />

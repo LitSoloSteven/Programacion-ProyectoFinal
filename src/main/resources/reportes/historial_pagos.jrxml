@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport name="historial_pagos" pageWidth="842" pageHeight="595" orientation="Landscape"
+              columnWidth="782" leftMargin="30" rightMargin="30" topMargin="24" bottomMargin="24"
+              whenNoDataType="AllSectionsNoDetail">
+
+    <parameter name="TITULO_SISTEMA" class="java.lang.String"/>
+    <parameter name="GENERADO_POR" class="java.lang.String"/>
+    <parameter name="FILTROS_TEXTO" class="java.lang.String"/>
+    <parameter name="TOTAL_REGISTROS" class="java.lang.Integer"/>
+    <parameter name="PAGOS_ANULADOS" class="java.lang.Integer"/>
+    <parameter name="TOTAL_NETO_USD" class="java.lang.String"/>
+    <parameter name="TOTAL_NETO_NIO" class="java.lang.String"/>
+
+    <field name="numeroRecibo" class="java.lang.String"/>
+    <field name="fechaPago" class="java.lang.String"/>
+    <field name="inquilino" class="java.lang.String"/>
+    <field name="contrato" class="java.lang.String"/>
+    <field name="montoOriginalTexto" class="java.lang.String"/>
+    <field name="montoContratoTexto" class="java.lang.String"/>
+    <field name="metodo" class="java.lang.String"/>
+    <field name="referencia" class="java.lang.String"/>
+    <field name="estado" class="java.lang.String"/>
+    <field name="motivoAnulacion" class="java.lang.String"/>
+
+    <title height="98">
+        <element kind="rectangle" x="0" y="0" width="782" height="40" backcolor="#0F172A">
+            <pen lineWidth="0.0"/>
+        </element>
+        <element kind="textField" x="14" y="5" width="510" height="30" forecolor="#FFFFFF" vTextAlign="Middle" fontSize="15.0" bold="true">
+            <expression><![CDATA[$P{TITULO_SISTEMA} == null ? "LATCH — Historial de Pagos del Inquilino" : $P{TITULO_SISTEMA}]]></expression>
+        </element>
+        <element kind="textField" x="530" y="8" width="238" height="24" forecolor="#CBD5E1" hTextAlign="Right" vTextAlign="Middle" fontSize="9.0">
+            <expression><![CDATA["Registros: " + ($P{TOTAL_REGISTROS} == null ? 0 : $P{TOTAL_REGISTROS}) + " · Anulados: " + ($P{PAGOS_ANULADOS} == null ? 0 : $P{PAGOS_ANULADOS})]]></expression>
+        </element>
+        <element kind="textField" x="0" y="44" width="782" height="16" forecolor="#475569" vTextAlign="Middle" fontSize="8.5">
+            <expression><![CDATA["Generado por: " + ($P{GENERADO_POR} == null ? "Sistema" : $P{GENERADO_POR}) + " · " + ($P{FILTROS_TEXTO} == null ? "" : $P{FILTROS_TEXTO})]]></expression>
+        </element>
+        <element kind="rectangle" x="0" y="64" width="782" height="26" backcolor="#F1F5F9">
+            <pen lineWidth="0.5" lineColor="#E2E8F0"/>
+        </element>
+        <element kind="textField" x="8" y="66" width="766" height="22" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.5" bold="true">
+            <expression><![CDATA["Neto USD (excluye anulados): " + ($P{TOTAL_NETO_USD} == null ? "0.00" : $P{TOTAL_NETO_USD}) + " USD   |   Neto NIO (excluye anulados): " + ($P{TOTAL_NETO_NIO} == null ? "0.00" : $P{TOTAL_NETO_NIO}) + " NIO"]]></expression>
+        </element>
+    </title>
+
+    <columnHeader height="26">
+        <element kind="rectangle" x="0" y="0" width="782" height="24" backcolor="#E2E8F0">
+            <pen lineWidth="0.0"/>
+        </element>
+        <element kind="staticText" x="4" y="0" width="46" height="24" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.0" bold="true">
+            <text><![CDATA[Recibo]]></text>
+        </element>
+        <element kind="staticText" x="50" y="0" width="64" height="24" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.0" bold="true">
+            <text><![CDATA[Fecha]]></text>
+        </element>
+        <element kind="staticText" x="114" y="0" width="110" height="24" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.0" bold="true">
+            <text><![CDATA[Inquilino]]></text>
+        </element>
+        <element kind="staticText" x="224" y="0" width="114" height="24" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.0" bold="true">
+            <text><![CDATA[Contrato / Unidad]]></text>
+        </element>
+        <element kind="staticText" x="338" y="0" width="84" height="24" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="8.0" bold="true">
+            <text><![CDATA[Orig.]]></text>
+        </element>
+        <element kind="staticText" x="424" y="0" width="84" height="24" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="8.0" bold="true">
+            <text><![CDATA[Contrato]]></text>
+        </element>
+        <element kind="staticText" x="512" y="0" width="66" height="24" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.0" bold="true">
+            <text><![CDATA[Método]]></text>
+        </element>
+        <element kind="staticText" x="578" y="0" width="66" height="24" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.0" bold="true">
+            <text><![CDATA[Ref.]]></text>
+        </element>
+        <element kind="staticText" x="644" y="0" width="54" height="24" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.0" bold="true">
+            <text><![CDATA[Estado]]></text>
+        </element>
+        <element kind="staticText" x="698" y="0" width="84" height="24" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.0" bold="true">
+            <text><![CDATA[Motivo anul.]]></text>
+        </element>
+    </columnHeader>
+
+    <detail>
+        <band height="24">
+            <element kind="textField" x="4" y="2" width="46" height="18" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.0" bold="true">
+                <expression><![CDATA[$F{numeroRecibo} == null ? "—" : $F{numeroRecibo}]]></expression>
+            </element>
+            <element kind="textField" x="50" y="2" width="64" height="18" forecolor="#334155" vTextAlign="Middle" fontSize="8.0">
+                <expression><![CDATA[$F{fechaPago} == null ? "—" : $F{fechaPago}]]></expression>
+            </element>
+            <element kind="textField" x="114" y="2" width="110" height="18" forecolor="#1E293B" vTextAlign="Middle" fontSize="8.0" textAdjust="StretchHeight">
+                <expression><![CDATA[$F{inquilino} == null ? "—" : $F{inquilino}]]></expression>
+            </element>
+            <element kind="textField" x="224" y="2" width="114" height="18" forecolor="#334155" vTextAlign="Middle" fontSize="8.0" textAdjust="StretchHeight">
+                <expression><![CDATA[$F{contrato} == null ? "—" : $F{contrato}]]></expression>
+            </element>
+            <element kind="textField" x="338" y="2" width="84" height="18" forecolor="#334155" hTextAlign="Right" vTextAlign="Middle" fontSize="8.0">
+                <expression><![CDATA[$F{montoOriginalTexto} == null ? "—" : $F{montoOriginalTexto}]]></expression>
+            </element>
+            <element kind="textField" x="424" y="2" width="84" height="18" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="8.0" bold="true">
+                <expression><![CDATA[$F{montoContratoTexto} == null ? "—" : $F{montoContratoTexto}]]></expression>
+            </element>
+            <element kind="textField" x="512" y="2" width="66" height="18" forecolor="#334155" vTextAlign="Middle" fontSize="8.0">
+                <expression><![CDATA[$F{metodo} == null ? "—" : $F{metodo}]]></expression>
+            </element>
+            <element kind="textField" x="578" y="2" width="66" height="18" forecolor="#334155" vTextAlign="Middle" fontSize="8.0" textAdjust="StretchHeight">
+                <expression><![CDATA[$F{referencia} == null ? "—" : $F{referencia}]]></expression>
+            </element>
+            <element kind="textField" x="644" y="2" width="54" height="18" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.0" bold="true">
+                <expression><![CDATA[$F{estado} == null ? "—" : $F{estado}]]></expression>
+            </element>
+            <element kind="textField" x="698" y="2" width="84" height="18" forecolor="#475569" vTextAlign="Middle" fontSize="7.5" textAdjust="StretchHeight">
+                <expression><![CDATA[$F{motivoAnulacion} == null || $F{motivoAnulacion}.isBlank() ? "—" : $F{motivoAnulacion}]]></expression>
+            </element>
+            <element kind="line" x="0" y="22" width="782" height="1" forecolor="#E2E8F0">
+                <pen lineWidth="0.5"/>
+            </element>
+        </band>
+    </detail>
+
+    <pageFooter height="22">
+        <element kind="textField" x="0" y="2" width="660" height="18" forecolor="#64748B" vTextAlign="Middle" fontSize="8.5">
+            <expression><![CDATA["Latch · Los pagos anulados se muestran identificados y excluidos del total neto"]]></expression>
+        </element>
+        <element kind="textField" x="660" y="2" width="90" height="18" forecolor="#64748B" hTextAlign="Right" vTextAlign="Middle" fontSize="8.5">
+            <expression><![CDATA["Página " + $V{PAGE_NUMBER} + " de "]]></expression>
+        </element>
+        <element kind="textField" x="750" y="2" width="32" height="18" forecolor="#64748B" vTextAlign="Middle" fontSize="8.5" evaluationTime="Report">
+            <expression><![CDATA[$V{PAGE_NUMBER}]]></expression>
+        </element>
+    </pageFooter>
+</jasperReport>

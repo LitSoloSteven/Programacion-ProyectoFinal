@@ -31,6 +31,11 @@ public final class AutenticacionService {
 
     public SesionUsuario autenticar(String nombre, char[] password,
                                     boolean establecerSesionGlobal, String origen) {
+        return autenticar(nombre, password, establecerSesionGlobal, origen, null);
+    }
+
+    public SesionUsuario autenticar(String nombre, char[] password,
+                                    boolean establecerSesionGlobal, String origen, char[] nuevaPassword) {
         String normalizado;
         try { normalizado = Usuario.normalizarNombre(nombre); }
         catch (IllegalArgumentException e) { normalizado = null; }
@@ -43,6 +48,27 @@ public final class AutenticacionService {
                 auditoria.registrarIntentoLoginFallido(session, UUID.randomUUID(), nombre, origen);
                 return null;
             }
+            if (usuario.isDebeCambiarPassword()) {
+                if (nuevaPassword == null || nuevaPassword.length == 0) {
+                    throw new CambioPasswordRequerido("Debes cambiar tu contraseña temporal para iniciar sesión.");
+                }
+                if (java.util.Arrays.equals(password, nuevaPassword)) {
+                    throw new CambioPasswordRequerido("La nueva contraseña debe ser diferente a la temporal.");
+                }
+                try {
+                    usuario.completarCambioPassword(passwords.crear(nuevaPassword));
+                } catch (IllegalArgumentException e) {
+                    throw new CambioPasswordRequerido(e.getMessage());
+                }
+                session.flush();
+                auditoria.registrar(session, usuario, UUID.randomUUID(),
+                        "CAMBIAR_PASSWORD_PROPIA", "usuario:" + usuario.getId());
+            } else if (passwords.requiereActualizacion(usuario.getPasswordHash())) {
+                usuario.actualizarPasswordHash(passwords.crear(password));
+                session.flush();
+                auditoria.registrar(session, usuario, UUID.randomUUID(),
+                        "MIGRAR_HASH_PASSWORD", "usuario:" + usuario.getId());
+            }
             auditoria.registrar(session, usuario, UUID.randomUUID(), "INICIO_SESION", "usuario:" + usuario.getId());
             SesionUsuario sesionUsuario = new SesionUsuario(
                     usuario.getId(), usuario.getNombre(), usuario.getRol(), usuario.getVersion());
@@ -51,6 +77,12 @@ public final class AutenticacionService {
         });
         if (identidad == null) throw credencialesInvalidas();
         return identidad;
+    }
+
+    public static final class CambioPasswordRequerido extends IllegalArgumentException {
+        public CambioPasswordRequerido(String mensaje) {
+            super(mensaje);
+        }
     }
 
     public boolean sesionVigente(SesionApi identidad) {

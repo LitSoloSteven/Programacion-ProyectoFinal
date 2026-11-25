@@ -47,14 +47,22 @@ LATCH_API_PORT=8090
   `verify-ca` y `verify-full` requieren `sslrootcert`.
 - `validate` (predeterminado) verifica el esquema sin modificarlo. `update` solo
   debe usarse en una base de desarrollo durante la inicialización.
+- `LATCH_ADJUNTOS_DIR` (opcional) define la carpeta controlada donde se guardan
+  fotografías, logotipos y documentos adjuntos (por defecto
+  `%LOCALAPPDATA%/Latch/adjuntos` en Windows o `~/.latch/adjuntos`).
 
 ## Base de datos y migraciones
 
-Crear un usuario local propio y una base `latch_db` de su propiedad. Después,
-aplicar **en orden** las migraciones de `docs/migrations`:
+Crear un usuario local propio y una base `latch_db` de su propiedad. Para una
+**instalación nueva sobre base vacía**, aplicar primero `V0__esquema_inicial.sql`
+y después **en orden** las migraciones `V1`–`V16` de `docs/migrations`; luego
+arrancar directamente con `LATCH_DB_SCHEMA_MODE=validate` (sin usar `update`).
+Para **actualizar una base existente**, aplicar únicamente las migraciones
+pendientes `V1`–`V16` en orden y mantener `validate`:
 
 | Archivo | Contenido |
 | --- | --- |
+| `V0__esquema_inicial.sql` | Esquema base para instalaciones limpias sin DDL automático |
 | `V1__propietario_perfil.sql` | Perfil de propietario y relación con propiedades |
 | `V2__seguimiento_garantias.sql` | Seguimiento del depósito en garantía |
 | `V3__descripcion_unidad.sql` | Descripción de unidades |
@@ -65,21 +73,52 @@ aplicar **en orden** las migraciones de `docs/migrations`:
 | `V8__consecutivo_recibos_transaccional.sql` | Consecutivo de recibos sin huecos por rollback |
 | `V9__auditoria_login_fallido.sql` | Auditoría de login fallido sin requerir una cuenta existente |
 | `V10__instante_operativo_pago.sql` | Instante UTC de registro del pago, separado de su fecha efectiva |
+| `V11__idempotencia_respuesta_text.sql` | Alinea `solicitud_idempotente.respuesta_json` a `TEXT` en bases previas |
+| `V12__p1_cuentas_y_parametros_historial.sql` | Cambio de clave pendiente, emisor en recibos y parámetros con historial |
+| `V13__p2_contratos_y_movimientos_garantia.sql` | Renovación enlazada, motivo de cierre, duración mínima y movimientos de garantía |
+| `V14__p3_cobranza_mora_y_creditos.sql` | Mora automática (`cargo_origen_id`), anulación trazable de cargos, reversión RN-31 y créditos |
+| `V15__p4_referencias_y_control_fx.sql` | Historial de referencias USD/NIO y concesión, calendario y cuota compartidos de H3 |
+| `V16__p5_mantenimiento_y_adjuntos.sql` | Solicitudes de mantenimiento, gastos de propiedad, metadatos de adjuntos y puerta de exclusión |
 
-Ejemplo con `psql`:
+Ejemplo en PowerShell para una instalación nueva. En una base existente,
+seleccionar únicamente los archivos pendientes (sin V0). `psql` se detiene en
+el primer error y revierte las migraciones de esa ejecución:
 
 ```powershell
-psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V1__propietario_perfil.sql
-psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V2__seguimiento_garantias.sql
-psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V3__descripcion_unidad.sql
-psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V4__tasas_autorizadas.sql
-psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V5__pagos_idempotencia_aplicaciones.sql
-psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V6__contratos_activos_por_unidad.sql
-psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V7__retencion_idempotencia_pagos.sql
-psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V8__consecutivo_recibos_transaccional.sql
-psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V9__auditoria_login_fallido.sql
-psql -h localhost -U tu_usuario -d latch_db -f docs/migrations/V10__instante_operativo_pago.sql
+$migraciones = Get-ChildItem docs/migrations -Filter 'V*.sql' -File |
+    Sort-Object { [int]($_.BaseName -replace '^V(\d+)__.*$', '$1') }
+$psqlArgs = @('-X', '-h', 'localhost', '-U', 'tu_usuario', '-d', 'latch_db',
+    '-v', 'ON_ERROR_STOP=1', '--single-transaction')
+foreach ($archivo in $migraciones) { $psqlArgs += @('-f', $archivo.FullName) }
+psql @psqlArgs
+if ($LASTEXITCODE -ne 0) { throw 'Falló la migración. Revisa el primer error antes de reintentar.' }
 ```
+
+Para **V11 en una base histórica con `respuesta_json` de tipo `oid`**, detener
+la aplicación antes de migrar y ejecutar V11 con el rol propietario de
+`solicitud_idempotente`. Si otro rol creó los Large Objects, ser dueño de la
+tabla o la base no concede lectura sobre esos objetos. El error de V11
+conserva el OID en el detalle original. Consultar los objetos referenciados y
+sus propietarios antes de reintentar:
+
+```sql
+SELECT DISTINCT s.respuesta_json AS oid, pg_get_userbyid(m.lomowner) AS propietario
+FROM solicitud_idempotente s
+JOIN pg_largeobject_metadata m ON m.oid = s.respuesta_json
+ORDER BY oid;
+```
+
+El propietario de cada objeto que reporte un error concede únicamente
+`GRANT SELECT ON LARGE OBJECT <oid> TO <rol_migracion>;` con los valores reales.
+Reintentar el mismo lote y comprobar que termina correctamente. Si los
+permisos se otorgaron solo para la migración, el propietario puede revocarlos
+al terminar. Con una columna ya de tipo `text`, V11 no necesita esos permisos.
+
+La regresión de este caso se puede ejecutar con `psql -f` y el archivo
+[`v11_large_object_ownership.sql`](src/test/resources/postgres/v11_large_object_ownership.sql)
+como administrador de un clúster desechable, indicando la conexión a la base
+de pruebas. La prueba usa dos roles sin privilegios elevados y revierte su
+transacción al terminar.
 
 Comprobar la conexión:
 
@@ -133,6 +172,18 @@ PowerShell):
 Desde la raíz del repositorio, después de empaquetar con `verify -Ppostgres`,
 genera el classpath de ejecución y elige uno de los dos puntos de entrada.
 Ambos necesitan la configuración local descrita arriba y un puerto libre.
+
+### Referencia comercial USD/NIO
+
+H3 se habilita al arrancar el backend con `LATCH_FX_API_KEY` en el entorno del
+proceso. En LAN, configurar la llave en el equipo consultor designado. Para
+desactivar las llamadas salientes en un equipo, usar `LATCH_FX_CONSULTOR=false`.
+La pantalla Tasas de cambio lee la última referencia guardada y muestra fuente,
+fecha efectiva, consulta, antigüedad y aviso. Actualizar en pantalla vuelve a
+leer la caché. H3 usa el parámetro `fx_intervalo_horas` (24 a 168, 24 por
+defecto) y comparte el límite de 100 intentos por mes local. Si se corrige una
+credencial suspendida, reiniciar el backend con el nuevo valor. Los pagos
+entre monedas requieren una tasa autorizada por el Propietario.
 
 ```powershell
 $runtimeFile = Join-Path (Get-Location) 'target\latch-runtime.txt'
