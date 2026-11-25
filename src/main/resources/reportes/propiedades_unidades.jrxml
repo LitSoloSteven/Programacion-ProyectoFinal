@@ -88,7 +88,7 @@
                 <expression><![CDATA[$F{estadoUnidad} == null || $F{estadoUnidad}.isBlank() ? "—" : $F{estadoUnidad}]]></expression>
             </element>
             <element kind="textField" x="682" y="2" width="94" height="18" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="9.0">
-                <expression><![CDATA[($F{canonReferencia} == null ? "0.00" : $F{canonReferencia}.toPlainString()) + ($F{moneda} == null || $F{moneda}.isBlank() ? "" : " " + $F{moneda})]]></expression>
+                <expression><![CDATA[(new java.text.DecimalFormat("#,##0.00", new java.text.DecimalFormatSymbols(java.util.Locale.US))).format($F{canonReferencia} == null ? java.math.BigDecimal.ZERO : $F{canonReferencia}) + ($F{moneda} == null || $F{moneda}.isBlank() ? "" : " " + $F{moneda})]]></expression>
             </element>
             <element kind="line" x="0" y="22" width="782" height="1" forecolor="#E2E8F0">
                 <pen lineWidth="0.5"/>

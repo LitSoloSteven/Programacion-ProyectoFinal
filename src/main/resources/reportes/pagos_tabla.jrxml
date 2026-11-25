@@ -41,11 +41,11 @@
         <element kind="staticText" x="185" y="0" width="82" height="24" forecolor="#0F172A" vTextAlign="Middle" fontSize="9.0" bold="true">
             <text><![CDATA[Fecha pago]]></text>
         </element>
-        <element kind="staticText" x="267" y="0" width="125" height="24" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="9.0" bold="true">
-            <text><![CDATA[Monto original]]></text>
+        <element kind="textField" x="267" y="2" width="125" height="18" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="9.0">
+            <expression><![CDATA[String.format(java.util.Locale.US, "%,.2f", $F{montoOriginal} == null ? java.math.BigDecimal.ZERO : $F{montoOriginal}) + ($F{monedaOriginal} == null || $F{monedaOriginal}.isBlank() ? "" : " " + $F{monedaOriginal})]]></expression>
         </element>
-        <element kind="staticText" x="392" y="0" width="125" height="24" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="9.0" bold="true">
-            <text><![CDATA[Monto contrato]]></text>
+        <element kind="textField" x="392" y="2" width="125" height="18" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="9.0">
+            <expression><![CDATA[String.format(java.util.Locale.US, "%,.2f", $F{montoContrato} == null ? java.math.BigDecimal.ZERO : $F{montoContrato}) + ($F{monedaContrato} == null || $F{monedaContrato}.isBlank() ? "" : " " + $F{monedaContrato})]]></expression>
         </element>
         <element kind="staticText" x="524" y="0" width="78" height="24" forecolor="#0F172A" vTextAlign="Middle" fontSize="9.0" bold="true">
             <text><![CDATA[Método]]></text>
@@ -67,10 +67,10 @@
                 <expression><![CDATA[$F{fechaPago} == null ? "—" : $F{fechaPago}.toString()]]></expression>
             </element>
             <element kind="textField" x="267" y="2" width="125" height="18" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="9.0">
-                <expression><![CDATA[($F{montoOriginal} == null ? "0.00" : $F{montoOriginal}.toPlainString()) + ($F{monedaOriginal} == null || $F{monedaOriginal}.isBlank() ? "" : " " + $F{monedaOriginal})]]></expression>
+                <expression><![CDATA[(new java.text.DecimalFormat("#,##0.00", new java.text.DecimalFormatSymbols(java.util.Locale.US))).format($F{montoOriginal} == null ? java.math.BigDecimal.ZERO : $F{montoOriginal}) + ($F{monedaOriginal} == null || $F{monedaOriginal}.isBlank() ? "" : " " + $F{monedaOriginal})]]></expression>
             </element>
             <element kind="textField" x="392" y="2" width="125" height="18" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="9.0">
-                <expression><![CDATA[($F{montoContrato} == null ? "0.00" : $F{montoContrato}.toPlainString()) + ($F{monedaContrato} == null || $F{monedaContrato}.isBlank() ? "" : " " + $F{monedaContrato})]]></expression>
+                <expression><![CDATA[(new java.text.DecimalFormat("#,##0.00", new java.text.DecimalFormatSymbols(java.util.Locale.US))).format($F{montoContrato} == null ? java.math.BigDecimal.ZERO : $F{montoContrato}) + ($F{monedaContrato} == null || $F{monedaContrato}.isBlank() ? "" : " " + $F{monedaContrato})]]></expression>
             </element>
             <element kind="textField" x="524" y="2" width="78" height="18" forecolor="#334155" vTextAlign="Middle" fontSize="9.0">
                 <expression><![CDATA[$F{metodo} == null || $F{metodo}.isBlank() ? "—" : $F{metodo}]]></expression>

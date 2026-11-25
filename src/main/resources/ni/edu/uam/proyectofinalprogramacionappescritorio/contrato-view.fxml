@@ -34,7 +34,7 @@
                     styleClass="button-destructive" text="Eliminar contrato" />
         </HBox>
         <Button fx:id="btnGenerarReporte" onAction="#handleGenerarReporte"
-                styleClass="button-secondary" text="Generar reporte" />
+                styleClass="button-secondary" text="📄 Generar reporte" />
     </HBox>
     <Label fx:id="lblErrorConsulta" managed="false" minHeight="18.0" styleClass="field-error"
            text="" visible="false" wrapText="true" />
