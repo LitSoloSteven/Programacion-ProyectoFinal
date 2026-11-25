@@ -19,7 +19,7 @@
         </VBox>
         <Button fx:id="btnRefrescar" onAction="#refrescarTabla" styleClass="button-secondary" text="Actualizar" />
         <Button fx:id="btnGenerarReporte" onAction="#handleGenerarReporte"
-                minWidth="USE_PREF_SIZE" styleClass="button-secondary" text="Reporte" />
+                minWidth="-Infinity" styleClass="button-secondary" text="Reporte" />
         <Button fx:id="btnNuevo" onAction="#handleNuevo" styleClass="button-primary" text="Registrar pago" />
     </HBox>
     <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
@@ -27,7 +27,7 @@
                    styleClass="search-field" />
         <Button fx:id="btnLimpiar" onAction="#limpiarFiltros" styleClass="button-secondary" text="Limpiar" />
         <Label fx:id="lblContador" styleClass="secondary-text" text="0 pagos" HBox.hgrow="ALWAYS" />
-        <Button fx:id="btnVerRecibo" disable="true" minWidth="USE_PREF_SIZE"
+        <Button fx:id="btnVerRecibo" disable="true" minWidth="-Infinity"
                 onAction="#handleVerRecibo" styleClass="button-secondary" text="Ver recibo" />
         <HBox fx:id="anularTooltipHost">
             <Button fx:id="btnAnular" disable="true" onAction="#handleAnular"

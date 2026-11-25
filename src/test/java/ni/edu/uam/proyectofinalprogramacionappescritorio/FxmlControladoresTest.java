@@ -19,7 +19,7 @@ class FxmlControladoresTest {
             "src/main/resources/ni/edu/uam/proyectofinalprogramacionappescritorio");
 
     @Test
-    void cadaVistaResuelveLosCamposYAccionesDeSuControladorSinJavaFxRuntime() throws Exception {
+    void cadaVistaDeclaraCamposAccionesYAnchosValidosSinJavaFxRuntime() throws Exception {
         var constructor = DocumentBuilderFactory.newInstance();
         constructor.setNamespaceAware(true);
         constructor.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
@@ -38,6 +38,9 @@ class FxmlControladoresTest {
                 for (int i = 0; i < nodos.getLength(); i++) {
                     Node nodo = nodos.item(i);
                     if (!(nodo instanceof Element elemento)) continue;
+                    if ("USE_PREF_SIZE".equals(elemento.getAttribute("minWidth"))) {
+                        errores.add(archivo.getFileName() + ": minWidth debe usar -Infinity para el ancho preferido");
+                    }
                     String id = elemento.getAttributeNS(FX_NS, "id");
                     if (!id.isBlank() && !tieneCampo(controlador, id)) {
                         errores.add(archivo.getFileName() + ": fx:id=" + id

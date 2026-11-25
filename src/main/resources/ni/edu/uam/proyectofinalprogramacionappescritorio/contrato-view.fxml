@@ -18,9 +18,9 @@
         </VBox>
         <Button fx:id="btnRefrescar" onAction="#refrescarTabla" styleClass="button-secondary" text="Actualizar" />
         <Button fx:id="btnGenerarReporte" onAction="#handleGenerarReporte"
-                minWidth="USE_PREF_SIZE" styleClass="button-secondary" text="Reporte" />
+                minWidth="-Infinity" styleClass="button-secondary" text="Reporte" />
         <Button fx:id="btnReporteGarantias" onAction="#handleReporteGarantias"
-                minWidth="USE_PREF_SIZE" styleClass="button-secondary" text="Garantías" />
+                minWidth="-Infinity" styleClass="button-secondary" text="Garantías" />
         <Button fx:id="btnNuevo" onAction="#handleNuevo" styleClass="button-primary" text="Nuevo contrato" />
     </HBox>
     <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
@@ -33,7 +33,7 @@
             <Button fx:id="btnAjustarGarantia" disable="true" onAction="#handleAjustarGarantia"
                     styleClass="button-secondary" text="Ajustar garantía" />
         </HBox>
-        <Button fx:id="btnEstadoCuenta" disable="true" minWidth="USE_PREF_SIZE"
+        <Button fx:id="btnEstadoCuenta" disable="true" minWidth="-Infinity"
                 onAction="#handleEstadoCuenta" styleClass="button-secondary" text="Estado de cuenta" />
         <HBox fx:id="eliminarTooltipHost">
             <Button fx:id="btnEliminar" disable="true" onAction="#handleEliminar"

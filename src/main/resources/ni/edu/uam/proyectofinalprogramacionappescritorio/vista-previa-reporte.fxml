@@ -22,16 +22,16 @@
             <Button fx:id="btnAnterior"
                     text="Anterior"
                     styleClass="button-secondary"
-                    minWidth="USE_PREF_SIZE"
+                    minWidth="-Infinity"
                     onAction="#handleAnterior"/>
             <Label fx:id="lblPaginacion"
                    text="Página 0 de 0"
                    styleClass="secondary-text, numeric"
-                   minWidth="USE_PREF_SIZE"/>
+                   minWidth="-Infinity"/>
             <Button fx:id="btnSiguiente"
                     text="Siguiente"
                     styleClass="button-secondary"
-                    minWidth="USE_PREF_SIZE"
+                    minWidth="-Infinity"
                     onAction="#handleSiguiente"/>
 
             <Separator orientation="VERTICAL"/>
@@ -39,26 +39,26 @@
             <Button fx:id="btnZoomMenos"
                     text="-"
                     styleClass="button-secondary"
-                    minWidth="USE_PREF_SIZE"
+                    minWidth="-Infinity"
                     onAction="#handleZoomMenos"/>
             <Label fx:id="lblZoom"
                    text="100%"
                    styleClass="secondary-text, numeric"
-                   minWidth="USE_PREF_SIZE"/>
+                   minWidth="-Infinity"/>
             <Button fx:id="btnZoomMas"
                     text="+"
                     styleClass="button-secondary"
-                    minWidth="USE_PREF_SIZE"
+                    minWidth="-Infinity"
                     onAction="#handleZoomMas"/>
             <Button fx:id="btnZoomCien"
                     text="100%"
                     styleClass="button-secondary"
-                    minWidth="USE_PREF_SIZE"
+                    minWidth="-Infinity"
                     onAction="#handleZoomCien"/>
             <Button fx:id="btnAjustarAncho"
                     text="Ajustar ancho"
                     styleClass="button-secondary"
-                    minWidth="USE_PREF_SIZE"
+                    minWidth="-Infinity"
                     onAction="#handleAjustarAncho"/>
 
             <Region HBox.hgrow="ALWAYS"/>
@@ -66,12 +66,12 @@
             <Button fx:id="btnExportarPdf"
                     text="Exportar PDF…"
                     styleClass="button-primary"
-                    minWidth="USE_PREF_SIZE"
+                    minWidth="-Infinity"
                     onAction="#handleExportarPdf"/>
             <Button fx:id="btnCerrar"
                     text="Cerrar"
                     styleClass="button-secondary"
-                    minWidth="USE_PREF_SIZE"
+                    minWidth="-Infinity"
                     onAction="#handleCerrar"/>
         </HBox>
     </top>
