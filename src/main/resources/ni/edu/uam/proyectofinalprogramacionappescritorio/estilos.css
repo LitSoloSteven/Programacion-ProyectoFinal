@@ -546,4 +546,36 @@
 .toast .icon-glyph { -fx-fill: -latch-slate-100; }
 .toast-close { -fx-background-color: transparent; -fx-text-fill: -latch-slate-100; -fx-min-width: 32px; }
 
+.preview-root {
+    -fx-background-color: -latch-background;
+    -fx-padding: 16px;
+    -fx-spacing: 12px;
+}
+.preview-toolbar {
+    -fx-background-color: -latch-surface-raised;
+    -fx-border-color: -latch-divider;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-padding: 10px 12px;
+}
+.preview-viewport {
+    -fx-padding: 12px 0 0 0;
+}
+.preview-scroll {
+    -fx-background-color: -latch-hover;
+    -fx-border-color: -latch-divider;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+}
+.preview-scroll > .viewport {
+    -fx-background-color: -latch-hover;
+}
+.preview-page-container {
+    -fx-padding: 20px;
+    -fx-alignment: center;
+}
+
+
 
