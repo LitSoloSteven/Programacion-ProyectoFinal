@@ -416,6 +416,10 @@ public class TasaController {
         if (error instanceof ErrorClienteException clienteError && clienteError.esNoAutenticado()) {
             return "Tu sesión expiró.";
         }
+        if (error instanceof ErrorClienteException clienteError
+                && clienteError.getEstado() == 409 && "ERR-060".equals(clienteError.getCodigo())) {
+            return clienteError.getMessage();
+        }
         return "No se pudo completar la solicitud. Revisa los datos e inténtalo de nuevo.";
     }
 
