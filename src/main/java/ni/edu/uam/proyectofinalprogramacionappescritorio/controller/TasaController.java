@@ -135,7 +135,6 @@ public class TasaController {
     }
 
     @FXML public void cargarTasas() {
-        iniciarOperacion();
         long version = ++versionConsulta;
         Task<List<TasaResponse>> tarea = new Task<>() {
             @Override protected List<TasaResponse> call() { return cliente.listar(null, null, 200); }
