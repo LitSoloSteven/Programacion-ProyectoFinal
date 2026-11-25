@@ -10,7 +10,8 @@ public final class Iconos {
     public enum Nombre {
         PANEL, PROPIEDAD, UNIDAD, PERSONAS, CONTRATO, CARGO, PAGO, TASA,
         BUSCAR, ACTUALIZAR, ADVERTENCIA, CONFIRMACION, CERRAR, RELOJ,
-        MAS, ELIMINAR, EDITAR, ACCIONES, SALIR, TEMA, PUNTO, VER, ENTRAR
+        MAS, ELIMINAR, EDITAR, ACCIONES, SALIR, TEMA, PUNTO, VER, ENTRAR,
+        REPORTE, DESCARGAR
     }
 
     private static final String[] TRAZOS = {
@@ -36,7 +37,9 @@ public final class Iconos {
             "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18 M12 7v5l3 2",
             "M12 12h.01",
             "M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
-            "M14 3h7v18h-7 M10 17l5-5-5-5 M15 12H3"
+            "M14 3h7v18h-7 M10 17l5-5-5-5 M15 12H3",
+            "M6 3h9l4 4v14H6z M14 3v5h5 M9 17v-4 M12 17v-6 M15 17v-2",
+            "M12 4v11 M8 11l4 4 4-4 M4 19h16"
     };
 
     private Iconos() { }

@@ -8,8 +8,10 @@
     <parameter name="TOTAL_CARGOS" class="java.lang.Integer"/>
     <parameter name="CARGOS_VENCIDOS" class="java.lang.Integer"/>
     <parameter name="CARGOS_PENDIENTES" class="java.lang.Integer"/>
-    <parameter name="TOTAL_SALDO_PENDIENTE" class="java.lang.String"/>
-    <parameter name="TOTAL_EN_MORA" class="java.lang.String"/>
+    <parameter name="TOTAL_SALDO_USD" class="java.lang.String"/>
+    <parameter name="TOTAL_SALDO_NIO" class="java.lang.String"/>
+    <parameter name="TOTAL_MORA_USD" class="java.lang.String"/>
+    <parameter name="TOTAL_MORA_NIO" class="java.lang.String"/>
 
     <field name="contrato" class="java.lang.String"/>
     <field name="tipo" class="java.lang.String"/>
@@ -39,7 +41,7 @@
             <pen lineWidth="0.0"/>
         </element>
         <element kind="textField" x="10" y="66" width="762" height="20" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.5" bold="true">
-            <expression><![CDATA["Pendientes/Parciales: " + ($P{CARGOS_PENDIENTES} == null ? 0 : $P{CARGOS_PENDIENTES}) + "   |   Saldo pendiente: " + ($P{TOTAL_SALDO_PENDIENTE} == null ? "0.00" : $P{TOTAL_SALDO_PENDIENTE}) + "   |   En mora: " + ($P{TOTAL_EN_MORA} == null ? "0.00" : $P{TOTAL_EN_MORA})]]></expression>
+            <expression><![CDATA["Pendientes/Parciales: " + ($P{CARGOS_PENDIENTES} == null ? 0 : $P{CARGOS_PENDIENTES}) + "   |   Saldo USD: " + ($P{TOTAL_SALDO_USD} == null ? "0.00" : $P{TOTAL_SALDO_USD}) + "   |   Saldo NIO: " + ($P{TOTAL_SALDO_NIO} == null ? "0.00" : $P{TOTAL_SALDO_NIO}) + "   |   Mora USD: " + ($P{TOTAL_MORA_USD} == null ? "0.00" : $P{TOTAL_MORA_USD}) + "   |   Mora NIO: " + ($P{TOTAL_MORA_NIO} == null ? "0.00" : $P{TOTAL_MORA_NIO})]]></expression>
         </element>
     </title>
 

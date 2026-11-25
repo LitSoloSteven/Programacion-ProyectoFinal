@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport name="garantias_depositos" pageWidth="842" pageHeight="595" orientation="Landscape"
+              columnWidth="782" leftMargin="30" rightMargin="30" topMargin="24" bottomMargin="24">
+
+    <parameter name="TITULO_SISTEMA" class="java.lang.String"/>
+    <parameter name="GENERADO_POR" class="java.lang.String"/>
+    <parameter name="TOTAL_GARANTIAS" class="java.lang.Integer"/>
+    <parameter name="TOTAL_PACTADO_USD" class="java.lang.String"/>
+    <parameter name="TOTAL_SALDO_USD" class="java.lang.String"/>
+    <parameter name="TOTAL_PACTADO_NIO" class="java.lang.String"/>
+    <parameter name="TOTAL_SALDO_NIO" class="java.lang.String"/>
+
+    <field name="inquilino" class="java.lang.String"/>
+    <field name="unidad" class="java.lang.String"/>
+    <field name="estadoContrato" class="java.lang.String"/>
+    <field name="moneda" class="java.lang.String"/>
+    <field name="montoPactado" class="java.math.BigDecimal"/>
+    <field name="saldoActual" class="java.math.BigDecimal"/>
+
+    <title height="90">
+        <element kind="rectangle" x="0" y="0" width="782" height="42" backcolor="#0F172A">
+            <pen lineWidth="0.0"/>
+        </element>
+        <element kind="textField" x="14" y="6" width="510" height="30" forecolor="#FFFFFF" vTextAlign="Middle" fontSize="15.0" bold="true">
+            <expression><![CDATA[$P{TITULO_SISTEMA} == null ? "LATCH — Depósitos de Garantía" : $P{TITULO_SISTEMA}]]></expression>
+        </element>
+        <element kind="textField" x="528" y="8" width="240" height="26" forecolor="#CBD5E1" hTextAlign="Right" vTextAlign="Middle" fontSize="9.0">
+            <expression><![CDATA["Garantías: " + ($P{TOTAL_GARANTIAS} == null ? 0 : $P{TOTAL_GARANTIAS}) + " · Separado de renta"]]></expression>
+        </element>
+        <element kind="textField" x="0" y="46" width="782" height="16" forecolor="#475569" vTextAlign="Middle" fontSize="9.0">
+            <expression><![CDATA["Generado por: " + ($P{GENERADO_POR} == null || $P{GENERADO_POR}.isBlank() ? "Sistema" : $P{GENERADO_POR})]]></expression>
+        </element>
+        <element kind="rectangle" x="0" y="64" width="782" height="22" backcolor="#F1F5F9">
+            <pen lineWidth="0.5" lineColor="#E2E8F0"/>
+        </element>
+        <element kind="textField" x="10" y="65" width="762" height="20" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.5" bold="true">
+            <expression><![CDATA["USD pactado: " + ($P{TOTAL_PACTADO_USD} == null ? "0.00" : $P{TOTAL_PACTADO_USD}) + " USD / saldo: " + ($P{TOTAL_SALDO_USD} == null ? "0.00" : $P{TOTAL_SALDO_USD}) + " USD   |   NIO pactado: " + ($P{TOTAL_PACTADO_NIO} == null ? "0.00" : $P{TOTAL_PACTADO_NIO}) + " NIO / saldo: " + ($P{TOTAL_SALDO_NIO} == null ? "0.00" : $P{TOTAL_SALDO_NIO}) + " NIO"]]></expression>
+        </element>
+    </title>
+
+    <columnHeader height="26">
+        <element kind="rectangle" x="0" y="0" width="782" height="24" backcolor="#E2E8F0">
+            <pen lineWidth="0.0"/>
+        </element>
+        <element kind="staticText" x="6" y="0" width="184" height="24" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.5" bold="true">
+            <text><![CDATA[Inquilino]]></text>
+        </element>
+        <element kind="staticText" x="190" y="0" width="210" height="24" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.5" bold="true">
+            <text><![CDATA[Unidad / Propiedad]]></text>
+        </element>
+        <element kind="staticText" x="400" y="0" width="90" height="24" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.5" bold="true">
+            <text><![CDATA[Estado contrato]]></text>
+        </element>
+        <element kind="staticText" x="490" y="0" width="52" height="24" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.5" bold="true">
+            <text><![CDATA[Mon.]]></text>
+        </element>
+        <element kind="staticText" x="542" y="0" width="120" height="24" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="8.5" bold="true">
+            <text><![CDATA[Monto pactado]]></text>
+        </element>
+        <element kind="staticText" x="662" y="0" width="114" height="24" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="8.5" bold="true">
+            <text><![CDATA[Saldo actual]]></text>
+        </element>
+    </columnHeader>
+
+    <detail>
+        <band height="24">
+            <element kind="textField" x="6" y="2" width="184" height="18" forecolor="#1E293B" vTextAlign="Middle" fontSize="8.5" textAdjust="StretchHeight">
+                <expression><![CDATA[$F{inquilino} == null || $F{inquilino}.isBlank() ? "—" : $F{inquilino}]]></expression>
+            </element>
+            <element kind="textField" x="190" y="2" width="210" height="18" forecolor="#334155" vTextAlign="Middle" fontSize="8.5" textAdjust="StretchHeight">
+                <expression><![CDATA[$F{unidad} == null || $F{unidad}.isBlank() ? "—" : $F{unidad}]]></expression>
+            </element>
+            <element kind="textField" x="400" y="2" width="90" height="18" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.5" bold="true">
+                <expression><![CDATA[$F{estadoContrato} == null || $F{estadoContrato}.isBlank() ? "—" : $F{estadoContrato}]]></expression>
+            </element>
+            <element kind="textField" x="490" y="2" width="52" height="18" forecolor="#334155" vTextAlign="Middle" fontSize="8.5">
+                <expression><![CDATA[$F{moneda} == null || $F{moneda}.isBlank() ? "—" : $F{moneda}]]></expression>
+            </element>
+            <element kind="textField" x="542" y="2" width="120" height="18" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="8.5">
+                <expression><![CDATA[(new java.text.DecimalFormat("#,##0.00", new java.text.DecimalFormatSymbols(java.util.Locale.US))).format($F{montoPactado} == null ? java.math.BigDecimal.ZERO : $F{montoPactado}) + ($F{moneda} == null || $F{moneda}.isBlank() ? "" : " " + $F{moneda})]]></expression>
+            </element>
+            <element kind="textField" x="662" y="2" width="114" height="18" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="8.5" bold="true">
+                <expression><![CDATA[(new java.text.DecimalFormat("#,##0.00", new java.text.DecimalFormatSymbols(java.util.Locale.US))).format($F{saldoActual} == null ? java.math.BigDecimal.ZERO : $F{saldoActual}) + ($F{moneda} == null || $F{moneda}.isBlank() ? "" : " " + $F{moneda})]]></expression>
+            </element>
+            <element kind="line" x="0" y="22" width="782" height="1" forecolor="#E2E8F0">
+                <pen lineWidth="0.5"/>
+            </element>
+        </band>
+    </detail>
+
+    <pageFooter height="22">
+        <element kind="textField" x="0" y="2" width="660" height="18" forecolor="#64748B" vTextAlign="Middle" fontSize="8.5">
+            <expression><![CDATA["Latch · Documento generado automáticamente"]]></expression>
+        </element>
+        <element kind="textField" x="660" y="2" width="90" height="18" forecolor="#64748B" hTextAlign="Right" vTextAlign="Middle" fontSize="8.5">
+            <expression><![CDATA["Página " + $V{PAGE_NUMBER} + " de "]]></expression>
+        </element>
+        <element kind="textField" x="750" y="2" width="32" height="18" forecolor="#64748B" vTextAlign="Middle" fontSize="8.5" evaluationTime="Report">
+            <expression><![CDATA[$V{PAGE_NUMBER}]]></expression>
+        </element>
+    </pageFooter>
+</jasperReport>

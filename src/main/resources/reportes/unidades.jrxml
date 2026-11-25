@@ -7,7 +7,8 @@
     <parameter name="TOTAL_UNIDADES" class="java.lang.Integer"/>
     <parameter name="UNIDADES_DISPONIBLES" class="java.lang.Integer"/>
     <parameter name="UNIDADES_OCUPADAS" class="java.lang.Integer"/>
-    <parameter name="TOTAL_CANON_REFERENCIA" class="java.lang.String"/>
+    <parameter name="TOTAL_CANON_USD" class="java.lang.String"/>
+    <parameter name="TOTAL_CANON_NIO" class="java.lang.String"/>
 
     <field name="propiedad" class="java.lang.String"/>
     <field name="codigo" class="java.lang.String"/>
@@ -34,7 +35,7 @@
             <pen lineWidth="0.0"/>
         </element>
         <element kind="textField" x="10" y="64" width="762" height="18" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.5" bold="true">
-            <expression><![CDATA["Disponibles: " + ($P{UNIDADES_DISPONIBLES} == null ? 0 : $P{UNIDADES_DISPONIBLES}) + "   |   Ocupadas: " + ($P{UNIDADES_OCUPADAS} == null ? 0 : $P{UNIDADES_OCUPADAS}) + "   |   Suma canon ref.: " + ($P{TOTAL_CANON_REFERENCIA} == null ? "0.00" : $P{TOTAL_CANON_REFERENCIA})]]></expression>
+            <expression><![CDATA["Disponibles: " + ($P{UNIDADES_DISPONIBLES} == null ? 0 : $P{UNIDADES_DISPONIBLES}) + "   |   Ocupadas: " + ($P{UNIDADES_OCUPADAS} == null ? 0 : $P{UNIDADES_OCUPADAS}) + "   |   Canon USD: " + ($P{TOTAL_CANON_USD} == null ? "0.00" : $P{TOTAL_CANON_USD}) + "   |   Canon NIO: " + ($P{TOTAL_CANON_NIO} == null ? "0.00" : $P{TOTAL_CANON_NIO})]]></expression>
         </element>
     </title>
 
