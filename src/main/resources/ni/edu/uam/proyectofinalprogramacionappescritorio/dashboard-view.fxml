@@ -64,10 +64,14 @@
         <StackPane fx:id="contentArea" styleClass="content-area">
             <VBox fx:id="homeView" spacing="24.0" styleClass="dashboard-home">
                 <padding><Insets bottom="28.0" left="24.0" right="24.0" top="24.0" /></padding>
-                <VBox spacing="4.0">
-                    <Label styleClass="page-title" text="Resumen de Latch" />
-                    <Label styleClass="page-subtitle" text="Indicadores de propiedades, contratos y movimientos registrados." />
-                </VBox>
+                <HBox alignment="CENTER_LEFT" spacing="16.0" styleClass="page-header">
+                    <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                        <Label styleClass="page-title" text="Resumen de Latch" />
+                        <Label styleClass="page-subtitle" text="Indicadores de propiedades, contratos y movimientos registrados." />
+                    </VBox>
+                    <Button fx:id="btnGenerarReporte" onAction="#handleGenerarReporte"
+                            minWidth="USE_PREF_SIZE" styleClass="button-secondary" text="Reporte" />
+                </HBox>
                 <GridPane hgap="16.0" vgap="16.0" VBox.vgrow="ALWAYS">
                     <columnConstraints>
                         <ColumnConstraints percentWidth="33.333" hgrow="ALWAYS" />

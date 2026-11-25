@@ -17,6 +17,8 @@
             <Label styleClass="page-subtitle" text="Registro informativo y autorización de tasas NIO por USD." />
         </VBox>
         <Button fx:id="btnRefrescar" onAction="#refrescarTabla" styleClass="button-secondary" text="Actualizar" />
+        <Button fx:id="btnGenerarReporte" onAction="#handleGenerarReporte"
+                minWidth="USE_PREF_SIZE" styleClass="button-secondary" text="Reporte" />
         <Button fx:id="btnRegistrar" onAction="#handleRegistrar" styleClass="button-primary" text="Registrar tasa informativa" />
     </HBox>
     <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">

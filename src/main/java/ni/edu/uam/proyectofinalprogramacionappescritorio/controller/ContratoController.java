@@ -1,6 +1,5 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
 
-import javafx.stage.FileChooser;
 import lombok.RequiredArgsConstructor;
 
 import javafx.collections.FXCollections;
@@ -13,7 +12,9 @@ import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.DatePicker;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableColumn;
@@ -27,6 +28,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.ContratoRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteCatalogos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClientePagos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Contrato;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Garantia;
@@ -45,13 +47,11 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PanelEstadoTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TemaAplicacion;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.VistaPreviaReporte;
 
-import java.awt.*;
-import java.io.File;
-import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.file.Files;
 import java.sql.SQLException;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -64,6 +64,7 @@ import java.util.UUID;
 public class ContratoController {
     @FXML private VBox rootView;
     @FXML private Button btnGenerarReporte;
+    @FXML private Button btnReporteGarantias;
     @FXML private HBox eliminarTooltipHost;
     @FXML private HBox garantiaTooltipHost;
     @FXML private Button btnNuevo;
@@ -72,6 +73,7 @@ public class ContratoController {
     @FXML private Button btnTerminar;
     @FXML private Button btnEliminar;
     @FXML private Button btnAjustarGarantia;
+    @FXML private Button btnEstadoCuenta;
     @FXML private Label lblTitulo;
     @FXML private Label lblContador;
     @FXML private Label lblErrorConsulta;
@@ -90,6 +92,7 @@ public class ContratoController {
 
     private final ReporteService reporteService = new ReporteService();
     private final ClienteCatalogos clienteCatalogos = new ClienteCatalogos(ClienteLatch.api());
+    private final ClientePagos clientePagos = new ClientePagos();
     private final ContratoService contratoService;
     private final GarantiaService garantiaService;
     private final ObservableList<Contrato> registros = FXCollections.observableArrayList();
@@ -114,12 +117,25 @@ public class ContratoController {
     @FXML public void initialize() {
         lblTitulo.setGraphic(Iconos.crear(Iconos.Nombre.CONTRATO, 20));
         Iconos.asignar(btnRefrescar, Iconos.Nombre.ACTUALIZAR, 16);
+        if (btnGenerarReporte != null) {
+            Iconos.asignar(btnGenerarReporte, Iconos.Nombre.REPORTE, 16);
+            btnGenerarReporte.setTooltip(new Tooltip("Vista previa y exportación PDF del resumen de contratos y ocupación"));
+        }
+        if (btnReporteGarantias != null) {
+            Iconos.asignar(btnReporteGarantias, Iconos.Nombre.REPORTE, 16);
+            btnReporteGarantias.setTooltip(new Tooltip("Vista previa y exportación PDF de los depósitos de garantía"));
+        }
         Iconos.asignar(btnNuevo, Iconos.Nombre.MAS, 16);
         btnNuevo.disableProperty().bind(btnRefrescar.disableProperty());
         Iconos.asignar(btnLimpiar, Iconos.Nombre.CERRAR, 14);
         Iconos.asignar(btnTerminar, Iconos.Nombre.CONFIRMACION, 16);
         Iconos.asignar(btnEliminar, Iconos.Nombre.ELIMINAR, 16);
         Iconos.asignar(btnAjustarGarantia, Iconos.Nombre.EDITAR, 16);
+        if (btnEstadoCuenta != null) {
+            Iconos.asignar(btnEstadoCuenta, Iconos.Nombre.REPORTE, 16);
+            btnEstadoCuenta.setTooltip(new Tooltip("Consultar y exportar el estado de cuenta del contrato seleccionado"));
+            btnEstadoCuenta.setDisable(true);
+        }
         Tooltip.install(eliminarTooltipHost, new Tooltip(permisoEliminar
                 ? "Selecciona un contrato para eliminarlo." : "Solo el propietario puede eliminar contratos."));
         Tooltip.install(garantiaTooltipHost, new Tooltip(permisoAjustarGarantia
@@ -145,8 +161,9 @@ public class ContratoController {
         colSaldoGarantia.setCellFactory(FormatoTabla.numerica());
         colEstado.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getEstado()));
         colEstado.setCellFactory(FormatoTabla.estado());
-        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>(
-                "Editar contrato", this::abrirEdicion, Iconos.Nombre.EDITAR)));
+        AccionesTabla.configurar(colAcciones, List.of(
+                new AccionesTabla.Accion<>("Editar contrato", this::abrirEdicion, Iconos.Nombre.EDITAR),
+                new AccionesTabla.Accion<>("Estado de cuenta", this::abrirEstadoCuenta, Iconos.Nombre.REPORTE)));
         tblContratos.getSelectionModel().selectedItemProperty().addListener((obs, anterior, actual) -> {
             seleccionado = actual;
             actualizarAcciones();
@@ -388,6 +405,9 @@ public class ContratoController {
     private void actualizarAcciones() {
         btnTerminar.setDisable(seleccionado == null || !sePuedeFinalizar(seleccionado));
         btnEliminar.setDisable(seleccionado == null || !permisoEliminar);
+        if (btnEstadoCuenta != null) {
+            btnEstadoCuenta.setDisable(seleccionado == null);
+        }
         boolean puedeAjustar = seleccionado != null && garantias.containsKey(seleccionado.getId())
                 && permisoAjustarGarantia;
         btnAjustarGarantia.setDisable(!puedeAjustar);
@@ -428,64 +448,69 @@ public class ContratoController {
             return;
         }
 
-        if (btnGenerarReporte != null) {
-            btnGenerarReporte.setDisable(true);
+        Window ventana = tblContratos == null || tblContratos.getScene() == null
+                ? null
+                : tblContratos.getScene().getWindow();
+        VistaPreviaReporte.generarYMostrar(btnGenerarReporte, ventana,
+                () -> reporteService.generarDocumentoContratosOcupacion(contratosActuales));
+    }
+
+    @FXML
+    public void handleReporteGarantias() {
+        Window ventana = tblContratos == null || tblContratos.getScene() == null
+                ? null
+                : tblContratos.getScene().getWindow();
+        VistaPreviaReporte.generarYMostrar(btnReporteGarantias, ventana,
+                reporteService::generarDocumentoGarantias);
+    }
+
+    @FXML
+    public void handleEstadoCuenta() {
+        abrirEstadoCuenta(seleccionado);
+    }
+
+    private void abrirEstadoCuenta(Contrato contrato) {
+        if (contrato == null || contrato.getId() == null) {
+            AlertaUtil.mostrarAdvertencia("Selección requerida",
+                    "Selecciona un contrato para consultar su estado de cuenta.");
+            return;
         }
 
-        Task<byte[]> tareaGenerarPdf = new Task<>() {
-            @Override
-            protected byte[] call() {
-                return reporteService.generarReporteContratosOcupacionPdf(contratosActuales);
-            }
-        };
+        Window ventana = tblContratos == null || tblContratos.getScene() == null
+                ? null
+                : tblContratos.getScene().getWindow();
+        String descripcion = contrato.getInquilinoNombre() + " · " + contrato.getUnidadInfo();
 
-        TareasJavaFx.ejecutar(
-                HelloApplication.instancia().getTareas(),
-                tareaGenerarPdf,
-                pdfBytes -> {
-                    if (btnGenerarReporte != null) {
-                        btnGenerarReporte.setDisable(false);
-                    }
-                    if (pdfBytes == null || pdfBytes.length == 0) {
-                        AlertaUtil.mostrarError("Error de reporte",
-                                "El reporte de contratos y ocupación está vacío.");
-                        return;
-                    }
+        Dialog<LocalDate> dialogo = new Dialog<>();
+        dialogo.setTitle("Estado de cuenta");
+        dialogo.setHeaderText("Contrato: " + descripcion);
+        if (ventana != null) {
+            dialogo.initOwner(ventana);
+        }
+        DatePicker selectorCorte = new DatePicker(LocalDate.now());
+        selectorCorte.getStyleClass().add("field");
+        VBox contenido = new VBox(8, new Label("Fecha de corte"), selectorCorte);
+        contenido.setPadding(new Insets(16));
+        dialogo.getDialogPane().setContent(contenido);
 
-                    FileChooser fileChooser = new FileChooser();
-                    fileChooser.setTitle("Guardar resumen de contratos y ocupación");
-                    fileChooser.setInitialFileName("Resumen-Contratos-Ocupacion.pdf");
-                    fileChooser.getExtensionFilters().add(
-                            new FileChooser.ExtensionFilter("Documento PDF (*.pdf)", "*.pdf")
-                    );
+        ButtonType cancelar = new ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE);
+        ButtonType generar = new ButtonType("Generar estado de cuenta", ButtonBar.ButtonData.OK_DONE);
+        dialogo.getDialogPane().getButtonTypes().setAll(cancelar, generar);
+        dialogo.setResultConverter(tipo -> tipo == generar
+                ? (selectorCorte.getValue() != null ? selectorCorte.getValue() : LocalDate.now())
+                : null);
+        TemaAplicacion.aplicar(dialogo.getDialogPane());
 
-                    Window ventana = tblContratos.getScene() == null
-                            ? null
-                            : tblContratos.getScene().getWindow();
-                    File archivoDestino = fileChooser.showSaveDialog(ventana);
+        LocalDate fechaCorte = dialogo.showAndWait().orElse(null);
+        if (fechaCorte == null) {
+            return;
+        }
 
-                    if (archivoDestino != null) {
-                        try {
-                            Files.write(archivoDestino.toPath(), pdfBytes);
-                            AlertaUtil.mostrarExito("Reporte listo",
-                                    "El resumen de contratos y ocupación se guardó correctamente.");
-
-                            if (Desktop.isDesktopSupported()) {
-                                Desktop.getDesktop().open(archivoDestino);
-                            }
-                        } catch (Exception ex) {
-                            AlertaUtil.mostrarError("Error al guardar",
-                                    "No se pudo guardar el archivo PDF en disco.");
-                        }
-                    }
-                },
-                error -> {
-                    if (btnGenerarReporte != null) {
-                        btnGenerarReporte.setDisable(false);
-                    }
-                    AlertaUtil.mostrarError("Error al generar reporte", mensajeError(error));
-                }
-        );
+        String contratoId = contrato.getId().toString();
+        VistaPreviaReporte.generarYMostrar(btnEstadoCuenta, ventana, () -> {
+            var respuesta = clientePagos.estadoCuenta(contratoId, fechaCorte);
+            return reporteService.generarDocumentoEstadoCuenta(respuesta, descripcion);
+        });
     }
 
 }

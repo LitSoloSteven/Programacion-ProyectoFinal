@@ -19,7 +19,6 @@ import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
-import javafx.stage.FileChooser;
 import javafx.stage.Window;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PaginaResponse;
@@ -45,12 +44,10 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PanelEstadoTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TemaAplicacion;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.VistaPreviaReporte;
 
-import java.awt.Desktop;
-import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -62,6 +59,7 @@ public class PagoController {
 
     @FXML private VBox rootView;
     @FXML private Button btnGenerarReporte;
+    @FXML private Button btnVerRecibo;
     @FXML private HBox anularTooltipHost;
     @FXML private Button btnAnular;
     @FXML private Button btnNuevo;
@@ -98,8 +96,17 @@ public class PagoController {
     @FXML public void initialize() {
         lblTitulo.setGraphic(Iconos.crear(Iconos.Nombre.PAGO, 20));
         Iconos.asignar(btnRefrescar, Iconos.Nombre.ACTUALIZAR, 16);
+        if (btnGenerarReporte != null) {
+            Iconos.asignar(btnGenerarReporte, Iconos.Nombre.REPORTE, 16);
+            btnGenerarReporte.setTooltip(new Tooltip("Vista previa y exportación PDF del reporte de pagos"));
+        }
         Iconos.asignar(btnNuevo, Iconos.Nombre.MAS, 16);
         Iconos.asignar(btnLimpiar, Iconos.Nombre.CERRAR, 14);
+        if (btnVerRecibo != null) {
+            Iconos.asignar(btnVerRecibo, Iconos.Nombre.VER, 16);
+            btnVerRecibo.setTooltip(new Tooltip("Vista previa y exportación PDF del recibo del pago seleccionado"));
+            btnVerRecibo.setDisable(true);
+        }
         Iconos.asignar(btnAnular, Iconos.Nombre.ELIMINAR, 16);
         btnAnular.setDisable(true);
         Tooltip.install(anularTooltipHost, new Tooltip(permisoAnular
@@ -117,10 +124,14 @@ public class PagoController {
         colReferencia.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().referencia()));
         colEstado.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().estado()));
         colEstado.setCellFactory(FormatoTabla.estado());
-        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>(
-                "Ver pago", this::mostrarDetalle, Iconos.Nombre.VER)));
+        AccionesTabla.configurar(colAcciones, List.of(
+                new AccionesTabla.Accion<>("Ver pago", this::mostrarDetalle, Iconos.Nombre.VER),
+                new AccionesTabla.Accion<>("Ver recibo", this::abrirRecibo, Iconos.Nombre.REPORTE)));
         tblPagos.getSelectionModel().selectedItemProperty().addListener((obs, anterior, actual) -> {
             pagoSeleccionado = actual;
+            if (btnVerRecibo != null) {
+                btnVerRecibo.setDisable(actual == null);
+            }
             btnAnular.setDisable(actual == null || !permisoAnular || "Anulado".equalsIgnoreCase(actual.estado()));
         });
         txtBuscar.textProperty().addListener((obs, anterior, nuevo) -> {
@@ -349,64 +360,37 @@ public class PagoController {
                 .map(this::mapearPagoDesdeLista)
                 .toList();
 
-        if (btnGenerarReporte != null) {
-            btnGenerarReporte.setDisable(true);
+        Window ventana = tblPagos == null || tblPagos.getScene() == null
+                ? null
+                : tblPagos.getScene().getWindow();
+        VistaPreviaReporte.generarYMostrar(btnGenerarReporte, ventana,
+                () -> reporteService.generarDocumentoPagos(pagosParaReporte));
+    }
+
+    @FXML
+    public void handleVerRecibo() {
+        abrirRecibo(pagoSeleccionado);
+    }
+
+    private void abrirRecibo(PagoListaResponse pago) {
+        if (pago == null || pago.id() == null || pago.id().isBlank()) {
+            AlertaUtil.mostrarAdvertencia("Selección requerida",
+                    "Selecciona un pago para consultar su recibo.");
+            return;
         }
-
-        Task<byte[]> tareaGenerarPdf = new Task<>() {
-            @Override
-            protected byte[] call() {
-                return reporteService.generarReportePagosPdf(pagosParaReporte);
-            }
-        };
-
-        TareasJavaFx.ejecutar(
-                HelloApplication.instancia().getTareas(),
-                tareaGenerarPdf,
-                pdfBytes -> {
-                    if (btnGenerarReporte != null) {
-                        btnGenerarReporte.setDisable(false);
-                    }
-                    if (pdfBytes == null || pdfBytes.length == 0) {
-                        AlertaUtil.mostrarError("Error de reporte",
-                                "El reporte generado está vacío.");
-                        return;
-                    }
-
-                    FileChooser fileChooser = new FileChooser();
-                    fileChooser.setTitle("Guardar reporte de pagos");
-                    fileChooser.setInitialFileName("Reporte-Pagos.pdf");
-                    fileChooser.getExtensionFilters().add(
-                            new FileChooser.ExtensionFilter("Documento PDF (*.pdf)", "*.pdf")
-                    );
-
-                    Window ventana = tblPagos.getScene() == null
-                            ? null
-                            : tblPagos.getScene().getWindow();
-                    File archivoDestino = fileChooser.showSaveDialog(ventana);
-
-                    if (archivoDestino != null) {
-                        try {
-                            Files.write(archivoDestino.toPath(), pdfBytes);
-                            AlertaUtil.mostrarExito("Reporte listo",
-                                    "El reporte de pagos se guardó correctamente.");
-
-                            if (Desktop.isDesktopSupported()) {
-                                Desktop.getDesktop().open(archivoDestino);
-                            }
-                        } catch (Exception ex) {
-                            AlertaUtil.mostrarError("Error al guardar",
-                                    "No se pudo guardar el archivo PDF en disco.");
-                        }
-                    }
-                },
-                error -> {
-                    if (btnGenerarReporte != null) {
-                        btnGenerarReporte.setDisable(false);
-                    }
-                    AlertaUtil.mostrarError("Error al generar reporte", mensajeErrorPago(error));
-                }
-        );
+        UUID pagoId;
+        try {
+            pagoId = UUID.fromString(pago.id());
+        } catch (IllegalArgumentException ex) {
+            AlertaUtil.mostrarAdvertencia("Identificador inválido",
+                    "El pago seleccionado no tiene un identificador válido.");
+            return;
+        }
+        Window ventana = tblPagos == null || tblPagos.getScene() == null
+                ? null
+                : tblPagos.getScene().getWindow();
+        VistaPreviaReporte.generarYMostrar(btnVerRecibo, ventana,
+                () -> reporteService.generarDocumentoRecibo(pagoId));
     }
 
     private Pago mapearPagoDesdeLista(PagoListaResponse item) {

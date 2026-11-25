@@ -19,11 +19,13 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import javafx.stage.Window;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteApi;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteAuth;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
 
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ReporteService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoMoneda;
@@ -32,6 +34,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Notificaciones;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TemaAplicacion;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TransicionesUI;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.VistaPreviaReporte;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
 
 import java.io.IOException;
@@ -53,6 +56,7 @@ public class DashboardController {
     @FXML private Label lblContexto;
     @FXML private Label lblActualizado;
     @FXML private Button btnActualizar;
+    @FXML private Button btnGenerarReporte;
     @FXML private Button btnTema;
     @FXML private CheckBox chkReducirMovimiento;
 
@@ -126,6 +130,9 @@ public class DashboardController {
     @FXML private Label lblPagosMontoUsd;
     @FXML private Label lblPagosMontoNio;
 
+    private final ReporteService reporteService = new ReporteService();
+    private MetricasResponse ultimasMetricas;
+
     @FXML
     public void initialize() {
         SesionUsuario usuario = SesionUsuario.getActual();
@@ -140,6 +147,10 @@ public class DashboardController {
         actualizarMetricas();
         configurarNavegacion();
         Iconos.asignar(btnActualizar, Iconos.Nombre.ACTUALIZAR, 16);
+        if (btnGenerarReporte != null) {
+            Iconos.asignar(btnGenerarReporte, Iconos.Nombre.REPORTE, 16);
+            btnGenerarReporte.setTooltip(new Tooltip("Vista previa y exportación PDF del resumen del panel"));
+        }
         asignarIconosKpi();
         Iconos.asignar(btnTema, Iconos.Nombre.TEMA, 16);
         btnTema.setAccessibleText("Cambiar tema de color");
@@ -191,6 +202,7 @@ public class DashboardController {
             }
         };
         TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, metricas -> {
+            ultimasMetricas = metricas;
             lblTotalPropiedades.setText(String.valueOf(metricas.propiedades()));
             lblTotalUnidades.setText(String.valueOf(metricas.unidades()));
             lblTotalInquilinos.setText(String.valueOf(metricas.inquilinos()));
@@ -233,6 +245,20 @@ public class DashboardController {
                 .findFirst()
                 .map(total -> FormatoMoneda.formatear(total.moneda(), new BigDecimal(total.total())))
                 .orElseGet(() -> FormatoMoneda.formatear(moneda, BigDecimal.ZERO));
+    }
+
+    @FXML
+    public void handleGenerarReporte() {
+        Window ventana = contentArea == null || contentArea.getScene() == null
+                ? null
+                : contentArea.getScene().getWindow();
+        MetricasResponse snapshot = ultimasMetricas;
+        VistaPreviaReporte.generarYMostrar(btnGenerarReporte, ventana, () -> {
+            MetricasResponse metricas = snapshot != null
+                    ? snapshot
+                    : ClienteLatch.api().get("/api/v1/dashboard/metricas", MetricasResponse.class);
+            return reporteService.generarDocumentoResumenDashboard(metricas);
+        });
     }
 
     @FXML

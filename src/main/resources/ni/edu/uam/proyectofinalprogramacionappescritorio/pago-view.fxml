@@ -18,6 +18,8 @@
             <Label styleClass="page-subtitle" text="Registro e historial de pagos recibidos." />
         </VBox>
         <Button fx:id="btnRefrescar" onAction="#refrescarTabla" styleClass="button-secondary" text="Actualizar" />
+        <Button fx:id="btnGenerarReporte" onAction="#handleGenerarReporte"
+                minWidth="USE_PREF_SIZE" styleClass="button-secondary" text="Reporte" />
         <Button fx:id="btnNuevo" onAction="#handleNuevo" styleClass="button-primary" text="Registrar pago" />
     </HBox>
     <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
@@ -25,12 +27,12 @@
                    styleClass="search-field" />
         <Button fx:id="btnLimpiar" onAction="#limpiarFiltros" styleClass="button-secondary" text="Limpiar" />
         <Label fx:id="lblContador" styleClass="secondary-text" text="0 pagos" HBox.hgrow="ALWAYS" />
+        <Button fx:id="btnVerRecibo" disable="true" minWidth="USE_PREF_SIZE"
+                onAction="#handleVerRecibo" styleClass="button-secondary" text="Ver recibo" />
         <HBox fx:id="anularTooltipHost">
             <Button fx:id="btnAnular" disable="true" onAction="#handleAnular"
                     styleClass="button-destructive" text="Anular pago" />
         </HBox>
-        <Button fx:id="btnGenerarReporte" onAction="#handleGenerarReporte"
-                styleClass="button-secondary" text="📄 Generar reporte" />
     </HBox>
     <Label fx:id="lblErrorConsulta" managed="false" minHeight="18.0"
            styleClass="field-error" text="" visible="false" wrapText="true" />

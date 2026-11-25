@@ -26,6 +26,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteTasas;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.TipoCambio;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ReporteService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AccionesTabla;
@@ -38,6 +39,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.InsigniaEstado;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PanelEstadoTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TemaAplicacion;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.VistaPreviaReporte;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -61,6 +63,7 @@ public class TasaController {
     @FXML private Button btnRegistrar;
     @FXML private Button btnAutorizar;
     @FXML private Button btnRefrescar;
+    @FXML private Button btnGenerarReporte;
     @FXML private Button btnLimpiar;
     @FXML private Label lblContador;
     @FXML private Label lblErrorConsulta;
@@ -79,6 +82,7 @@ public class TasaController {
 
     private final ObservableList<TasaResponse> tasasVisibles = FXCollections.observableArrayList();
     private final List<TasaResponse> tasasCargadas = new ArrayList<>();
+    private final ReporteService reporteService = new ReporteService();
     private final ClienteTasas cliente;
     private TasaResponse seleccionada;
     private final boolean permisoAutorizar;
@@ -95,6 +99,10 @@ public class TasaController {
     @FXML public void initialize() {
         lblTitulo.setGraphic(Iconos.crear(Iconos.Nombre.TASA, 20));
         Iconos.asignar(btnRefrescar, Iconos.Nombre.ACTUALIZAR, 16);
+        if (btnGenerarReporte != null) {
+            Iconos.asignar(btnGenerarReporte, Iconos.Nombre.REPORTE, 16);
+            btnGenerarReporte.setTooltip(new Tooltip("Vista previa y exportación PDF del historial de tasas de cambio"));
+        }
         Iconos.asignar(btnRegistrar, Iconos.Nombre.MAS, 16);
         Iconos.asignar(btnLimpiar, Iconos.Nombre.CERRAR, 14);
         Iconos.asignar(btnAutorizar, Iconos.Nombre.CONFIRMACION, 16);
@@ -150,6 +158,22 @@ public class TasaController {
     }
 
     @FXML public void refrescarTabla() { cargarTasas(); }
+
+    @FXML public void handleGenerarReporte() {
+        List<TasaResponse> tasasActuales = tblTasas == null
+                ? List.of()
+                : List.copyOf(tblTasas.getItems());
+        if (tasasActuales.isEmpty()) {
+            AlertaUtil.mostrarAdvertencia("Sin datos",
+                    "No hay tasas en la tabla para generar el reporte.");
+            return;
+        }
+        Window ventana = tblTasas == null || tblTasas.getScene() == null
+                ? null
+                : tblTasas.getScene().getWindow();
+        VistaPreviaReporte.generarYMostrar(btnGenerarReporte, ventana,
+                () -> reporteService.generarDocumentoTasasCambio(tasasActuales));
+    }
 
     @FXML public void limpiarFiltros() { txtBuscar.clear(); }
 
@@ -327,6 +351,9 @@ public class TasaController {
         boolean ocupado = operacionesEnCurso > 0;
         btnRegistrar.setDisable(ocupado);
         btnRefrescar.setDisable(ocupado);
+        if (btnGenerarReporte != null) {
+            btnGenerarReporte.setDisable(ocupado);
+        }
         btnLimpiar.setDisable(ocupado);
         btnAutorizar.setDisable(ocupado || seleccionada == null || seleccionada.autorizada() || !permisoAutorizar);
         if (seleccionada != null && !seleccionada.autorizada() && !permisoAutorizar) {
