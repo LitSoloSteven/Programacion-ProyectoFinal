@@ -21,7 +21,7 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.LatchApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.UnidadRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteCatalogos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
@@ -84,7 +84,7 @@ public class UnidadController {
     private record DatosTabla(List<Propiedad> propiedades, List<Unidad> unidades) { }
 
     public UnidadController() {
-        this(HelloApplication.instancia().getComposicion().unidades());
+        this(LatchApplication.instancia().getComposicion().unidades());
     }
     @FXML public void initialize() {
         lblTitulo.setGraphic(Iconos.crear(Iconos.Nombre.UNIDAD, 20));
@@ -156,7 +156,7 @@ public class UnidadController {
                 return new DatosTabla(catalogos.propiedades(true), catalogos.unidades());
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, datos -> {
             if (version != versionConsulta) return;
             propiedadesDisponibles = datos.propiedades();
             registros.setAll(datos.unidades());
@@ -186,14 +186,14 @@ public class UnidadController {
         DialogosAdjuntos.mostrarFotoUnidad(
                 propietario,
                 unidad.toString(),
-                HelloApplication.instancia().getComposicion().adjuntos(),
+                LatchApplication.instancia().getComposicion().adjuntos(),
                 unidad.getId());
     }
 
     private void abrirFormulario(Unidad existente) {
         if (existente == null && !permisoEliminar) return;
         try {
-            FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource("unidad-form.fxml"));
+            FXMLLoader loader = new FXMLLoader(LatchApplication.class.getResource("unidad-form.fxml"));
             Node contenido = loader.load();
             UnidadFormController formulario = loader.getController();
             formulario.establecerPropiedades(propiedadesDisponibles);
@@ -223,7 +223,7 @@ public class UnidadController {
                         return null;
                     }
                 };
-                TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+                TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ignorado -> {
                     formulario.marcarLimpio(); DialogoFormulario.cerrar(dialogo);
                     AlertaUtil.mostrarExito(nueva ? "Unidad registrada" : "Unidad actualizada",
                             nueva ? "La unidad quedó registrada." : "Los cambios quedaron guardados.");
@@ -256,7 +256,7 @@ public class UnidadController {
         Task<Void> tarea = new Task<>() {
             @Override protected Void call() throws SQLException { unidadService.eliminar(unidad.getId()); return null; }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ignorado -> {
             seleccionada = null;
             AlertaUtil.mostrarExito("Unidad eliminada", "El registro de la unidad se eliminó.");
             cargarDatos();

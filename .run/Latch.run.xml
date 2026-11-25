@@ -10,7 +10,7 @@
       </option>
       <option name="myRunnerSettings">
         <MavenRunnerSettings>
-          <option name="jreName" value="Project SDK" />
+          <option name="jreName" value="#USE_PROJECT_JDK" />
           <option name="vmOptions" value="" />
           <option name="passParentEnv" value="true" />
           <option name="envs">

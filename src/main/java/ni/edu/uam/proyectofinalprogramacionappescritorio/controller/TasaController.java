@@ -20,7 +20,7 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.LatchApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.TasaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.ReferenciaTasaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
@@ -231,7 +231,7 @@ public class TasaController {
 
     private void abrirFormularioRegistro() {
         try {
-            FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource("tasa-form.fxml"));
+            FXMLLoader loader = new FXMLLoader(LatchApplication.class.getResource("tasa-form.fxml"));
             Node contenido = loader.load();
             TasaFormController formulario = loader.getController();
             formulario.mostrarRegistro();
@@ -277,7 +277,7 @@ public class TasaController {
 
     private void abrirFormularioAutorizacion(TasaResponse tasa) {
         try {
-            FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource("tasa-form.fxml"));
+            FXMLLoader loader = new FXMLLoader(LatchApplication.class.getResource("tasa-form.fxml"));
             Node contenido = loader.load();
             TasaFormController formulario = loader.getController();
             formulario.mostrarAutorizacion(tasa);
@@ -344,7 +344,7 @@ public class TasaController {
         });
         tarea.setOnCancelled(evento -> terminarOperacion());
         try {
-            HelloApplication.instancia().getTareas().ejecutar(tarea);
+            LatchApplication.instancia().getTareas().ejecutar(tarea);
         } catch (RuntimeException error) {
             terminarOperacion();
             fallo.accept(error);

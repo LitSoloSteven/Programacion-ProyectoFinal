@@ -18,7 +18,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.LatchApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.DocumentoAdjuntoDTO;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.DocumentoAdjunto;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.AdjuntoService;
@@ -76,7 +76,7 @@ public final class DialogosAdjuntos {
                     return new FotoCargada(meta.get(), bytes);
                 }
             };
-            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, res -> {
+            TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, res -> {
                 btnSubir.setDisable(false);
                 actual[0] = res.meta();
                 if (res.meta() == null) {
@@ -108,7 +108,7 @@ public final class DialogosAdjuntos {
                     return servicio.adjuntarFotoUnidad(identidad, unidadId, archivo.toPath());
                 }
             };
-            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ok -> recargar.run(), err -> {
+            TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ok -> recargar.run(), err -> {
                 btnSubir.setDisable(false);
                 mostrarError(lblError, mensajeSeguro(err, "No se pudo adjuntar la fotografía."));
             });
@@ -125,7 +125,7 @@ public final class DialogosAdjuntos {
                     return null;
                 }
             };
-            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ok -> recargar.run(), err -> {
+            TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ok -> recargar.run(), err -> {
                 btnQuitar.setDisable(false);
                 mostrarError(lblError, mensajeSeguro(err, "No se pudo desactivar la fotografía."));
             });
@@ -207,7 +207,7 @@ public final class DialogosAdjuntos {
                     return cargador.get();
                 }
             };
-            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea,
+            TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea,
                     filas::setAll,
                     err -> mostrarError(lblError, mensajeSeguro(err, "No se pudieron consultar los adjuntos.")));
         };
@@ -230,7 +230,7 @@ public final class DialogosAdjuntos {
                     return guardador.apply(archivo.toPath());
                 }
             };
-            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ok -> {
+            TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ok -> {
                 btnAdjuntar.setDisable(false);
                 recargar.run();
             }, err -> {
@@ -255,7 +255,7 @@ public final class DialogosAdjuntos {
                     return null;
                 }
             };
-            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ok -> {
+            TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ok -> {
                 btnGuardarCopia.setDisable(false);
                 AlertaUtil.mostrarExito("Copia guardada", "El archivo verificado se exportó correctamente.");
             }, err -> {
@@ -272,7 +272,7 @@ public final class DialogosAdjuntos {
                     return servicio.leerContenido(identidad, sel.id());
                 }
             };
-            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, bytes -> {
+            TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, bytes -> {
                 ImageView img = new ImageView(new Image(new ByteArrayInputStream(bytes)));
                 img.setFitWidth(520);
                 img.setFitHeight(360);
@@ -296,7 +296,7 @@ public final class DialogosAdjuntos {
                     return null;
                 }
             };
-            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ok -> recargar.run(), err -> {
+            TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ok -> recargar.run(), err -> {
                 btnDesactivar.setDisable(false);
                 mostrarError(lblError, mensajeSeguro(err, "No se pudo quitar el adjunto."));
             });

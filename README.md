@@ -153,6 +153,12 @@ la operación si ya existen usuarios.
 
 ## Ejecución
 
+En IntelliJ IDEA, selecciona la configuración Maven **Latch** y pulsa **Run**.
+Esta configuración resuelve las dependencias con Maven e inicia `Launcher`, el
+mismo punto de entrada del ejecutable de escritorio. Si IntelliJ todavía muestra
+una configuración antigua de tipo **Application**, recarga el proyecto desde la
+ventana Maven y vuelve a seleccionar **Latch**.
+
 ```powershell
 ./mvnw.cmd javafx:run
 ```

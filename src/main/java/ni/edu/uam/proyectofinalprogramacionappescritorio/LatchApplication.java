@@ -33,10 +33,10 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class HelloApplication extends Application {
+public class LatchApplication extends Application {
     @Getter
     private final TareasSegundoPlano tareas = new TareasSegundoPlano();
-    private static volatile HelloApplication instancia;
+    private static volatile LatchApplication instancia;
     private ComposicionAplicacion composicion;
     private ServletWebServerApplicationContext servidor;
     private String problemaArranque;
@@ -47,8 +47,8 @@ public class HelloApplication extends Application {
     private volatile boolean cierreH6Completado;
     private final AtomicBoolean cierreEnCurso = new AtomicBoolean(false);
 
-    public static HelloApplication instancia() {
-        HelloApplication actual = instancia;
+    public static LatchApplication instancia() {
+        LatchApplication actual = instancia;
         if (actual == null) {
             throw new IllegalStateException("La aplicación Latch no está iniciada.");
         }
@@ -241,7 +241,7 @@ public class HelloApplication extends Application {
     }
 
     private void mostrarLogin(Stage stage) throws IOException {
-        FXMLLoader fxmlLoader = new FXMLLoader(HelloApplication.class.getResource("login-view.fxml"));
+        FXMLLoader fxmlLoader = new FXMLLoader(LatchApplication.class.getResource("login-view.fxml"));
         Scene scene = new Scene(fxmlLoader.load(), 460, 580);
         TemaAplicacion.aplicar(scene);
         stage.setTitle("Latch — Iniciar sesión");

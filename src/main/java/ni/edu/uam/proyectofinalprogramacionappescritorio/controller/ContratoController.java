@@ -31,7 +31,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import javafx.util.StringConverter;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.LatchApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.ContratoRenovarRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.ContratoRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.ContratoTerminarRequest;
@@ -141,8 +141,8 @@ public class ContratoController {
     private Map<UUID, Garantia> garantias = Map.of();
 
     public ContratoController() {
-        this(HelloApplication.instancia().getComposicion().contratos(),
-                HelloApplication.instancia().getComposicion().garantias());
+        this(LatchApplication.instancia().getComposicion().contratos(),
+                LatchApplication.instancia().getComposicion().garantias());
     }
 
     @FXML public void initialize() {
@@ -286,7 +286,7 @@ public class ContratoController {
                 return new DatosTabla(catalogos, contratos, seguimiento);
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, datos -> {
             if (version != versionConsulta) return;
             mostrarCatalogos(datos.catalogos());
             garantias = datos.garantias();
@@ -316,7 +316,7 @@ public class ContratoController {
 
     private void abrirDocumentoPdf(Contrato contrato) {
         if (contrato == null || contrato.getId() == null) return;
-        var adjuntos = HelloApplication.instancia().getComposicion().adjuntos();
+        var adjuntos = LatchApplication.instancia().getComposicion().adjuntos();
         SesionUsuario identidad = SesionUsuario.getActual();
         DialogosAdjuntos.mostrarGestorAdjuntos(
                 ventanaActual(),
@@ -330,7 +330,7 @@ public class ContratoController {
 
     private void abrirFormulario(Contrato existente) {
         try {
-            FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource("contrato-form.fxml"));
+            FXMLLoader loader = new FXMLLoader(LatchApplication.class.getResource("contrato-form.fxml"));
             Node contenido = loader.load();
             ContratoFormController formulario = loader.getController();
             formulario.establecerCatalogos(unidadesDisponibles, inquilinosDisponibles);
@@ -362,7 +362,7 @@ public class ContratoController {
                         return null;
                     }
                 };
-                TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+                TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ignorado -> {
                     formulario.marcarLimpio(); DialogoFormulario.cerrar(dialogo);
                     AlertaUtil.mostrarExito(nuevo ? "Contrato registrado" : "Contrato actualizado",
                             nuevo ? "El contrato quedó registrado." : "Los términos del contrato quedaron guardados.");
@@ -402,7 +402,7 @@ public class ContratoController {
                 return null;
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ignorado -> {
             AlertaUtil.mostrarExito("Contrato activado", "El contrato quedó Vigente y con su garantía registrada.");
             cargarDatos();
         }, error -> {
@@ -447,7 +447,7 @@ public class ContratoController {
                     return null;
                 }
             };
-            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+            TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ignorado -> {
                 DialogoFormulario.cerrar(dialogo);
                 AlertaUtil.mostrarExito("Borrador cancelado", "El borrador quedó marcado como Cancelado.");
                 cargarDatos();
@@ -525,7 +525,7 @@ public class ContratoController {
                         return null;
                     }
                 };
-                TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+                TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ignorado -> {
                     DialogoFormulario.cerrar(dialogo);
                     AlertaUtil.mostrarExito("Renovación preparada",
                             "Se creó el borrador sucesor enlazado a este contrato.");
@@ -629,7 +629,7 @@ public class ContratoController {
                     return null;
                 }
             };
-            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+            TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ignorado -> {
                 DialogoFormulario.cerrar(dialogo);
                 AlertaUtil.mostrarExito("Contrato finalizado",
                         sucesorElegido != null
@@ -667,7 +667,7 @@ public class ContratoController {
                 return new DatosGarantiaDialogo(resumen, cargosAbiertos);
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, datos -> {
             actualizarAcciones();
             mostrarDialogoGarantia(contrato, datos);
         }, error -> {
@@ -850,7 +850,7 @@ public class ContratoController {
                         return null;
                     }
                 };
-                TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+                TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ignorado -> {
                     DialogoFormulario.cerrar(dialogo);
                     AlertaUtil.mostrarExito("Garantía liquidada",
                             "Los movimientos de garantía quedaron registrados.");
@@ -879,7 +879,7 @@ public class ContratoController {
         Task<Void> tarea = new Task<>() {
             @Override protected Void call() throws SQLException { contratoService.eliminar(contratoId); return null; }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ignorado -> {
             AlertaUtil.mostrarExito("Contrato eliminado", "El registro del contrato se eliminó.");
             cargarDatos();
         }, error -> {

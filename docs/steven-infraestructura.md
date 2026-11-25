@@ -70,7 +70,7 @@ Los métodos `mostrarPanel`, `mostrarError` y `restaurarFormulario` son puntos d
 
 El ejecutor tiene dos hilos y una cola de 32 tareas. Manejar `RejectedExecutionException` para informar que está ocupado y restaurar la pantalla. Una tarea cancelada puede no entrar a `call()`; limpiar también los datos sensibles en su evento de cancelación.
 
-`HelloApplication.stop()` cancela las tareas, espera hasta diez segundos desde un hilo de cierre y cierra Hibernate. Las tareas largas deben consultar `isCancelled()` e interrupción entre lotes y salir; cancelar una Task no garantiza que una operación ya confirmada en base de datos sea revertida. No implementar reintentos automáticos de pagos sin resolver antes su idempotencia.
+`LatchApplication.stop()` cancela las tareas, espera hasta diez segundos desde un hilo de cierre y cierra Hibernate. Las tareas largas deben consultar `isCancelled()` e interrupción entre lotes y salir; cancelar una Task no garantiza que una operación ya confirmada en base de datos sea revertida. No implementar reintentos automáticos de pagos sin resolver antes su idempotencia.
 
 ## Demostración de esta entrega
 

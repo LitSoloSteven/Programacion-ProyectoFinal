@@ -22,7 +22,7 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import javafx.util.StringConverter;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.LatchApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.mantenimiento.dto.CambioEstadoMantenimientoRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.mantenimiento.dto.GastoMantenimientoRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.mantenimiento.dto.GastoMantenimientoResponse;
@@ -226,7 +226,7 @@ public class MantenimientoController {
                 return new DatosCargados(props, unis, sols, resGastos);
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, datos -> {
             btnRefrescar.setDisable(false);
             propiedadesDisponibles = datos.propiedades();
             unidadesDisponibles = datos.unidades();
@@ -271,7 +271,7 @@ public class MantenimientoController {
                 return cliente.consultarGastos(propFiltro == null ? null : propFiltro.getId(), desde, hasta, moneda);
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea,
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea,
                 this::mostrarGastos,
                 err -> mostrarError(mensajeSeguro(err, "No se pudieron consultar los gastos de mantenimiento.")));
     }
@@ -325,7 +325,7 @@ public class MantenimientoController {
                             txtResponsable.getText(), null));
                 }
             };
-            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ok -> {
+            TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ok -> {
                 DialogoFormulario.cerrar(dialogo);
                 AlertaUtil.mostrarExito("Solicitud creada", "La solicitud quedó registrada como Abierta.");
                 refrescarDatos();
@@ -373,7 +373,7 @@ public class MantenimientoController {
                                     cmbPrioridad.getValue(), txtResponsable.getText()));
                 }
             };
-            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ok -> {
+            TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ok -> {
                 DialogoFormulario.cerrar(dialogo);
                 AlertaUtil.mostrarExito("Solicitud actualizada", "Se guardaron los cambios de la solicitud.");
                 refrescarDatos();
@@ -411,7 +411,7 @@ public class MantenimientoController {
                                     null, txtResponsable.getText()));
                 }
             };
-            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ok -> {
+            TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ok -> {
                 DialogoFormulario.cerrar(dialogo);
                 AlertaUtil.mostrarExito("Solicitud en proceso", "La solicitud pasó a estado En proceso.");
                 refrescarDatos();
@@ -470,7 +470,7 @@ public class MantenimientoController {
                                     dpFecha.getValue().toString(), txtTexto.getText().strip()));
                 }
             };
-            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ok -> {
+            TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ok -> {
                 DialogoFormulario.cerrar(dialogo);
                 AlertaUtil.mostrarExito("Estado actualizado", "La solicitud quedó en estado " + estadoDestino + ".");
                 refrescarDatos();
@@ -557,7 +557,7 @@ public class MantenimientoController {
                             txtConcepto.getText().strip()));
                 }
             };
-            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ok -> {
+            TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ok -> {
                 DialogoFormulario.cerrar(dialogo);
                 AlertaUtil.mostrarExito("Gasto registrado", "El egreso quedó registrado sin generar cargo al inquilino.");
                 refrescarDatos();

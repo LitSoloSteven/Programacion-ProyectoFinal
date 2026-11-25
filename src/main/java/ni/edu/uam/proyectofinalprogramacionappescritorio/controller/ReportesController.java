@@ -12,7 +12,7 @@ import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
 import javafx.util.StringConverter;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.LatchApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteCatalogos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.DocumentoReporte;
@@ -204,7 +204,7 @@ public class ReportesController {
                         catalogos.inquilinos(false));
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, datos -> {
             btnRefrescarCatalogos.setDisable(false);
             poblarComboConNulo(cmbPropiedad, datos.propiedades());
             poblarComboConNulo(cmbUnidad, datos.unidades());
@@ -415,7 +415,7 @@ public class ReportesController {
         };
 
         TareasJavaFx.ejecutar(
-                HelloApplication.instancia().getTareas(),
+                LatchApplication.instancia().getTareas(),
                 tarea,
                 res -> {
                     ejecucion.close();

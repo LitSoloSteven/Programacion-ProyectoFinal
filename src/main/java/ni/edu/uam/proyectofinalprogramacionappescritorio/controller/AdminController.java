@@ -24,7 +24,7 @@ import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.ComposicionAplicacion;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.LatchApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.AuditoriaRegistroDTO;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.DocumentoAdjuntoDTO;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.EstadoAlertaRespaldoDTO;
@@ -198,14 +198,14 @@ public class AdminController {
     public void refrescarUsuarios() {
         ocultarError(lblErrorUsuarios);
         SesionUsuario identidad = SesionUsuario.getActual();
-        ComposicionAplicacion comp = HelloApplication.instancia().getComposicion();
+        ComposicionAplicacion comp = LatchApplication.instancia().getComposicion();
         btnRefrescarUsuarios.setDisable(true);
         Task<List<UsuarioResumenDTO>> tarea = new Task<>() {
             @Override protected List<UsuarioResumenDTO> call() {
                 return comp.usuarios().listar(identidad);
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, lista -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, lista -> {
             usuarios.setAll(lista);
             btnRefrescarUsuarios.setDisable(false);
         }, error -> {
@@ -246,7 +246,7 @@ public class AdminController {
             String clave = txtClave.getText();
             String rol = cmbRol.getValue();
             SesionUsuario identidad = SesionUsuario.getActual();
-            ComposicionAplicacion comp = HelloApplication.instancia().getComposicion();
+            ComposicionAplicacion comp = LatchApplication.instancia().getComposicion();
             accion.setDisable(true);
             Task<Void> tarea = new Task<>() {
                 @Override protected Void call() {
@@ -254,7 +254,7 @@ public class AdminController {
                     return null;
                 }
             };
-            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ok -> {
+            TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ok -> {
                 txtClave.clear();
                 DialogoFormulario.cerrar(dialogo);
                 AlertaUtil.mostrarExito("Usuario creado", "La cuenta quedó registrada.");
@@ -277,14 +277,14 @@ public class AdminController {
             return;
         }
         SesionUsuario identidad = SesionUsuario.getActual();
-        ComposicionAplicacion comp = HelloApplication.instancia().getComposicion();
+        ComposicionAplicacion comp = LatchApplication.instancia().getComposicion();
         Task<Void> tarea = new Task<>() {
             @Override protected Void call() {
                 comp.usuarios().cambiarRol(identidad, sel.id(), nuevoRol);
                 return null;
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ok -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ok -> {
             AlertaUtil.mostrarExito("Rol actualizado", "El rol cambió a " + nuevoRol + ".");
             refrescarUsuarios();
         }, error -> AlertaUtil.mostrarError("No se pudo cambiar el rol",
@@ -302,7 +302,7 @@ public class AdminController {
             return;
         }
         SesionUsuario identidad = SesionUsuario.getActual();
-        ComposicionAplicacion comp = HelloApplication.instancia().getComposicion();
+        ComposicionAplicacion comp = LatchApplication.instancia().getComposicion();
         Task<Void> tarea = new Task<>() {
             @Override protected Void call() {
                 if (activar) comp.usuarios().activar(identidad, sel.id());
@@ -310,7 +310,7 @@ public class AdminController {
                 return null;
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ok -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ok -> {
             AlertaUtil.mostrarExito("Cuenta actualizada", activar ? "La cuenta quedó activa." : "La cuenta quedó desactivada.");
             refrescarUsuarios();
         }, error -> AlertaUtil.mostrarError("No se pudo actualizar la cuenta",
@@ -338,7 +338,7 @@ public class AdminController {
             ev.consume();
             String temporal = txtTemporal.getText();
             SesionUsuario identidad = SesionUsuario.getActual();
-            ComposicionAplicacion comp = HelloApplication.instancia().getComposicion();
+            ComposicionAplicacion comp = LatchApplication.instancia().getComposicion();
             accion.setDisable(true);
             Task<Void> tarea = new Task<>() {
                 @Override protected Void call() {
@@ -347,7 +347,7 @@ public class AdminController {
                     return null;
                 }
             };
-            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ok -> {
+            TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ok -> {
                 txtTemporal.clear();
                 DialogoFormulario.cerrar(dialogo);
                 AlertaUtil.mostrarExito("Contraseña restablecida", "Se marcó cambio de contraseña pendiente.");
@@ -364,7 +364,7 @@ public class AdminController {
     public void refrescarParametros() {
         ocultarError(lblErrorParametro);
         SesionUsuario identidad = SesionUsuario.getActual();
-        ComposicionAplicacion comp = HelloApplication.instancia().getComposicion();
+        ComposicionAplicacion comp = LatchApplication.instancia().getComposicion();
         btnRefrescarParametros.setDisable(true);
         Task<DatosParametros> tarea = new Task<>() {
             @Override protected DatosParametros call() {
@@ -374,7 +374,7 @@ public class AdminController {
                         comp.configuracion().listarHistorialParametros(identidad, null));
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, datos -> {
             btnRefrescarParametros.setDisable(false);
             parametros.setAll(datos.historial());
             logotipoVigente = datos.logotipo().orElse(null);
@@ -408,14 +408,14 @@ public class AdminController {
         java.io.File archivo = fc.showOpenDialog(ventanaActual());
         if (archivo == null) return;
         SesionUsuario identidad = SesionUsuario.getActual();
-        ComposicionAplicacion comp = HelloApplication.instancia().getComposicion();
+        ComposicionAplicacion comp = LatchApplication.instancia().getComposicion();
         btnAdjuntarLogotipo.setDisable(true);
         Task<DocumentoAdjuntoDTO> tarea = new Task<>() {
             @Override protected DocumentoAdjuntoDTO call() {
                 return comp.adjuntos().adjuntarLogotipoEmisor(identidad, archivo.toPath());
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ok -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ok -> {
             btnAdjuntarLogotipo.setDisable(false);
             AlertaUtil.mostrarExito("Logotipo guardado", "El logotipo quedó vinculado al perfil emisor vigente.");
             refrescarParametros();
@@ -430,7 +430,7 @@ public class AdminController {
         if (logotipoVigente == null) return;
         ocultarError(lblErrorParametro);
         SesionUsuario identidad = SesionUsuario.getActual();
-        ComposicionAplicacion comp = HelloApplication.instancia().getComposicion();
+        ComposicionAplicacion comp = LatchApplication.instancia().getComposicion();
         java.util.UUID adjuntoId = logotipoVigente.id();
         btnQuitarLogotipo.setDisable(true);
         Task<Void> tarea = new Task<>() {
@@ -439,7 +439,7 @@ public class AdminController {
                 return null;
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ok -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ok -> {
             AlertaUtil.mostrarExito("Logotipo quitado", "Se desactivó el logotipo del emisor.");
             refrescarParametros();
         }, error -> {
@@ -456,7 +456,7 @@ public class AdminController {
                 txtEmisorDireccion.getText(), txtEmisorTelefono.getText(), txtEmisorCorreo.getText());
         String motivo = txtEmisorMotivo.getText();
         SesionUsuario identidad = SesionUsuario.getActual();
-        ComposicionAplicacion comp = HelloApplication.instancia().getComposicion();
+        ComposicionAplicacion comp = LatchApplication.instancia().getComposicion();
         btnGuardarEmisor.setDisable(true);
         Task<Void> tarea = new Task<>() {
             @Override protected Void call() {
@@ -464,7 +464,7 @@ public class AdminController {
                 return null;
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ok -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ok -> {
             btnGuardarEmisor.setDisable(false);
             txtEmisorMotivo.clear();
             AlertaUtil.mostrarExito("Perfil emisor guardado", "Los nuevos recibos usarán este perfil emisor.");
@@ -482,7 +482,7 @@ public class AdminController {
         String valor = txtParamValor.getText();
         String motivo = txtParamMotivo.getText();
         SesionUsuario identidad = SesionUsuario.getActual();
-        ComposicionAplicacion comp = HelloApplication.instancia().getComposicion();
+        ComposicionAplicacion comp = LatchApplication.instancia().getComposicion();
         btnRegistrarParametro.setDisable(true);
         Task<Void> tarea = new Task<>() {
             @Override protected Void call() {
@@ -490,7 +490,7 @@ public class AdminController {
                 return null;
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ok -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ok -> {
             btnRegistrarParametro.setDisable(false);
             txtParamClave.clear();
             txtParamValor.clear();
@@ -514,14 +514,14 @@ public class AdminController {
         Instant hasta = dHasta == null ? null
                 : dHasta.plusDays(1).atStartOfDay(RelojService.ZONA_OPERATIVA).minusNanos(1).toInstant();
         SesionUsuario identidad = SesionUsuario.getActual();
-        ComposicionAplicacion comp = HelloApplication.instancia().getComposicion();
+        ComposicionAplicacion comp = LatchApplication.instancia().getComposicion();
         btnConsultarAuditoria.setDisable(true);
         Task<List<AuditoriaRegistroDTO>> tarea = new Task<>() {
             @Override protected List<AuditoriaRegistroDTO> call() {
                 return comp.auditoria().consultar(identidad, usuarioFiltro, accionFiltro, desde, hasta, 200);
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, lista -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, lista -> {
             btnConsultarAuditoria.setDisable(false);
             auditorias.setAll(lista);
         }, error -> {
@@ -534,14 +534,14 @@ public class AdminController {
     public void refrescarEstadoRespaldo() {
         ocultarError(lblErrorRespaldo);
         SesionUsuario identidad = SesionUsuario.getActual();
-        ComposicionAplicacion comp = HelloApplication.instancia().getComposicion();
+        ComposicionAplicacion comp = LatchApplication.instancia().getComposicion();
         btnRefrescarRespaldo.setDisable(true);
         Task<EstadoAlertaRespaldoDTO> tarea = new Task<>() {
             @Override protected EstadoAlertaRespaldoDTO call() {
                 return comp.respaldos().consultarEstadoAlerta(identidad);
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, estado -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, estado -> {
             btnRefrescarRespaldo.setDisable(false);
             lblEstadoRespaldo.setText(estado.mensaje());
         }, error -> {
@@ -605,7 +605,7 @@ public class AdminController {
 
         Path destino = Path.of(rutaDestino.strip());
         SesionUsuario identidad = SesionUsuario.getActual();
-        ComposicionAplicacion comp = HelloApplication.instancia().getComposicion();
+        ComposicionAplicacion comp = LatchApplication.instancia().getComposicion();
         btnCrearRespaldo.setDisable(true);
         Task<ResultadoRespaldoDTO> tarea = new Task<>() {
             @Override protected ResultadoRespaldoDTO call() {
@@ -616,7 +616,7 @@ public class AdminController {
                 }
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, resultado -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, resultado -> {
             btnCrearRespaldo.setDisable(false);
             txtArchivoRespaldo.setText(resultado.archivo().toString());
             mostrarError(lblResultadoRespaldo,
@@ -644,7 +644,7 @@ public class AdminController {
         pwdClaveRestaurar.clear();
 
         Path archivo = Path.of(rutaArchivo.strip());
-        ComposicionAplicacion comp = HelloApplication.instancia().getComposicion();
+        ComposicionAplicacion comp = LatchApplication.instancia().getComposicion();
         btnVerificarRespaldo.setDisable(true);
         Task<ResultadoVerificacionRespaldoDTO> tarea = new Task<>() {
             @Override protected ResultadoVerificacionRespaldoDTO call() {
@@ -655,7 +655,7 @@ public class AdminController {
                 }
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ver -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ver -> {
             btnVerificarRespaldo.setDisable(false);
             mostrarError(lblResultadoRespaldo,
                     "Paquete auténtico e íntegro: corte " + ver.manifiesto().corteLocal()
@@ -709,7 +709,7 @@ public class AdminController {
         Arrays.fill(claveDestino, '\0');
 
         SesionUsuario identidad = SesionUsuario.getActual();
-        ComposicionAplicacion comp = HelloApplication.instancia().getComposicion();
+        ComposicionAplicacion comp = LatchApplication.instancia().getComposicion();
         btnRestaurarAislado.setDisable(true);
         Task<ResultadoRestauracionDTO> tarea = new Task<>() {
             @Override protected ResultadoRestauracionDTO call() {
@@ -722,7 +722,7 @@ public class AdminController {
                 }
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, res -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, res -> {
             btnRestaurarAislado.setDisable(false);
             mostrarError(lblResultadoRespaldo,
                     "Restauración aislada completada: " + res.adjuntosVerificados()

@@ -27,7 +27,7 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.ComposicionAplicacion;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.LatchApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.indicadores.dto.MetricasResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.indicadores.dto.TasaResumenResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.indicadores.dto.TotalMonedaResponse;
@@ -228,7 +228,7 @@ public class DashboardController {
         Task<Integer> leerMinutos = new Task<>() {
             @Override protected Integer call() {
                 try {
-                    return HelloApplication.instancia().getComposicion()
+                    return LatchApplication.instancia().getComposicion()
                             .configuracion().leerMinutosInactividad(identidad);
                 } catch (RuntimeException error) {
                     return 15;
@@ -245,7 +245,7 @@ public class DashboardController {
                             "Tu sesión se cerrará por inactividad en 60 segundos. Interactúa para continuar."),
                     this::cerrarPorInactividad);
             monitorInactividad.vincularEscena(contentArea.getScene());
-            HelloApplication.instancia().registrarMonitorInactividad(monitorInactividad);
+            LatchApplication.instancia().registrarMonitorInactividad(monitorInactividad);
         };
         contentArea.sceneProperty().addListener((obs, anterior, escena) -> {
             if (escena == null) {
@@ -254,7 +254,7 @@ public class DashboardController {
                 vincular.run();
             }
         });
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), leerMinutos,
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), leerMinutos,
                 minutos -> vincular.run(), error -> vincular.run());
     }
 
@@ -357,7 +357,7 @@ public class DashboardController {
                 return ClienteLatch.api().get(ruta, MetricasResponse.class);
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, metricas -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, metricas -> {
             ultimasMetricas = metricas;
             if (lblPorcentajeOcupacion != null) {
                 lblPorcentajeOcupacion.setText((metricas.porcentajeOcupacion() == null ? "0.00" : metricas.porcentajeOcupacion()) + " %");
@@ -667,7 +667,7 @@ public class DashboardController {
                 lblErr.setManaged(true);
                 return;
             }
-            ComposicionAplicacion comp = HelloApplication.instancia().getComposicion();
+            ComposicionAplicacion comp = LatchApplication.instancia().getComposicion();
             accion.setDisable(true);
             Task<Long> tarea = new Task<>() {
                 @Override protected Long call() {
@@ -677,7 +677,7 @@ public class DashboardController {
                             nueva.toCharArray());
                 }
             };
-            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, nuevaVersion -> {
+            TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, nuevaVersion -> {
                 txtActual.clear();
                 txtNueva.clear();
                 txtConfirmar.clear();
@@ -705,7 +705,7 @@ public class DashboardController {
 
     private void cargarVista(String fxmlFile, Consumer<Object> configurador) {
         try {
-            FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource(fxmlFile));
+            FXMLLoader loader = new FXMLLoader(LatchApplication.class.getResource(fxmlFile));
             Parent view = loader.load();
             if (configurador != null) {
                 configurador.accept(loader.getController());
@@ -832,7 +832,7 @@ public class DashboardController {
             }
         };
         try {
-            HelloApplication.instancia().getTareas().ejecutar(tarea);
+            LatchApplication.instancia().getTareas().ejecutar(tarea);
         } catch (RuntimeException e) {
             // El servicio local ya no está disponible.
         }
@@ -845,7 +845,7 @@ public class DashboardController {
 
     private void mostrarLoginEnStage(Stage stage) {
         try {
-            FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource("login-view.fxml"));
+            FXMLLoader loader = new FXMLLoader(LatchApplication.class.getResource("login-view.fxml"));
             Parent root = loader.load();
 
             Scene scene = new Scene(root, 460, 580);

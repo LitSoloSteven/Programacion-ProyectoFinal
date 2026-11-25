@@ -20,7 +20,7 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.LatchApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PaginaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoDetalleResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoListaResponse;
@@ -83,7 +83,7 @@ public class PagoController {
 
     private final ReporteService reporteService = new ReporteService();
     private final ClienteCatalogos catalogos = new ClienteCatalogos(ClienteLatch.api());
-    private final ClientePagos clientePagos = HelloApplication.instancia().getPagos();
+    private final ClientePagos clientePagos = LatchApplication.instancia().getPagos();
     private final ObservableList<PagoListaResponse> listaPagos = FXCollections.observableArrayList();
     private List<Contrato> contratosDisponibles = List.of();
     private PagoListaResponse pagoSeleccionado;
@@ -161,7 +161,7 @@ public class PagoController {
                         clientePagos.listarPagos(pagina, filtro));
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, datos -> {
             if (version != versionConsulta) return;
             contratosDisponibles = datos.contratos();
             btnNuevo.setDisable(contratosDisponibles.isEmpty());
@@ -186,7 +186,7 @@ public class PagoController {
                 return clientePagos.listarPagos(pagina, filtro);
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, resultado -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, resultado -> {
             if (version == versionConsulta) mostrarPagina(resultado);
             btnRefrescar.setDisable(false);
         }, error -> {
@@ -223,7 +223,7 @@ public class PagoController {
 
     private void abrirFormulario() {
         try {
-            FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource("pago-form.fxml"));
+            FXMLLoader loader = new FXMLLoader(LatchApplication.class.getResource("pago-form.fxml"));
             Node contenido = loader.load();
             PagoFormController formulario = loader.getController();
             formulario.establecerClientePagos(clientePagos);
@@ -263,7 +263,7 @@ public class PagoController {
         Task<PagoRegistroResponse> tarea = new Task<>() {
             @Override protected PagoRegistroResponse call() { return clientePagos.registrarReintentable(usuarioId, solicitud); }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, registro -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, registro -> {
             formulario.marcarLimpio();
             DialogoFormulario.cerrar(dialogo);
             AlertaUtil.mostrarExito("Pago registrado", "Pago de "
@@ -293,7 +293,7 @@ public class PagoController {
                         clientePagos.listarPagos(pagina, filtro));
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, datos -> {
             if (version != versionConsulta) return;
             contratosDisponibles = datos.contratos();
             btnNuevo.setDisable(contratosDisponibles.isEmpty());
@@ -343,7 +343,7 @@ public class PagoController {
                 return null;
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ignorado -> {
             pagoSeleccionado = null;
             AlertaUtil.mostrarExito("Pago anulado", "El pago quedó marcado como anulado.");
             cargarDatos();
@@ -481,7 +481,7 @@ public class PagoController {
                 return new Detalle(detalle, recibo);
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, detalle -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, detalle -> {
             PagoDetalleResponse datos = detalle.pago();
             ReciboResponse recibo = detalle.recibo();
             Alert alerta = new Alert(Alert.AlertType.INFORMATION);

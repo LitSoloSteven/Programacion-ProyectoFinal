@@ -18,7 +18,7 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.LatchApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.dto.LoginResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteAuth;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
@@ -157,7 +157,7 @@ public class LoginController {
             txtPassword.requestFocus();
         });
         try {
-            HelloApplication.instancia().getTareas().ejecutar(tarea);
+            LatchApplication.instancia().getTareas().ejecutar(tarea);
         } catch (RuntimeException e) {
             btnIngresar.setDisable(false);
             btnIngresar.setText("Ingresar");
@@ -210,7 +210,7 @@ public class LoginController {
 
     private void abrirDashboard(ActionEvent event) {
         try {
-            Parent root = new FXMLLoader(HelloApplication.class.getResource("dashboard-view.fxml")).load();
+            Parent root = new FXMLLoader(LatchApplication.class.getResource("dashboard-view.fxml")).load();
             Stage stage = (Stage) ((Node) event.getSource()).getScene().getWindow();
             Scene scene = new Scene(root, 1366, 820);
             TemaAplicacion.aplicar(scene);

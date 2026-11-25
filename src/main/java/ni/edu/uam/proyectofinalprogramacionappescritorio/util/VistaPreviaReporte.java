@@ -11,7 +11,7 @@ import javafx.stage.Stage;
 import javafx.stage.Window;
 import net.sf.jasperreports.engine.JasperExportManager;
 import net.sf.jasperreports.engine.JasperPrint;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.LatchApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.controller.VistaPreviaReporteController;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.DocumentoReporte;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.TablaReporteXlsx;
@@ -80,7 +80,7 @@ public final class VistaPreviaReporte {
         };
 
         TareasJavaFx.ejecutar(
-                HelloApplication.instancia().getTareas(),
+                LatchApplication.instancia().getTareas(),
                 tarea,
                 documento -> {
                     ejecucion.close();

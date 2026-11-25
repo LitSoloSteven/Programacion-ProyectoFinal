@@ -22,7 +22,7 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.LatchApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.InquilinoRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteCatalogos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
@@ -81,7 +81,7 @@ public class InquilinoController {
     private final boolean permisoEliminar = SesionUsuario.esPropietario();
     private long versionConsulta;
 
-    public InquilinoController() { this(HelloApplication.instancia().getComposicion().inquilinos()); }
+    public InquilinoController() { this(LatchApplication.instancia().getComposicion().inquilinos()); }
     @FXML public void initialize() {
         lblTitulo.setGraphic(Iconos.crear(Iconos.Nombre.PERSONAS, 20));
         Iconos.asignar(btnRefrescar, Iconos.Nombre.ACTUALIZAR, 16);
@@ -142,7 +142,7 @@ public class InquilinoController {
         Task<List<Inquilino>> tarea = new Task<>() {
             @Override protected List<Inquilino> call() throws SQLException { return catalogos.inquilinos(false); }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, datos -> {
             if (version != versionConsulta) return;
             registros.setAll(datos);
             aplicarFiltro(txtBuscar.getText());
@@ -166,7 +166,7 @@ public class InquilinoController {
     private void abrirAdjuntos(Inquilino inquilino) {
         if (inquilino == null || inquilino.getId() == null) return;
         Window propietario = tblInquilinos.getScene() == null ? null : tblInquilinos.getScene().getWindow();
-        var adjuntos = HelloApplication.instancia().getComposicion().adjuntos();
+        var adjuntos = LatchApplication.instancia().getComposicion().adjuntos();
         SesionUsuario identidad = SesionUsuario.getActual();
         DialogosAdjuntos.mostrarGestorAdjuntos(
                 propietario,
@@ -185,7 +185,7 @@ public class InquilinoController {
                 return inquilinoService.consultarHistorial(inquilino.getId());
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, historial -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, historial -> {
             StringBuilder detalle = new StringBuilder();
             detalle.append("Inquilino: ").append(historial.nombre());
             if (historial.identificacion() != null) {
@@ -230,7 +230,7 @@ public class InquilinoController {
 
     private void abrirFormulario(Inquilino existente) {
         try {
-            FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource("inquilino-form.fxml"));
+            FXMLLoader loader = new FXMLLoader(LatchApplication.class.getResource("inquilino-form.fxml"));
             Node contenido = loader.load();
             InquilinoFormController formulario = loader.getController();
             if (existente != null) formulario.cargar(existente);
@@ -260,7 +260,7 @@ public class InquilinoController {
                             return null;
                         }
                     };
-                    TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+                    TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ignorado -> {
                         formulario.marcarLimpio();
                         DialogoFormulario.cerrar(dialogo);
                         AlertaUtil.mostrarExito(nuevo ? "Inquilino registrado" : "Inquilino actualizada",
@@ -291,7 +291,7 @@ public class InquilinoController {
                                     ident, nuevo ? null : existente.getId());
                         }
                     };
-                    TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), verificar, coincidencias -> {
+                    TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), verificar, coincidencias -> {
                         if (!coincidencias.isEmpty()) {
                             Inquilino previo = coincidencias.getFirst();
                             boolean continuar = AlertaUtil.mostrarConfirmacion(
@@ -325,7 +325,7 @@ public class InquilinoController {
         Task<Void> tarea = new Task<>() {
             @Override protected Void call() throws SQLException { catalogos.darDeBajaInquilino(inquilino.getId()); return null; }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ignorado -> {
             AlertaUtil.mostrarExito("Inquilino deshabilitado", "El inquilino quedó inactivo.");
             cargarDatos();
         }, error -> {
@@ -349,7 +349,7 @@ public class InquilinoController {
         Task<Void> tarea = new Task<>() {
             @Override protected Void call() throws SQLException { inquilinoService.eliminar(inquilino.getId()); return null; }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ignorado -> {
             AlertaUtil.mostrarExito("Registro eliminado", "El registro del inquilino se eliminó.");
             cargarDatos();
         }, error -> {

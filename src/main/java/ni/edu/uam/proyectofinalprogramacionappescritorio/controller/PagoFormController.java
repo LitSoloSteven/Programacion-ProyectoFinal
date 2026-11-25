@@ -13,7 +13,7 @@ import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.LatchApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.CarteraResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.DistribucionRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClientePagos;
@@ -120,7 +120,7 @@ public class PagoFormController {
                 return clientePagos.consultarCartera(null, contratoId, null, null, null);
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, cartera -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, cartera -> {
             if (!Objects.equals(cmbContrato.getValue(), contrato)) return;
             listaCargosContainer.getChildren().clear();
             filasManuales.clear();

@@ -150,7 +150,7 @@
                         <id>default-cli</id>
                         <configuration>
                             <mainClass>
-                                ni.edu.uam.proyectofinalprogramacionappescritorio/ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication
+                                ni.edu.uam.proyectofinalprogramacionappescritorio/ni.edu.uam.proyectofinalprogramacionappescritorio.Launcher
                             </mainClass>
                             <launcher>app</launcher>
                             <jlinkZipName>app</jlinkZipName>

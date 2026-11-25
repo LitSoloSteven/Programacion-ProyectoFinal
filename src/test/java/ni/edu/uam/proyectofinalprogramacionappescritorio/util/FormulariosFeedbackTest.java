@@ -13,7 +13,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javafx.stage.Window;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.LatchApplication;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -124,7 +124,7 @@ class FormulariosFeedbackTest {
     }
 
     private static FXMLLoader cargar(String nombre) throws Exception {
-        FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource(nombre + "-form.fxml"));
+        FXMLLoader loader = new FXMLLoader(LatchApplication.class.getResource(nombre + "-form.fxml"));
         loader.load();
         return loader;
     }

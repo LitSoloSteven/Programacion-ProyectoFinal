@@ -36,7 +36,7 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.DialogPane;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.LatchApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PaginaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.ItemPrevisualizacionLoteDTO;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.PrevisualizacionLoteDTO;
@@ -112,7 +112,7 @@ public class CargoController {
     private record DatosTabla(List<Contrato> contratos, PaginaResponse<CargoListaResponse> cargos) { }
 
     public CargoController() {
-        this(HelloApplication.instancia().getComposicion().cargos());
+        this(LatchApplication.instancia().getComposicion().cargos());
     }
 
     @FXML
@@ -178,7 +178,7 @@ public class CargoController {
                         cobranza.listarCargos(pagina, filtro));
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, resultado -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, resultado -> {
             if (version != versionConsulta) return;
             contratosDisponibles = resultado.contratos();
             btnNuevo.setDisable(contratosDisponibles.isEmpty());
@@ -207,7 +207,7 @@ public class CargoController {
                 return cobranza.listarCargos(pagina, filtro);
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, resultado -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, resultado -> {
             if (version == versionConsulta) mostrarPagina(resultado);
         }, error -> {
             if (version == versionConsulta) mostrarErrorConsulta(error);
@@ -246,13 +246,13 @@ public class CargoController {
                 return cargoService.obtenerParaEdicion(UUID.fromString(fila.id()));
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, this::abrirFormulario,
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, this::abrirFormulario,
                 error -> AlertaUtil.mostrarError("No se pudo abrir el cargo", mensajeError(error)));
     }
 
     private void abrirFormulario(Cargo cargo) {
         try {
-            FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource("cargo-form.fxml"));
+            FXMLLoader loader = new FXMLLoader(LatchApplication.class.getResource("cargo-form.fxml"));
             Node contenido = loader.load();
             CargoFormController formulario = loader.getController();
             formulario.establecerContratos(contratosDisponibles);
@@ -292,7 +292,7 @@ public class CargoController {
                 return null;
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ignorado -> {
             formulario.marcarLimpio();
             DialogoFormulario.cerrar(dialogo);
             AlertaUtil.mostrarExito(nuevo ? "Cargo registrado" : "Cargo actualizado",
@@ -352,7 +352,7 @@ public class CargoController {
                 return null;
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ignorado -> {
             cargoSeleccionado = null;
             AlertaUtil.mostrarExito("Cargo anulado", "El cargo quedó anulado y conservó su importe histórico.");
             cargarPagina();
@@ -412,7 +412,7 @@ public class CargoController {
         contenido.setPrefSize(720, 440);
 
         AtomicBoolean cancelado = new AtomicBoolean(false);
-        CobranzaService cobranzaDomain = HelloApplication.instancia().getComposicion().cobranza();
+        CobranzaService cobranzaDomain = LatchApplication.instancia().getComposicion().cobranza();
 
         btnPrevisualizar.setOnAction(ev -> {
             YearMonth periodo;
@@ -428,7 +428,7 @@ public class CargoController {
                     return cobranzaDomain.previsualizarGeneracionMes(periodo);
                 }
             };
-            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, previa -> {
+            TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, previa -> {
                 btnPrevisualizar.setDisable(false);
                 tblPrevia.setItems(FXCollections.observableArrayList(previa.items()));
                 lblEstadoLote.setText("Vista previa " + previa.periodo() + ": "
@@ -487,7 +487,7 @@ public class CargoController {
                     }
                 }
             };
-            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, res -> {
+            TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, res -> {
                 btnEjecutar.setDisable(false);
                 btnPrevisualizar.setDisable(false);
                 btnCancelarLote.setDisable(true);
@@ -529,7 +529,7 @@ public class CargoController {
                 return cobranza.revisarMora(null);
             }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, res -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, res -> {
             btnRevisarMora.setDisable(false);
             AlertaUtil.mostrarExito("Revisión H2 completada",
                     "Fecha: " + res.fechaEvaluacion()
@@ -604,7 +604,7 @@ public class CargoController {
                     return cobranza.consultarCartera(corte, null, null, moneda, texto);
                 }
             };
-            TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, res -> {
+            TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, res -> {
                 btnConsultar.setDisable(false);
                 tblCartera.setItems(FXCollections.observableArrayList(res.items()));
                 if (res.totalesPorMoneda().isEmpty()) {

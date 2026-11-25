@@ -21,7 +21,7 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.LatchApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PropiedadRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteCatalogos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
@@ -77,7 +77,7 @@ public class PropiedadController {
     private final boolean permisoEliminar = SesionUsuario.esPropietario();
     private long versionConsulta;
 
-    public PropiedadController() { this(HelloApplication.instancia().getComposicion().propiedades()); }
+    public PropiedadController() { this(LatchApplication.instancia().getComposicion().propiedades()); }
     @FXML public void initialize() {
         lblTitulo.setGraphic(Iconos.crear(Iconos.Nombre.PROPIEDAD, 20));
         Iconos.asignar(btnRefrescar, Iconos.Nombre.ACTUALIZAR, 16);
@@ -135,7 +135,7 @@ public class PropiedadController {
         Task<List<Propiedad>> tarea = new Task<>() {
             @Override protected List<Propiedad> call() throws SQLException { return catalogos.propiedades(false); }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, datos -> {
             if (version != versionConsulta) return;
             registros.setAll(datos);
             aplicarFiltro(txtBuscar.getText());
@@ -159,7 +159,7 @@ public class PropiedadController {
 
     private void abrirFormulario(Propiedad existente) {
         try {
-            FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource("propiedad-form.fxml"));
+            FXMLLoader loader = new FXMLLoader(LatchApplication.class.getResource("propiedad-form.fxml"));
             Node contenido = loader.load();
             PropiedadFormController formulario = loader.getController();
             if (existente != null) formulario.cargar(existente);
@@ -184,7 +184,7 @@ public class PropiedadController {
                         return null;
                     }
                 };
-                TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+                TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ignorado -> {
                     formulario.marcarLimpio();
                     DialogoFormulario.cerrar(dialogo);
                     AlertaUtil.mostrarExito(nueva ? "Propiedad registrada" : "Propiedad actualizada",
@@ -219,7 +219,7 @@ public class PropiedadController {
         Task<Void> tarea = new Task<>() {
             @Override protected Void call() throws SQLException { propiedadService.eliminar(propiedad.getId()); return null; }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ignorado -> {
             seleccionada = null;
             AlertaUtil.mostrarExito("Propiedad eliminada", "El registro de la propiedad se eliminó.");
             cargarDatos();

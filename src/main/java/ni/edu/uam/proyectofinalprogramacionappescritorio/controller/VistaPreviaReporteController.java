@@ -11,7 +11,7 @@ import javafx.scene.image.WritableImage;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.Window;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.LatchApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.DocumentoReporte;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.service.OperacionCanceladaException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
@@ -228,7 +228,7 @@ public class VistaPreviaReporteController {
         };
 
         TareasJavaFx.ejecutar(
-                HelloApplication.instancia().getTareas(),
+                LatchApplication.instancia().getTareas(),
                 tareaExportar,
                 resultado -> {
                     ejecucion.close();
@@ -337,7 +337,7 @@ public class VistaPreviaReporteController {
         };
 
         TareasJavaFx.ejecutar(
-                HelloApplication.instancia().getTareas(),
+                LatchApplication.instancia().getTareas(),
                 tareaRender,
                 imagen -> {
                     if (idSolicitud != solicitudRenderId || documento == null) return;
