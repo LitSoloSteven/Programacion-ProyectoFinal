@@ -2,6 +2,10 @@ target/
 .idea/
 *.iml
 .agents/
+.codex/
+AGENTS.md
+docs/AGENTES_Y_MODELOS.md
+/src/graphify-out/
 docs/dashboard-latch-mockup.svg
 .env
 .env.*
