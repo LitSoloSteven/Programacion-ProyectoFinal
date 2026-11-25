@@ -5,6 +5,9 @@
     <parameter name="TITULO_SISTEMA" class="java.lang.String"/>
     <parameter name="GENERADO_POR" class="java.lang.String"/>
     <parameter name="TOTAL_REGISTROS" class="java.lang.Integer"/>
+    <parameter name="PAGOS_ANULADOS" class="java.lang.Integer"/>
+    <parameter name="TOTAL_NETO_USD" class="java.lang.String"/>
+    <parameter name="TOTAL_NETO_NIO" class="java.lang.String"/>
 
     <field name="contrato" class="java.lang.String"/>
     <field name="fechaPago" class="java.time.LocalDate"/>
@@ -16,7 +19,7 @@
     <field name="referencia" class="java.lang.String"/>
     <field name="estado" class="java.lang.String"/>
 
-    <title height="68">
+    <title height="88">
         <element kind="rectangle" x="0" y="0" width="782" height="42" backcolor="#0F172A">
             <pen lineWidth="0.0"/>
         </element>
@@ -26,8 +29,14 @@
         <element kind="textField" x="560" y="10" width="208" height="22" forecolor="#CBD5E1" hTextAlign="Right" vTextAlign="Middle" fontSize="9.5">
             <expression><![CDATA["Registros: " + ($P{TOTAL_REGISTROS} == null ? 0 : $P{TOTAL_REGISTROS})]]></expression>
         </element>
-        <element kind="textField" x="0" y="46" width="782" height="18" forecolor="#475569" vTextAlign="Middle" fontSize="9.0">
+        <element kind="textField" x="0" y="46" width="782" height="16" forecolor="#475569" vTextAlign="Middle" fontSize="9.0">
             <expression><![CDATA["Generado por: " + ($P{GENERADO_POR} == null || $P{GENERADO_POR}.isBlank() ? "Sistema" : $P{GENERADO_POR})]]></expression>
+        </element>
+        <element kind="rectangle" x="0" y="64" width="782" height="20" backcolor="#F1F5F9">
+            <pen lineWidth="0.0"/>
+        </element>
+        <element kind="textField" x="10" y="64" width="762" height="20" forecolor="#0F172A" vTextAlign="Middle" fontSize="8.5" bold="true">
+            <expression><![CDATA["Vigentes: " + (($P{TOTAL_REGISTROS} == null ? 0 : $P{TOTAL_REGISTROS}) - ($P{PAGOS_ANULADOS} == null ? 0 : $P{PAGOS_ANULADOS})) + "   |   Anulados: " + ($P{PAGOS_ANULADOS} == null ? 0 : $P{PAGOS_ANULADOS}) + "   |   Neto USD: " + ($P{TOTAL_NETO_USD} == null ? "0.00" : $P{TOTAL_NETO_USD}) + " USD   |   Neto NIO: " + ($P{TOTAL_NETO_NIO} == null ? "0.00" : $P{TOTAL_NETO_NIO}) + " NIO"]]></expression>
         </element>
     </title>
 
@@ -41,11 +50,11 @@
         <element kind="staticText" x="185" y="0" width="82" height="24" forecolor="#0F172A" vTextAlign="Middle" fontSize="9.0" bold="true">
             <text><![CDATA[Fecha pago]]></text>
         </element>
-        <element kind="textField" x="267" y="2" width="125" height="18" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="9.0">
-            <expression><![CDATA[String.format(java.util.Locale.US, "%,.2f", $F{montoOriginal} == null ? java.math.BigDecimal.ZERO : $F{montoOriginal}) + ($F{monedaOriginal} == null || $F{monedaOriginal}.isBlank() ? "" : " " + $F{monedaOriginal})]]></expression>
+        <element kind="staticText" x="267" y="0" width="125" height="24" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="9.0" bold="true">
+            <text><![CDATA[Monto original]]></text>
         </element>
-        <element kind="textField" x="392" y="2" width="125" height="18" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="9.0">
-            <expression><![CDATA[String.format(java.util.Locale.US, "%,.2f", $F{montoContrato} == null ? java.math.BigDecimal.ZERO : $F{montoContrato}) + ($F{monedaContrato} == null || $F{monedaContrato}.isBlank() ? "" : " " + $F{monedaContrato})]]></expression>
+        <element kind="staticText" x="392" y="0" width="125" height="24" forecolor="#0F172A" hTextAlign="Right" vTextAlign="Middle" fontSize="9.0" bold="true">
+            <text><![CDATA[Monto contrato]]></text>
         </element>
         <element kind="staticText" x="524" y="0" width="78" height="24" forecolor="#0F172A" vTextAlign="Middle" fontSize="9.0" bold="true">
             <text><![CDATA[Método]]></text>

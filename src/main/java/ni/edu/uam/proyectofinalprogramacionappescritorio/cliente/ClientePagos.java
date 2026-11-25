@@ -6,11 +6,13 @@ import com.google.gson.reflect.TypeToken;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PaginaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.AnulacionRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.CargoListaResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.EstadoCuentaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoDetalleResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoListaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.ReciboResponse;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoRegistroResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoRequest;
 
@@ -70,6 +72,18 @@ public final class ClientePagos {
 
     public void anular(String id, String motivo) {
         api.get().post("/api/v1/pagos/" + id + "/anulacion", new AnulacionRequest(motivo), Void.class);
+    }
+
+    public EstadoCuentaResponse estadoCuenta(String contratoId, LocalDate corte) {
+        if (contratoId == null || contratoId.isBlank()) {
+            throw new IllegalArgumentException("Falta el identificador del contrato.");
+        }
+        String ruta = "/api/v1/contratos/" + URLEncoder.encode(contratoId.strip(), StandardCharsets.UTF_8)
+                + "/estado-cuenta";
+        if (corte != null) {
+            ruta += "?corte=" + corte;
+        }
+        return api.get().get(ruta, EstadoCuentaResponse.class);
     }
 
     private <T> PaginaResponse<T> listar(String ruta, int pagina, String texto, Class<T> tipo) {
