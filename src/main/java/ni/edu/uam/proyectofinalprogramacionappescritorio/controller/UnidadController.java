@@ -39,6 +39,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PanelEstadoTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.VistaPreviaReporte;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -87,6 +88,10 @@ public class UnidadController {
     @FXML public void initialize() {
         lblTitulo.setGraphic(Iconos.crear(Iconos.Nombre.UNIDAD, 20));
         Iconos.asignar(btnRefrescar, Iconos.Nombre.ACTUALIZAR, 16);
+        if (btnGenerarReporte != null) {
+            Iconos.asignar(btnGenerarReporte, Iconos.Nombre.REPORTE, 16);
+            btnGenerarReporte.setTooltip(new Tooltip("Vista previa y exportación PDF del catálogo de unidades"));
+        }
         Iconos.asignar(btnNuevo, Iconos.Nombre.MAS, 16);
         btnNuevo.disableProperty().bind(btnRefrescar.disableProperty());
         Iconos.asignar(btnLimpiar, Iconos.Nombre.CERRAR, 14);
@@ -263,72 +268,11 @@ public class UnidadController {
             return;
         }
 
-        if (btnGenerarReporte != null) {
-            btnGenerarReporte.setDisable(true);
-        }
-
-        Task<byte[]> tareaGenerarPdf = new Task<>() {
-            @Override
-            protected byte[] call() {
-                return reporteService.generarReporteUnidadesPdf(unidadesActuales);
-            }
-        };
-
-        TareasJavaFx.ejecutar(
-                HelloApplication.instancia().getTareas(),
-                tareaGenerarPdf,
-                pdfBytes -> {
-                    if (btnGenerarReporte != null) {
-                        btnGenerarReporte.setDisable(false);
-                    }
-                    if (pdfBytes == null || pdfBytes.length == 0) {
-                        AlertaUtil.mostrarError("Error de reporte",
-                                "El reporte de unidades está vacío.");
-                        return;
-                    }
-
-                    javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
-                    fileChooser.setTitle("Guardar reporte de unidades");
-                    fileChooser.setInitialFileName("Reporte-Unidades.pdf");
-                    fileChooser.getExtensionFilters().add(
-                            new javafx.stage.FileChooser.ExtensionFilter("Documento PDF (*.pdf)", "*.pdf")
-                    );
-
-                    Window ventana = tblUnidades.getScene() == null
-                            ? null
-                            : tblUnidades.getScene().getWindow();
-                    java.io.File archivoDestino = fileChooser.showSaveDialog(ventana);
-
-                    if (archivoDestino != null) {
-                        try {
-                            java.nio.file.Files.write(archivoDestino.toPath(), pdfBytes);
-                        } catch (Exception ex) {
-                            AlertaUtil.mostrarError("Error al guardar",
-                                    "No se pudo guardar el archivo PDF en disco.");
-                            return;
-                        }
-
-                        AlertaUtil.mostrarExito("Reporte listo",
-                                "El reporte de unidades se guardó correctamente.");
-
-                        if (java.awt.Desktop.isDesktopSupported()
-                                && java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.OPEN)) {
-                            try {
-                                java.awt.Desktop.getDesktop().open(archivoDestino);
-                            } catch (Exception ex) {
-                                AlertaUtil.mostrarAdvertencia("No se pudo abrir automáticamente",
-                                        "El PDF se guardó bien, pero no se pudo abrir el visor automáticamente.");
-                            }
-                        }
-                    }
-                },
-                error -> {
-                    if (btnGenerarReporte != null) {
-                        btnGenerarReporte.setDisable(false);
-                    }
-                    AlertaUtil.mostrarError("Error al generar reporte", mensajeError(error));
-                }
-        );
+        Window ventana = tblUnidades == null || tblUnidades.getScene() == null
+                ? null
+                : tblUnidades.getScene().getWindow();
+        VistaPreviaReporte.generarYMostrar(btnGenerarReporte, ventana,
+                () -> reporteService.generarDocumentoUnidades(unidadesActuales));
     }
 
 

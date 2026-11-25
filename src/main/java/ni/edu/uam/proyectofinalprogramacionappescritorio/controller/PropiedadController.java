@@ -1,6 +1,5 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
 
-import javafx.stage.FileChooser;
 import lombok.RequiredArgsConstructor;
 
 import javafx.collections.FXCollections;
@@ -40,11 +39,9 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PanelEstadoTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.VistaPreviaReporte;
 
-import java.awt.*;
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.List;
@@ -84,6 +81,10 @@ public class PropiedadController {
     @FXML public void initialize() {
         lblTitulo.setGraphic(Iconos.crear(Iconos.Nombre.PROPIEDAD, 20));
         Iconos.asignar(btnRefrescar, Iconos.Nombre.ACTUALIZAR, 16);
+        if (btnGenerarReportePropiedades != null) {
+            Iconos.asignar(btnGenerarReportePropiedades, Iconos.Nombre.REPORTE, 16);
+            btnGenerarReportePropiedades.setTooltip(new Tooltip("Vista previa y exportación PDF del inventario de propiedades y unidades"));
+        }
         Iconos.asignar(btnNuevo, Iconos.Nombre.MAS, 16);
         Iconos.asignar(btnLimpiar, Iconos.Nombre.CERRAR, 14);
         Iconos.asignar(btnEliminar, Iconos.Nombre.ELIMINAR, 16);
@@ -241,74 +242,11 @@ public class PropiedadController {
 
     @FXML
     public void handleGenerarReportePropiedades() {
-        if (btnGenerarReportePropiedades != null) {
-            btnGenerarReportePropiedades.setDisable(true);
-        }
-
-        Task<byte[]> tareaGenerarPdf = new Task<>() {
-            @Override
-            protected byte[] call() {
-                return reporteService.generarReportePropiedadesPdf();
-            }
-        };
-
-        TareasJavaFx.ejecutar(
-                HelloApplication.instancia().getTareas(),
-                tareaGenerarPdf,
-                pdfBytes -> {
-                    if (btnGenerarReportePropiedades != null) {
-                        btnGenerarReportePropiedades.setDisable(false);
-                    }
-                    if (pdfBytes == null || pdfBytes.length == 0) {
-                        AlertaUtil.mostrarError("Error de reporte",
-                                "El reporte de propiedades generado está vacío.");
-                        return;
-                    }
-
-                    FileChooser fileChooser = new FileChooser();
-                    fileChooser.setTitle("Guardar reporte de propiedades y unidades");
-                    fileChooser.setInitialFileName("Reporte-Propiedades-Unidades.pdf");
-                    fileChooser.getExtensionFilters().add(
-                            new FileChooser.ExtensionFilter("Documento PDF (*.pdf)", "*.pdf")
-                    );
-
-                    Window ventana = (tblPropiedades != null && tblPropiedades.getScene() != null)
-                            ? tblPropiedades.getScene().getWindow()
-                            : null;
-                    File archivoDestino = fileChooser.showSaveDialog(ventana);
-
-                    if (archivoDestino != null) {
-                        try {
-                            Files.write(archivoDestino.toPath(), pdfBytes);
-                        } catch (Exception ex) {
-                            AlertaUtil.mostrarError("Error al guardar",
-                                    "No se pudo guardar el archivo PDF en disco.");
-                            return;
-                        }
-
-                        AlertaUtil.mostrarExito("Reporte listo",
-                                "El reporte de propiedades y unidades se guardó correctamente.");
-
-                        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
-                            try {
-                                Desktop.getDesktop().open(archivoDestino);
-                            } catch (Exception ex) {
-                                AlertaUtil.mostrarAdvertencia("No se pudo abrir automáticamente",
-                                        "El PDF se guardó bien, pero no se pudo abrir el visor automáticamente.");
-                            }
-                        }
-                    }
-                },
-                error -> {
-                    if (btnGenerarReportePropiedades != null) {
-                        btnGenerarReportePropiedades.setDisable(false);
-                    }
-                    String mensaje = (error != null && error.getMessage() != null && !error.getMessage().isBlank())
-                            ? error.getMessage()
-                            : "No se pudo generar el reporte de propiedades.";
-                    AlertaUtil.mostrarError("Error al generar reporte", mensaje);
-                }
-        );
+        Window ventana = (tblPropiedades != null && tblPropiedades.getScene() != null)
+                ? tblPropiedades.getScene().getWindow()
+                : null;
+        VistaPreviaReporte.generarYMostrar(btnGenerarReportePropiedades, ventana,
+                reporteService::generarDocumentoPropiedades);
     }
 
 

@@ -19,6 +19,8 @@
             <Label styleClass="page-subtitle" text="Consulta y registro de obligaciones por contrato." />
         </VBox>
         <Button fx:id="btnRefrescar" onAction="#refrescarTabla" styleClass="button-secondary" text="Actualizar" />
+        <Button fx:id="btnGenerarReporte" onAction="#handleGenerarReporte"
+                minWidth="USE_PREF_SIZE" styleClass="button-secondary" text="Reporte" />
         <Button fx:id="btnNuevo" onAction="#handleNuevo" styleClass="button-primary" text="Nuevo cargo" />
     </HBox>
     <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
@@ -30,8 +32,6 @@
             <Button fx:id="btnAnular" disable="true" onAction="#handleAnular"
                     styleClass="button-destructive" text="Anular cargo" />
         </HBox>
-        <Button fx:id="btnGenerarReporte" onAction="#handleGenerarReporte"
-                styleClass="button-secondary" text="📄 Generar reporte" />
     </HBox>
     <Label fx:id="lblErrorConsulta" managed="false" minHeight="18.0"
            styleClass="field-error" text="" visible="false" wrapText="true" />

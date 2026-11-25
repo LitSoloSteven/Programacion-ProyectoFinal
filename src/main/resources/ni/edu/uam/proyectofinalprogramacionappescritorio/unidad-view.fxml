@@ -17,6 +17,8 @@
             <Label styleClass="page-subtitle" text="Inventario, disponibilidad y canon base." />
         </VBox>
         <Button fx:id="btnRefrescar" onAction="#refrescarTabla" styleClass="button-secondary" text="Actualizar" />
+        <Button fx:id="btnGenerarReporte" onAction="#handleGenerarReporte"
+                minWidth="USE_PREF_SIZE" styleClass="button-secondary" text="Reporte" />
         <Button fx:id="btnNuevo" onAction="#handleNuevo" styleClass="button-primary" text="Nueva unidad" />
     </HBox>
     <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
@@ -27,8 +29,6 @@
             <Button fx:id="btnEliminar" disable="true" onAction="#handleEliminar"
                     styleClass="button-destructive" text="Eliminar unidad" />
         </HBox>
-        <Button fx:id="btnGenerarReporte" onAction="#handleGenerarReporte"
-                styleClass="button-secondary" text="📄 Generar reporte" />
     </HBox>
     <Label fx:id="lblErrorConsulta" managed="false" minHeight="18.0" styleClass="field-error"
            text="" visible="false" wrapText="true" />

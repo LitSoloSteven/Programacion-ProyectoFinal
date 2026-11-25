@@ -17,6 +17,8 @@
             <Label styleClass="page-subtitle" text="Inmuebles administrados en Latch." />
         </VBox>
         <Button fx:id="btnRefrescar" onAction="#refrescarTabla" styleClass="button-secondary" text="Actualizar" />
+        <Button fx:id="btnGenerarReportePropiedades" onAction="#handleGenerarReportePropiedades"
+                minWidth="USE_PREF_SIZE" styleClass="button-secondary" text="Reporte" />
         <Button fx:id="btnNuevo" onAction="#handleNuevo" styleClass="button-primary" text="Nueva propiedad" />
     </HBox>
     <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
@@ -27,9 +29,6 @@
             <Button fx:id="btnEliminar" disable="true" onAction="#handleEliminar"
                     styleClass="button-destructive" text="Eliminar propiedad" />
         </HBox>
-        <Button fx:id="btnGenerarReportePropiedades"
-                text="📄 Reporte Propiedades"
-                onAction="#handleGenerarReportePropiedades"/>
     </HBox>
     <Label fx:id="lblErrorConsulta" managed="false" minHeight="18.0" styleClass="field-error"
            text="" visible="false" wrapText="true" />

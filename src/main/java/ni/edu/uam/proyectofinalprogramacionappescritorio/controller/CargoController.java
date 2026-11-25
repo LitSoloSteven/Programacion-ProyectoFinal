@@ -1,6 +1,5 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
 
-import javafx.stage.FileChooser;
 import lombok.RequiredArgsConstructor;
 
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteCatalogos;
@@ -43,12 +42,10 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PanelEstadoTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.VistaPreviaReporte;
 
-import java.awt.*;
-import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.file.Files;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
@@ -102,6 +99,10 @@ public class CargoController {
         permisoAnular = SesionUsuario.esPropietario();
         lblTitulo.setGraphic(Iconos.crear(Iconos.Nombre.CARGO, 20));
         Iconos.asignar(btnRefrescar, Iconos.Nombre.ACTUALIZAR, 16);
+        if (btnGenerarReporte != null) {
+            Iconos.asignar(btnGenerarReporte, Iconos.Nombre.REPORTE, 16);
+            btnGenerarReporte.setTooltip(new Tooltip("Vista previa y exportación PDF de cargos, cartera y mora"));
+        }
         Iconos.asignar(btnNuevo, Iconos.Nombre.MAS, 16);
         Iconos.asignar(btnLimpiar, Iconos.Nombre.CERRAR, 14);
         Iconos.asignar(btnAnular, Iconos.Nombre.ELIMINAR, 16);
@@ -347,71 +348,11 @@ public class CargoController {
             return;
         }
 
-        if (btnGenerarReporte != null) {
-            btnGenerarReporte.setDisable(true);
-        }
-
-        Task<byte[]> tareaGenerarPdf = new Task<>() {
-            @Override
-            protected byte[] call() {
-                return reporteService.generarReporteCargosCarteraDesdeListaPdf(cargosActuales);
-            }
-        };
-
-        TareasJavaFx.ejecutar(
-                HelloApplication.instancia().getTareas(),
-                tareaGenerarPdf,
-                pdfBytes -> {
-                    if (btnGenerarReporte != null) {
-                        btnGenerarReporte.setDisable(false);
-                    }
-                    if (pdfBytes == null || pdfBytes.length == 0) {
-                        AlertaUtil.mostrarError("Error de reporte",
-                                "El reporte de cartera y mora está vacío.");
-                        return;
-                    }
-
-                    FileChooser fileChooser = new FileChooser();
-                    fileChooser.setTitle("Guardar reporte de cargos, cartera y mora");
-                    fileChooser.setInitialFileName("Reporte-Cargos-Cartera-Mora.pdf");
-                    fileChooser.getExtensionFilters().add(
-                            new FileChooser.ExtensionFilter("Documento PDF (*.pdf)", "*.pdf")
-                    );
-
-                    Window ventana = tblCargos.getScene() == null
-                            ? null
-                            : tblCargos.getScene().getWindow();
-                    File archivoDestino = fileChooser.showSaveDialog(ventana);
-
-                    if (archivoDestino != null) {
-                        try {
-                            Files.write(archivoDestino.toPath(), pdfBytes);
-                        } catch (Exception ex) {
-                            AlertaUtil.mostrarError("Error al guardar",
-                                    "No se pudo guardar el archivo PDF en disco.");
-                            return;
-                        }
-
-                        AlertaUtil.mostrarExito("Reporte listo",
-                                "El reporte de cargos, cartera y mora se guardó correctamente.");
-
-                        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
-                            try {
-                                Desktop.getDesktop().open(archivoDestino);
-                            } catch (Exception ex) {
-                                AlertaUtil.mostrarAdvertencia("No se pudo abrir automáticamente",
-                                        "El PDF se guardó bien, pero no se pudo abrir el visor automáticamente.");
-                            }
-                        }
-                    }
-                },
-                error -> {
-                    if (btnGenerarReporte != null) {
-                        btnGenerarReporte.setDisable(false);
-                    }
-                    AlertaUtil.mostrarError("Error al generar reporte", mensajeError(error));
-                }
-        );
+        Window ventana = tblCargos == null || tblCargos.getScene() == null
+                ? null
+                : tblCargos.getScene().getWindow();
+        VistaPreviaReporte.generarYMostrar(btnGenerarReporte, ventana,
+                () -> reporteService.generarDocumentoCargosCarteraDesdeLista(cargosActuales));
     }
 
 
