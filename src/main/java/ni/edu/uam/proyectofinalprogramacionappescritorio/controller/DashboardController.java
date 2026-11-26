@@ -86,6 +86,8 @@ public class DashboardController {
     @FXML private Button btnCambiarPassword;
     @FXML private Button btnTema;
     @FXML private CheckBox chkReducirMovimiento;
+    @FXML private ScrollPane configuracionView;
+    @FXML private VBox configuracionSistema;
 
     @FXML private Label lblUsuarioNombre;
     @FXML private Label lblUsuarioRol;
@@ -121,6 +123,7 @@ public class DashboardController {
     @FXML private Button btnNavTasas;
     @FXML private Button btnNavReportes;
     @FXML private Button btnNavAdmin;
+    @FXML private Button btnNavConfiguracion;
     @FXML private Button btnCerrarSesion;
 
     @FXML private StackPane contentArea;
@@ -339,7 +342,7 @@ public class DashboardController {
 
     private void actualizarControlTema() {
         boolean oscuro = TemaAplicacion.getTema() == TemaAplicacion.Tema.OSCURO;
-        btnTema.setText(oscuro ? "Tema claro" : "Tema oscuro");
+        btnTema.setText(oscuro ? "Usar tema claro" : "Usar tema oscuro");
         btnTema.setTooltip(new Tooltip("Cambiar a tema " + (oscuro ? "claro" : "oscuro")));
         chkReducirMovimiento.setSelected(TemaAplicacion.isSinEfectos());
         chkReducirMovimiento.setTooltip(new Tooltip("Elimina animaciones y luces decorativas en ambos temas"));
@@ -637,10 +640,28 @@ public class DashboardController {
 
     @FXML
     public void navegarAdministracion() {
+        abrirAdministracion(null);
+    }
+
+    @FXML
+    public void navegarParametros() {
+        abrirAdministracion(controlador -> ((AdminController) controlador).mostrarParametros());
+    }
+
+    private void abrirAdministracion(Consumer<Object> configurador) {
         if (!SesionCliente.haySesionActiva() || !SesionCliente.getActual().esPropietario()) return;
         activarBoton(btnNavAdmin);
         lblContexto.setText("Administración y auditoría");
-        cargarVista("admin-view.fxml");
+        cargarVista("admin-view.fxml", configurador);
+    }
+
+    @FXML
+    public void navegarConfiguracion() {
+        activarBoton(btnNavConfiguracion);
+        lblContexto.setText("Configuración");
+        if (recargadorMetricas != null) recargadorMetricas.pausar();
+        actualizarControlTema();
+        if (!contentArea.getChildren().contains(configuracionView)) mostrarVista(configuracionView);
     }
 
     @FXML
@@ -784,15 +805,19 @@ public class DashboardController {
             if (configurador != null) {
                 configurador.accept(loader.getController());
             }
-            if (auroraFondo != null) {
-                contentArea.getChildren().setAll(auroraFondo, view);
-                TransicionesUI.entrada(view);
-            } else {
-                TransicionesUI.reemplazar(contentArea, view);
-            }
+            mostrarVista(view);
         } catch (IOException e) {
             AlertaUtil.mostrarError("No se pudo abrir la pantalla",
                     "La vista solicitada no está disponible. Inténtalo nuevamente.");
+        }
+    }
+
+    private void mostrarVista(Parent vista) {
+        if (auroraFondo != null) {
+            contentArea.getChildren().setAll(auroraFondo, vista);
+            TransicionesUI.entrada(vista);
+        } else {
+            TransicionesUI.reemplazar(contentArea, vista);
         }
     }
 
@@ -802,12 +827,15 @@ public class DashboardController {
             btnNavAdmin.setVisible(esPropietario);
             btnNavAdmin.setManaged(esPropietario);
         }
+        configuracionSistema.setVisible(esPropietario);
+        configuracionSistema.setManaged(esPropietario);
         Button[] botones = {btnNavDashboard, btnNavPropiedades, btnNavUnidades, btnNavInquilinos,
-                btnNavContratos, btnNavCargos, btnNavPagos, btnNavMantenimiento, btnNavTasas, btnNavReportes, btnNavAdmin};
+                btnNavContratos, btnNavCargos, btnNavPagos, btnNavMantenimiento, btnNavTasas, btnNavReportes,
+                btnNavAdmin, btnNavConfiguracion};
         Iconos.Nombre[] iconos = {Iconos.Nombre.PANEL, Iconos.Nombre.PROPIEDAD,
                 Iconos.Nombre.UNIDAD, Iconos.Nombre.PERSONAS, Iconos.Nombre.CONTRATO,
                 Iconos.Nombre.CARGO, Iconos.Nombre.PAGO, Iconos.Nombre.MANTENIMIENTO,
-                Iconos.Nombre.TASA, Iconos.Nombre.REPORTE, Iconos.Nombre.EDITAR};
+                Iconos.Nombre.TASA, Iconos.Nombre.REPORTE, Iconos.Nombre.EDITAR, Iconos.Nombre.ACCIONES};
         for (int i = 0; i < botones.length; i++) {
             if (botones[i] == null) continue;
             String nombre = botones[i].getText();
@@ -840,7 +868,8 @@ public class DashboardController {
         sidebar.getChildren().stream().filter(nodo -> nodo.getStyleClass().contains("sidebar-separator"))
                 .forEach(nodo -> { nodo.setVisible(!compacta); nodo.setManaged(!compacta); });
         Button[] botones = {btnNavDashboard, btnNavPropiedades, btnNavUnidades, btnNavInquilinos,
-                btnNavContratos, btnNavCargos, btnNavPagos, btnNavMantenimiento, btnNavTasas, btnNavReportes, btnNavAdmin};
+                btnNavContratos, btnNavCargos, btnNavPagos, btnNavMantenimiento, btnNavTasas, btnNavReportes,
+                btnNavAdmin, btnNavConfiguracion};
         for (Button boton : botones) {
             if (boton == null) continue;
             boton.setContentDisplay(compacta ? ContentDisplay.GRAPHIC_ONLY : ContentDisplay.LEFT);
@@ -853,10 +882,11 @@ public class DashboardController {
 
     private void activarBoton(Button botonActivo) {
         Button[] botones = {btnNavDashboard, btnNavPropiedades, btnNavUnidades, btnNavInquilinos,
-                btnNavContratos, btnNavCargos, btnNavPagos, btnNavMantenimiento, btnNavTasas, btnNavReportes, btnNavAdmin};
+                btnNavContratos, btnNavCargos, btnNavPagos, btnNavMantenimiento, btnNavTasas, btnNavReportes,
+                btnNavAdmin, btnNavConfiguracion};
         for (Button b : botones) {
             if (b != null) {
-                b.getStyleClass().remove("nav-btn-active");
+                b.getStyleClass().removeAll("nav-item-active", "nav-btn-active");
             }
         }
         if (botonActivo != null && !botonActivo.getStyleClass().contains("nav-btn-active")) {

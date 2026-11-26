@@ -10,6 +10,7 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
@@ -29,6 +30,7 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.SesionCliente;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.contrato.ConstantesLatch;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.controller.CargoFormController;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.controller.ContratoFormController;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.controller.DashboardController;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.controller.InquilinoFormController;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.controller.PropiedadFormController;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.controller.TasaFormController;
@@ -54,6 +56,31 @@ class FormulariosFeedbackTest {
         catch (IllegalStateException existente) { iniciado.countDown(); }
         assertTrue(iniciado.await(5, TimeUnit.SECONDS));
         enFx(() -> { Platform.setImplicitExit(false); return null; });
+    }
+
+    @Test
+    void configuracionCargaFueraDeLaBarraYAbreDesdeLaNavegacion() throws Exception {
+        enFx(() -> {
+            FXMLLoader loader = new FXMLLoader(LatchApplication.class.getResource("dashboard-view.fxml"));
+            loader.setControllerFactory(tipo -> new DashboardController() {
+                @Override public void initialize() { }
+            });
+            Parent dashboard = loader.load();
+            assertNull(dashboard.lookup("#btnTema"));
+            assertNull(dashboard.lookup("#chkReducirMovimiento"));
+            assertNull(dashboard.lookup("#btnCambiarPassword"));
+
+            Button acceso = (Button) loader.getNamespace().get("btnNavConfiguracion");
+            ScrollPane configuracion = (ScrollPane) loader.getNamespace().get("configuracionView");
+            ((DashboardController) loader.getController()).navegarConfiguracion();
+            StackPane area = (StackPane) loader.getNamespace().get("contentArea");
+            assertTrue(area.getChildren().contains(configuracion));
+            assertTrue(acceso.getStyleClass().contains("nav-btn-active"));
+            assertTrue(configuracion.getContent().lookup("#btnTema") instanceof Button);
+            assertTrue(configuracion.getContent().lookup("#chkReducirMovimiento") instanceof CheckBox);
+            assertTrue(configuracion.getContent().lookup("#btnCambiarPassword") instanceof Button);
+            return null;
+        });
     }
 
     @Test

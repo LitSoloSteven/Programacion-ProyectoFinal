@@ -18,6 +18,35 @@
 <BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="ni.edu.uam.proyectofinalprogramacionappescritorio.controller.DashboardController"
             prefHeight="820.0" prefWidth="1366.0" styleClass="dashboard-root">
+    <fx:define>
+        <ScrollPane fx:id="configuracionView" fitToWidth="true" hbarPolicy="NEVER" styleClass="content-area">
+            <VBox spacing="20.0" styleClass="dashboard-home">
+                <padding><Insets bottom="28.0" left="24.0" right="24.0" top="24.0" /></padding>
+                <Label styleClass="page-title" text="Configuración" />
+                <VBox spacing="14.0" styleClass="welcome-banner">
+                    <Label styleClass="section-title" text="Apariencia" />
+                    <HBox alignment="CENTER_LEFT" spacing="12.0">
+                        <Label styleClass="field-label" text="Tema de color" HBox.hgrow="ALWAYS" maxWidth="Infinity" />
+                        <Button fx:id="btnTema" onAction="#handleCambiarTema"
+                                styleClass="button-secondary" text="Usar tema oscuro" />
+                    </HBox>
+                    <CheckBox fx:id="chkReducirMovimiento" onAction="#handleReducirMovimiento" text="Sin efectos" />
+                    <Label styleClass="secondary-text" text="Reduce las animaciones y luces decorativas." wrapText="true" />
+                </VBox>
+                <VBox spacing="14.0" styleClass="welcome-banner">
+                    <Label styleClass="section-title" text="Seguridad de la cuenta" />
+                    <Button fx:id="btnCambiarPassword" onAction="#handleCambiarPassword"
+                            styleClass="button-secondary" text="Cambiar contraseña" />
+                </VBox>
+                <VBox fx:id="configuracionSistema" spacing="14.0" styleClass="welcome-banner"
+                      visible="false" managed="false">
+                    <Label styleClass="section-title" text="Sistema" />
+                    <Label styleClass="secondary-text" text="Identidad del emisor y parámetros operativos de Latch." wrapText="true" />
+                    <Button onAction="#navegarParametros" styleClass="button-secondary" text="Parámetros y emisor" />
+                </VBox>
+            </VBox>
+        </ScrollPane>
+    </fx:define>
     <left>
         <VBox fx:id="sidebar" prefWidth="224.0" styleClass="sidebar">
             <VBox spacing="4.0" styleClass="sidebar-brand-block">
@@ -48,6 +77,8 @@
                         styleClass="nav-item" text="Reportes" />
                 <Button fx:id="btnNavAdmin" maxWidth="Infinity" onAction="#navegarAdministracion"
                         styleClass="nav-item" text="Administración" />
+                <Button fx:id="btnNavConfiguracion" maxWidth="Infinity" onAction="#navegarConfiguracion"
+                        styleClass="nav-item" text="Configuración" />
             </VBox>
             <Separator styleClass="sidebar-separator" />
             <VBox fx:id="userProfile" spacing="4.0" styleClass="user-profile-box">
@@ -63,9 +94,6 @@
             <padding><Insets bottom="8.0" left="24.0" right="24.0" top="8.0" /></padding>
             <Label fx:id="lblContexto" styleClass="section-title" text="Panel principal" HBox.hgrow="ALWAYS" />
             <Label fx:id="lblActualizado" styleClass="secondary-text" text="" />
-            <CheckBox fx:id="chkReducirMovimiento" onAction="#handleReducirMovimiento" text="Sin efectos" />
-            <Button fx:id="btnTema" onAction="#handleCambiarTema" styleClass="button-secondary" text="Tema oscuro" />
-            <Button fx:id="btnCambiarPassword" onAction="#handleCambiarPassword" styleClass="button-secondary" text="Cambiar clave" />
         </HBox>
     </top>
     <center>

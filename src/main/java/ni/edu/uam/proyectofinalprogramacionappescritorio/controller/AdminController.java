@@ -172,6 +172,10 @@ public class AdminController {
                                   Optional<DocumentoAdjuntoResponse> logotipo,
                                   List<ParametroHistorialResponse> historial) { }
 
+    public void mostrarParametros() {
+        tabPaneAdmin.getSelectionModel().select(tabParametros);
+    }
+
     @FXML
     public void initialize() {
         lblTitulo.setGraphic(Iconos.crear(Iconos.Nombre.PANEL, 20));
