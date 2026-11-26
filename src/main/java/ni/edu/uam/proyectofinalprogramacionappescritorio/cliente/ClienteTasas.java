@@ -20,7 +20,12 @@ public final class ClienteTasas {
     }
 
     public List<TasaResponse> listar(LocalDate fecha, Boolean autorizada, int limite) {
+        return listar(fecha, autorizada, limite, false);
+    }
+
+    public List<TasaResponse> listar(LocalDate fecha, Boolean autorizada, int limite, boolean operativa) {
         StringBuilder ruta = new StringBuilder("/api/v1/tasas?limite=").append(limite);
+        if (operativa) ruta.append("&vista=operativa");
         if (fecha != null) ruta.append("&fecha=").append(fecha);
         if (autorizada != null) ruta.append("&autorizada=").append(autorizada);
         ListaTasasResponse respuesta = api.get(ruta.toString(), ListaTasasResponse.class);
@@ -30,6 +35,11 @@ public final class ClienteTasas {
     public TasaResponse registrar(LocalDate fecha, BigDecimal tasa, String fuente) {
         TasaRequest solicitud = new TasaRequest(fecha.toString(), tasa.toPlainString(), fuente);
         return api.post("/api/v1/tasas", solicitud, TasaResponse.class);
+    }
+
+    public TasaResponse editar(String id, LocalDate fecha, BigDecimal tasa, String fuente) {
+        TasaRequest solicitud = new TasaRequest(fecha.toString(), tasa.toPlainString(), fuente);
+        return api.post("/api/v1/tasas/" + id + "/revisiones", solicitud, TasaResponse.class);
     }
 
     public TasaResponse autorizar(String id, String motivo) {

@@ -64,6 +64,22 @@ public class TasaFormController {
         panelRegistro.setManaged(true);
     }
 
+    public void mostrarEdicion(TasaResponse tasa) {
+        mostrarRegistro();
+        inicializando = true;
+        try {
+            dpFecha.setValue(LocalDate.parse(tasa.fecha()));
+            dpFecha.setDisable(true);
+            txtTasa.setText(tasa.nioPorUsd());
+            txtFuente.setText(tasa.fuente());
+            tocados.clear();
+            limpiarErrores();
+            marcarLimpio();
+        } finally {
+            inicializando = false;
+        }
+    }
+
     public void mostrarAutorizacion(TasaResponse tasa) {
         inicializando = true;
         try {

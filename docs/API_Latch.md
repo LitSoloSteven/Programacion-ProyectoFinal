@@ -108,6 +108,7 @@ Cuerpo uniforme:
 | GET | `/api/v1/tasas/referencia` | `CONSULTAR_REPORTES` |
 | GET | `/api/v1/tasas/{id}` | `CONSULTAR_REPORTES` |
 | POST | `/api/v1/tasas` | `OPERAR_ALQUILERES` |
+| POST | `/api/v1/tasas/{id}/revisiones` | `OPERAR_ALQUILERES` |
 | POST | `/api/v1/tasas/{id}/autorizar` | `AUTORIZAR_TASA` (solo propietario) |
 | GET | `/api/v1/propiedades` | `OPERAR_ALQUILERES` |
 | GET | `/api/v1/propiedades/{id}` | `OPERAR_ALQUILERES` |
@@ -213,9 +214,18 @@ incidente de H3. La consulta lee la caché. La operación de pago usa la tasa
 autorizada para su fecha efectiva.
 
 Las tasas son inmutables. Registrar una tasa crea una instantánea
-**informativa**; autorizarla crea una nueva instantánea **autorizada** y
-conserva la original. Solo hay una tasa autorizada por fecha, y solo puede
-autorizarla el propietario.
+**informativa**. Cada fecha abierta admite una propuesta vigente. Se puede
+corregir su importe y fuente con `POST /api/v1/tasas/{id}/revisiones`, usando
+la misma fecha y el mismo cuerpo que al registrar. Responde `201` con el ID
+de la nueva versión y conserva la anterior en el historial. Una versión
+anterior devuelve `409` al editarla o intentar autorizarla.
+
+La autorización por el propietario conserva la propuesta, crea la tasa
+autorizada de esa fecha y cierra el registro y la edición para esa misma
+fecha efectiva. Ambos intentos posteriores devuelven `409`.
+`GET /api/v1/tasas?vista=operativa` muestra una fila por fecha, con la tasa
+autorizada si existe o la propuesta vigente. La consulta sin `vista`
+conserva acceso al historial completo sujeto al límite de la consulta.
 
 ```http
 POST /api/v1/tasas

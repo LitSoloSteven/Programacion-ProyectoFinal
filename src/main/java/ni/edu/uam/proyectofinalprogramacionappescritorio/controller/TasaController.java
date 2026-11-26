@@ -10,6 +10,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableColumn;
@@ -51,6 +52,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /** Registro informativo y autorización de tasas NIO por USD vía HTTP. */
 public class TasaController {
@@ -62,6 +64,8 @@ public class TasaController {
     @FXML private HBox autorizacionTooltipHost;
     @FXML private Button btnRegistrar;
     @FXML private Button btnAutorizar;
+    @FXML private Button btnEditar;
+    @FXML private CheckBox chkHistorial;
     @FXML private Button btnLimpiar;
     @FXML private Label lblContador;
     @FXML private Label lblErrorConsulta;
@@ -115,7 +119,7 @@ public class TasaController {
         colTasa.setCellFactory(FormatoTabla.numerica());
         colFuente.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().fuente()));
         colEstado.setCellValueFactory(cell -> new SimpleStringProperty(
-                cell.getValue().autorizada() ? "Autorizada" : "Pendiente de autorización"));
+                estadoVisible(cell.getValue())));
         colEstado.setCellFactory(FormatoTabla.estado());
         colAutorizadoPor.setCellValueFactory(cell -> new SimpleStringProperty(
                 cell.getValue().autorizadoPorNombre() == null ? "—" : cell.getValue().autorizadoPorNombre()));
@@ -126,11 +130,18 @@ public class TasaController {
                 tasa -> tblTasas.getSelectionModel().select(tasa), Iconos.Nombre.CONFIRMACION)));
         tblTasas.getSelectionModel().selectedItemProperty().addListener((obs, anterior, actual) -> actualizarSeleccion(actual));
         txtBuscar.textProperty().addListener((obs, anterior, actual) -> aplicarFiltro());
+        chkHistorial.selectedProperty().addListener((obs, anterior, actual) -> {
+            tasasCargadas.clear();
+            tasasVisibles.clear();
+            actualizarSeleccion(null);
+            tblTasas.setPlaceholder(PanelEstadoTabla.crear("Cargando tasas", null, null, null));
+            cargarTasas();
+        });
         AtajosLista.instalar(rootView, txtBuscar, this::handleRegistrar);
         cargarTasas();
         recargadorTasas.activarConsultaPeriodica(Duration.seconds(60), () -> {
             recargadorTasas.recargarSiInactivo(
-                    () -> cliente.listar(null, null, 200),
+                    consultaTasas(),
                     this::aplicarTasas,
                     this::manejarErrorTasas);
             consultarReferenciaSiInactivo();
@@ -139,10 +150,20 @@ public class TasaController {
 
     public void cargarTasas() {
         recargadorTasas.recargar(
-                () -> cliente.listar(null, null, 200),
+                consultaTasas(),
                 this::aplicarTasas,
                 this::manejarErrorTasas);
         consultarReferencia();
+    }
+
+    private Supplier<List<TasaResponse>> consultaTasas() {
+        boolean operativa = !chkHistorial.isSelected();
+        return () -> cliente.listar(null, null, 200, operativa);
+    }
+
+    private String estadoVisible(TasaResponse tasa) {
+        if (tasa.autorizada()) return "Autorizada";
+        return chkHistorial.isSelected() ? "Propuesta" : "Pendiente";
     }
 
     private void aplicarTasas(List<TasaResponse> lista) {
@@ -213,32 +234,46 @@ public class TasaController {
         List<TasaResponse> resultado = tasasCargadas.stream().filter(tasa -> {
             if (filtro.isEmpty()) return true;
             return (tasa.fecha() + " " + tasa.nioPorUsd() + " " + tasa.fuente() + " "
-                    + (tasa.autorizada() ? "Autorizada" : "Pendiente de autorización") + " "
+                    + estadoVisible(tasa) + " "
                     + tasa.autorizadoPorNombre() + " " + tasa.motivo()).toLowerCase(Locale.ROOT).contains(filtro);
         }).toList();
-        RecargadorVista.conservarSeleccionPorId(tblTasas, TasaResponse::id, () -> tasasVisibles.setAll(resultado));
+        RecargadorVista.conservarSeleccionPorId(tblTasas,
+                chkHistorial.isSelected() ? TasaResponse::id : TasaResponse::fecha,
+                () -> tasasVisibles.setAll(resultado));
         lblContador.setText(resultado.size() + (resultado.size() == 1 ? " tasa" : " tasas"));
         if (tblTasas.getSelectionModel().getSelectedItem() == null && seleccionada != null) {
             actualizarSeleccion(null);
         }
+        boolean puedeRegistrar = filtro.isEmpty() && !chkHistorial.isSelected();
         tblTasas.setPlaceholder(PanelEstadoTabla.crear(filtro.isEmpty() ? "Aún no hay tasas" : "No hay coincidencias",
                 filtro.isEmpty() ? "Las tasas registradas aparecerán aquí." : "Prueba con otro término o limpia la búsqueda.",
-                filtro.isEmpty() ? "Registrar tasa" : "Limpiar búsqueda",
-                filtro.isEmpty() ? this::handleRegistrar : this::limpiarFiltros));
+                puedeRegistrar ? "Registrar tasa" : filtro.isEmpty() ? null : "Limpiar búsqueda",
+                puedeRegistrar ? this::handleRegistrar : filtro.isEmpty() ? null : this::limpiarFiltros));
     }
 
-    @FXML public void handleRegistrar() { abrirFormularioRegistro(); }
+    @FXML public void handleRegistrar() {
+        if (!chkHistorial.isSelected()) abrirFormularioPropuesta(null);
+    }
 
-    private void abrirFormularioRegistro() {
+    @FXML public void handleEditar() {
+        if (puedeEditarSeleccion()) abrirFormularioPropuesta(seleccionada);
+    }
+
+    private void abrirFormularioPropuesta(TasaResponse propuesta) {
+        boolean editando = propuesta != null;
+        String titulo = editando ? "Editar propuesta" : "Registrar propuesta";
+        String textoAccion = editando ? "Guardar cambios" : "Registrar tasa";
         try {
             FXMLLoader loader = new FXMLLoader(LatchApplication.class.getResource("tasa-form.fxml"));
             Node contenido = loader.load();
             TasaFormController formulario = loader.getController();
-            formulario.mostrarRegistro();
+            if (editando) formulario.mostrarEdicion(propuesta);
+            else formulario.mostrarRegistro();
             Window propietario = tblTasas.getScene() == null ? null : tblTasas.getScene().getWindow();
-            Dialog<ButtonType> dialogo = DialogoFormulario.crear("Registrar tasa informativa", contenido,
-                    propietario, 720, 620, "Registrar tasa");
-            DialogoFormulario.protegerCambiosSinGuardar(dialogo, btnRegistrar, formulario::hayCambios);
+            Dialog<ButtonType> dialogo = DialogoFormulario.crear(titulo, contenido,
+                    propietario, 720, 620, textoAccion);
+            DialogoFormulario.protegerCambiosSinGuardar(dialogo, editando ? btnEditar : btnRegistrar,
+                    formulario::hayCambios);
             ButtonType tipoAccion = dialogo.getDialogPane().getButtonTypes().getFirst();
             Button accion = (Button) dialogo.getDialogPane().lookupButton(tipoAccion);
             accion.addEventFilter(ActionEvent.ACTION, evento -> {
@@ -249,18 +284,20 @@ public class TasaController {
                 accion.setText("Guardando tasa…");
                 Task<TasaResponse> tarea = new Task<>() {
                     @Override protected TasaResponse call() {
-                        return cliente.registrar(datos.fecha(), datos.tasa(), datos.fuente().strip());
+                        return editando
+                                ? cliente.editar(propuesta.id(), datos.fecha(), datos.tasa(), datos.fuente())
+                                : cliente.registrar(datos.fecha(), datos.tasa(), datos.fuente());
                     }
                 };
                 TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, registro -> {
                     formulario.marcarLimpio();
                     DialogoFormulario.cerrar(dialogo);
-                    AlertaUtil.mostrarExito("Tasa informativa registrada", "La tasa del "
-                            + fechaVisible(registro.fecha()) + " quedó registrada: "
+                    AlertaUtil.mostrarExito(editando ? "Propuesta actualizada" : "Propuesta registrada", "Tasa del "
+                            + fechaVisible(registro.fecha()) + ": "
                             + FormatoTasa.formatear(new BigDecimal(registro.nioPorUsd())) + " NIO/USD."
                             + " Fuente: " + registro.fuente() + ". Pendiente de autorización.");
                     cargarTasas();
-                }, error -> manejarErrorFormulario(error, formulario, accion, "Registrar tasa"));
+                }, error -> manejarErrorFormulario(error, formulario, accion, textoAccion));
             });
             dialogo.showAndWait();
         } catch (IOException error) {
@@ -270,7 +307,7 @@ public class TasaController {
 
     @FXML public void handleAutorizar() {
         TasaResponse tasa = seleccionada;
-        if (tasa == null || !permisoAutorizar || tasa.autorizada()) return;
+        if (!permisoAutorizar || !puedeEditarSeleccion()) return;
         abrirFormularioAutorizacion(tasa);
     }
 
@@ -337,17 +374,21 @@ public class TasaController {
             lblSeleccion.setVisible(false);
             lblSeleccion.setManaged(false);
         } else {
-            lblSeleccion.setText(tasa.autorizada()
-                    ? "Autorizada · " + fechaVisible(tasa.fecha()) + " · fuente " + tasa.fuente()
-                    : "Pendiente de autorización · " + fechaVisible(tasa.fecha()) + " · fuente " + tasa.fuente());
+            lblSeleccion.setText(estadoVisible(tasa) + " · " + fechaVisible(tasa.fecha()) + " · fuente " + tasa.fuente());
             lblSeleccion.setVisible(true);
             lblSeleccion.setManaged(true);
         }
         actualizarControles();
     }
 
+    private boolean puedeEditarSeleccion() {
+        return !chkHistorial.isSelected() && seleccionada != null && !seleccionada.autorizada();
+    }
+
     private void actualizarControles() {
-        btnAutorizar.setDisable(seleccionada == null || seleccionada.autorizada() || !permisoAutorizar);
+        btnRegistrar.setDisable(chkHistorial.isSelected());
+        btnEditar.setDisable(!puedeEditarSeleccion());
+        btnAutorizar.setDisable(!puedeEditarSeleccion() || !permisoAutorizar);
         if (seleccionada != null && !seleccionada.autorizada() && !permisoAutorizar) {
             Tooltip.install(autorizacionTooltipHost, new Tooltip("Solo el propietario puede autorizar tasas."));
         }
@@ -363,6 +404,7 @@ public class TasaController {
             return;
         }
         formulario.mostrarError(mensajeError(error));
+        if (error instanceof ErrorClienteException clienteError && clienteError.getEstado() == 409) cargarTasas();
     }
 
     private void mostrarErrorConsulta(Throwable error) {

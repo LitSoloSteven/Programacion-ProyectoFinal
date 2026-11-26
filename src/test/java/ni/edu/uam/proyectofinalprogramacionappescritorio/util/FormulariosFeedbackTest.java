@@ -6,6 +6,7 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
@@ -20,13 +21,18 @@ import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.Contr
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.InquilinoResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PropiedadResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.UnidadResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.TasaResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteApi;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteTasas;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.SesionCliente;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.contrato.ConstantesLatch;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.controller.CargoFormController;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.controller.ContratoFormController;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.controller.InquilinoFormController;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.controller.PropiedadFormController;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.controller.TasaFormController;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.controller.TasaController;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -48,6 +54,38 @@ class FormulariosFeedbackTest {
         catch (IllegalStateException existente) { iniciado.countDown(); }
         assertTrue(iniciado.await(5, TimeUnit.SECONDS));
         enFx(() -> { Platform.setImplicitExit(false); return null; });
+    }
+
+    @Test
+    void vistaDeTasasCargaHistorialYFormularioDeEdicion() throws Exception {
+        enFx(() -> {
+            SesionCliente.iniciar(1, "operador", "ASISTENTE");
+            try {
+                FXMLLoader vista = new FXMLLoader(LatchApplication.class.getResource("tasa-view.fxml"));
+                vista.setControllerFactory(tipo -> new TasaController(
+                        new ClienteTasas(new ClienteApi("http://127.0.0.1:8090"))) {
+                    @Override public void initialize() { }
+                });
+                vista.load();
+                assertFalse(((CheckBox) vista.getNamespace().get("chkHistorial")).isSelected());
+                assertTrue(((Button) vista.getNamespace().get("btnEditar")).isDisabled());
+
+                FXMLLoader loader = cargar("tasa");
+                TasaFormController formulario = loader.getController();
+                formulario.mostrarEdicion(new TasaResponse("tasa", "2026-01-02", "36.75000000",
+                        "BCN", "2026-01-02T08:00:00-06:00", false, null, null, null));
+                assertTrue(((DatePicker) loader.getNamespace().get("dpFecha")).isDisabled());
+                assertFalse(formulario.hayCambios());
+                ((TextField) loader.getNamespace().get("txtTasa")).setText("37.10");
+                assertTrue(formulario.hayCambios());
+                assertTrue(formulario.validarRegistro());
+                assertEquals(LocalDate.of(2026, 1, 2), formulario.datos().fecha());
+                assertEquals("37.10", formulario.datos().tasa().toPlainString());
+                return null;
+            } finally {
+                SesionCliente.cerrarSesion();
+            }
+        });
     }
 
     @Test

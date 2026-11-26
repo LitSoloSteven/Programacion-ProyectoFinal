@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
@@ -16,7 +17,7 @@
             <Label fx:id="lblTitulo" styleClass="page-title" text="Tasas de cambio" />
             <Label styleClass="page-subtitle" text="Registro informativo y autorización de tasas NIO por USD." />
         </VBox>
-        <Button fx:id="btnRegistrar" onAction="#handleRegistrar" styleClass="button-primary" text="Registrar tasa informativa" />
+        <Button fx:id="btnRegistrar" onAction="#handleRegistrar" styleClass="button-primary" text="Registrar propuesta" />
     </HBox>
     <Label fx:id="lblReferencia" styleClass="secondary-text" wrapText="true"
            text="Cargando referencia comercial…" />
@@ -25,6 +26,9 @@
                    styleClass="search-field" />
         <Button fx:id="btnLimpiar" onAction="#limpiarFiltros" styleClass="button-secondary" text="Limpiar" />
         <Label fx:id="lblContador" styleClass="secondary-text" text="0 tasas" HBox.hgrow="ALWAYS" />
+        <CheckBox fx:id="chkHistorial" text="Ver historial" />
+        <Button fx:id="btnEditar" disable="true" onAction="#handleEditar"
+                styleClass="button-secondary" text="Editar propuesta" />
         <HBox fx:id="autorizacionTooltipHost">
             <Button fx:id="btnAutorizar" disable="true" onAction="#handleAutorizar"
                     styleClass="button-secondary" text="Autorizar tasa" />
