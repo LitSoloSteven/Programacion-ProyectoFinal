@@ -1,11 +1,15 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.util;
 
 import javafx.application.Platform;
+import javafx.css.PseudoClass;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.SVGPath;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -65,6 +69,34 @@ class TemaAplicacionTest {
     void restaurar() {
         TemaAplicacion.registrarObservadorAviso(null);
         TemaAplicacion.restaurarAlmacenPorDefecto();
+    }
+
+    @Test
+    void botonesPrincipalesSeOscurecenSinPerderContrasteAlPasarElCursor() throws Exception {
+        enFx(() -> {
+            VBox raiz = new VBox();
+            raiz.getStyleClass().add("theme-dark");
+            Scene escena = new Scene(raiz);
+            escena.getStylesheets().add(getClass().getResource(
+                    "/ni/edu/uam/proyectofinalprogramacionappescritorio/estilos.css").toExternalForm());
+            for (String estilo : List.of("button-primary", "btn-primary", "btn-success")) {
+                Button boton = new Button("Guardar");
+                boton.getStyleClass().add(estilo);
+                Iconos.asignar(boton, Iconos.Nombre.MAS, 16);
+                raiz.getChildren().add(boton);
+                raiz.applyCss();
+                assertEquals(Color.web("#E6E9EF"), boton.getBackground().getFills().getFirst().getFill(), estilo);
+
+                boton.pseudoClassStateChanged(PseudoClass.getPseudoClass("hover"), true);
+                raiz.applyCss();
+
+                Color azulOscuro = Color.web("#0B1F3A");
+                assertEquals(Color.web("#A7B1BE"), boton.getBackground().getFills().getFirst().getFill(), estilo);
+                assertEquals(azulOscuro, boton.getTextFill(), estilo);
+                assertEquals(azulOscuro, ((SVGPath) boton.getGraphic().lookup(".icon-glyph")).getStroke(), estilo);
+            }
+            return null;
+        });
     }
 
     @Test

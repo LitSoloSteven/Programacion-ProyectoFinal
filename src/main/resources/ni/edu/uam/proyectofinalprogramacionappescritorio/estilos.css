@@ -413,7 +413,7 @@
 .btn-success:hover { -fx-background-color: -latch-action-secondary; }
 .theme-dark .button-primary:hover,
 .theme-dark .btn-primary:hover,
-.theme-dark .btn-success:hover { -fx-text-fill: -latch-slate-100; }
+.theme-dark .btn-success:hover { -fx-background-color: -latch-slate-400; }
 .button-primary:focused,
 .btn-primary:focused,
 .btn-success:focused,
@@ -554,6 +554,7 @@
 .status-neutral { -fx-background-color: -latch-hover; -fx-border-color: -latch-divider; -fx-border-radius: 12px; }
 .status-neutral .label { -fx-text-fill: -latch-text; }
 .status-pending { -fx-background-color: -latch-navy-800; -fx-text-fill: -latch-slate-100; }
+.status-pending .label { -fx-text-fill: -latch-slate-100; }
 .status-cancelled { -fx-background-color: -latch-slate-400; -fx-text-fill: -latch-ink-900; }
 
 .pagination-bar { -fx-min-height: 48px; -fx-alignment: center-right; -fx-spacing: 8px; }
