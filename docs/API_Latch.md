@@ -1,12 +1,12 @@
 # API local de Latch
 
-Servicio HTTP local de Spring Boot con Spring MVC. La interfaz JavaFX lo
-consume con `java.net.http.HttpClient`. El servidor escucha **solo** en
-`127.0.0.1` y el puerto se toma de `LATCH_API_PORT`.
+Servicio HTTP REST en `latch-api` (Spring Boot WebMVC empaquetado como `ROOT.war` para Apache Tomcat 11). La interfaz JavaFX (`latch-cliente`) lo
+consume por separado con `java.net.http.HttpClient`. El servidor escucha **solo** en
+`127.0.0.1` y el cliente resuelve la URL mediante `LATCH_API_BASE_URL` (por defecto `http://127.0.0.1:8080`, o p. ej. `http://127.0.0.1:<LATCH_API_PORT>/latch-api` si se despliega en subcontexto).
 
-- Base: `http://127.0.0.1:<LATCH_API_PORT>`
+- Base recomendada (`ROOT.war`): `http://127.0.0.1:<LATCH_API_PORT>` (subcontexto soportado normalizando `request.getContextPath()` en `FiltroApi`)
 - Versión de rutas: `/api/v1`
-- Formato: JSON UTF-8
+- Formato: JSON UTF-8 (`application/octet-stream` únicamente para `POST /api/v1/adjuntos`)
 - Monedas admitidas: `USD` y `NIO`
 
 ## Autenticación
@@ -51,8 +51,8 @@ Content-Type: application/json
 
 | Regla | Valor |
 | --- | --- |
-| `Content-Type` | `application/json` obligatorio en cuerpos JSON (`415` si falta) |
-| Cuerpo máximo | 256 KiB (`413`) |
+| `Content-Type` | `application/json` obligatorio en cuerpos JSON (`415` si falta); binario acotado en `POST /api/v1/adjuntos` |
+| Cuerpo máximo | 256 KiB para JSON (`413`); excepción explícita de **5 MiB** únicamente para subida de adjuntos en `POST /api/v1/adjuntos` |
 | Idempotencia | Cabecera `Idempotency-Key: <UUID>` en escrituras financieras |
 | Importes | Texto decimal con 2 decimales (`"1000.00"`); nunca números flotantes |
 | Tasas | Texto decimal con 8 decimales (`"36.62430000"`) |
@@ -101,6 +101,8 @@ Cuerpo uniforme:
 | --- | --- | --- |
 | POST | `/api/v1/auth/login` | pública |
 | POST | `/api/v1/auth/logout` | autenticado |
+| POST | `/api/v1/auth/cambiar-password` | autenticado (cuenta propia) |
+| GET | `/api/v1/salud` | pública (solo `127.0.0.1`) |
 | GET | `/api/v1/tasas` | `CONSULTAR_REPORTES` |
 | GET | `/api/v1/tasas/vigente?fecha=AAAA-MM-DD` | `CONSULTAR_REPORTES` |
 | GET | `/api/v1/tasas/referencia` | `CONSULTAR_REPORTES` |
@@ -112,28 +114,38 @@ Cuerpo uniforme:
 | POST | `/api/v1/propiedades` | `OPERAR_ALQUILERES` |
 | PUT | `/api/v1/propiedades/{id}` | `OPERAR_ALQUILERES` |
 | PATCH | `/api/v1/propiedades/{id}` | `OPERAR_ALQUILERES` |
+| DELETE | `/api/v1/propiedades/{id}` | `ELIMINAR_CATALOGOS` (solo propietario) |
 | GET | `/api/v1/unidades`, `/{id}` | `OPERAR_ALQUILERES` |
 | POST | `/api/v1/unidades` | `OPERAR_ALQUILERES` |
 | PUT | `/api/v1/unidades/{id}` | `OPERAR_ALQUILERES` |
 | PATCH | `/api/v1/unidades/{id}` | `OPERAR_ALQUILERES` |
+| DELETE | `/api/v1/unidades/{id}` | `ELIMINAR_CATALOGOS` (solo propietario) |
 | GET | `/api/v1/inquilinos`, `/{id}` | `OPERAR_ALQUILERES` |
+| GET | `/api/v1/inquilinos/{id}/historial` | `OPERAR_ALQUILERES` |
+| GET | `/api/v1/inquilinos/coincidencias?identificacion=...&excluirId=...` | `OPERAR_ALQUILERES` |
 | POST | `/api/v1/inquilinos` | `OPERAR_ALQUILERES` |
 | PUT | `/api/v1/inquilinos/{id}` | `OPERAR_ALQUILERES` |
 | PATCH | `/api/v1/inquilinos/{id}` | `OPERAR_ALQUILERES` |
+| DELETE | `/api/v1/inquilinos/{id}` | `ELIMINAR_CATALOGOS` (solo propietario) |
 | GET | `/api/v1/contratos`, `/{id}` | `OPERAR_ALQUILERES` |
 | POST | `/api/v1/contratos` | `OPERAR_ALQUILERES` |
 | PUT | `/api/v1/contratos/{id}` | `OPERAR_ALQUILERES` |
 | PATCH | `/api/v1/contratos/{id}` | `OPERAR_ALQUILERES` |
+| DELETE | `/api/v1/contratos/{id}` | `ELIMINAR_CATALOGOS` (solo propietario) |
 | POST | `/api/v1/contratos/{id}/activar` | `OPERAR_ALQUILERES` |
 | POST | `/api/v1/contratos/{id}/cancelar` | `OPERAR_ALQUILERES` |
 | POST | `/api/v1/contratos/{id}/renovar` | `OPERAR_ALQUILERES` |
 | POST | `/api/v1/contratos/{id}/terminar` | `OPERAR_ALQUILERES` (`LIQUIDAR_GARANTIA` si hay depósito > 0 o movimientos) |
 | GET | `/api/v1/contratos/{id}/garantia` | `OPERAR_ALQUILERES` |
 | POST | `/api/v1/contratos/{id}/garantia/movimientos` | `LIQUIDAR_GARANTIA` + `Idempotency-Key` / `liquidacionId` |
+| GET | `/api/v1/garantias` | `OPERAR_ALQUILERES` |
 | POST | `/api/v1/validaciones` | `OPERAR_ALQUILERES` |
 | POST | `/api/v1/pagos` | `OPERAR_ALQUILERES` + `Idempotency-Key` |
 | GET | `/api/v1/pagos?pagina=1&tamano=50&texto=...` | `OPERAR_ALQUILERES` |
 | GET | `/api/v1/cargos?pagina=1&tamano=50&texto=...` | `OPERAR_ALQUILERES` |
+| GET | `/api/v1/cargos/{id}` | `OPERAR_ALQUILERES` |
+| POST | `/api/v1/cargos` | `OPERAR_ALQUILERES` |
+| PUT | `/api/v1/cargos/{id}` | `OPERAR_ALQUILERES` |
 | GET | `/api/v1/cargos/cartera?corte=AAAA-MM-DD&contratoId=...&periodo=AAAA-MM&moneda=...&texto=...` | `OPERAR_ALQUILERES` |
 | GET | `/api/v1/cargos/generacion-mes/vista-previa?periodo=AAAA-MM` | `OPERAR_ALQUILERES` |
 | POST | `/api/v1/cargos/generacion-mes` | `OPERAR_ALQUILERES` |
@@ -151,6 +163,15 @@ Cuerpo uniforme:
 | GET | `/api/v1/mantenimiento/gastos` | `OPERAR_ALQUILERES` |
 | POST | `/api/v1/mantenimiento/gastos` | `OPERAR_ALQUILERES` |
 | GET | `/api/v1/dashboard/metricas` | `CONSULTAR_REPORTES` |
+| GET / POST / PUT / PATCH | `/api/v1/usuarios/**` (`desbloquear`, `rol`, `estado`, `restablecer-password`) | `GESTIONAR_USUARIOS` (solo propietario) |
+| GET | `/api/v1/configuracion/inactividad` | autenticado |
+| GET / PUT | `/api/v1/admin/emisor` | `CAMBIAR_CONFIGURACION` (solo propietario) |
+| GET / POST | `/api/v1/admin/parametros` | `CAMBIAR_CONFIGURACION` (solo propietario) |
+| GET | `/api/v1/admin/auditoria` | `CONSULTAR_AUDITORIA` (solo propietario) |
+| GET / POST | `/api/v1/admin/respaldos/estado`, `/respaldos`, `/verificar`, `/restaurar` | `CAMBIAR_CONFIGURACION` (solo propietario) |
+| GET / POST / DELETE | `/api/v1/adjuntos`, `/adjuntos/{id}/contenido`, `/adjuntos/{id}` | `OPERAR_ALQUILERES` (`CAMBIAR_CONFIGURACION` para `EMISOR_LOGO`) |
+| POST / GET / DELETE | `/api/v1/reportes/generar`, `/reportes/documentos/{id}/paginas/{indice}`, `/pdf`, `/xlsx`, `/{id}` | `CONSULTAR_REPORTES` |
+| GET | `/api/v1/recibos/buscar?numero=&texto=` | `CONSULTAR_REPORTES` |
 
 Las rutas `PUT` requieren el campo `version` del registro leído; si otro usuario
 lo modificó, responden `409` y el cliente debe recargar.
@@ -336,6 +357,11 @@ entran en los totales y los pagos anulados no aportan aplicado ni crédito.
 Los totales, porcentajes y tasas siempre van separados por moneda y como texto decimal; nunca se
 suman USD con NIO. Si `?periodo` no usa el formato `AAAA-MM`, responde `400 SOLICITUD_INVALIDA`.
 
+## Reportes y recibos
+
+- `POST /api/v1/reportes/generar` admite los 19 documentos del Centro de Reportes (`RECIBO` solo PDF; los 18 restantes en PDF y XLSX). `TASAS_CATALOGO` acepta `desde` y `hasta` opcionales (`AAAA-MM-DD`, validando `hasta >= desde`).
+- `GET /api/v1/recibos/buscar?numero=&texto=` devuelve hasta 100 recibos ordenados del más reciente al más antiguo (incluyendo su estado `anulado`); `texto` busca por número (incluso con prefijo `#`), inquilino, contrato, referencia o método.
+
 ## Validaciones
 
 `POST /api/v1/validaciones`
@@ -355,19 +381,24 @@ admite hasta 255 caracteres; una solicitud más larga devuelve
 
 ## Uso desde JavaFX
 
-El cliente está en `cliente/`:
+El cliente vive en el módulo independiente `latch-cliente` (`cliente/`, sin Spring, Hibernate, PostgreSQL, JasperReports ni BouncyCastle):
 
 | Clase | Uso |
 | --- | --- |
-| `ClienteLatch` | Inicia/cierra el cliente con el puerto local |
-| `ClienteApi` | GET/POST/PUT/PATCH, token en memoria, timeouts 5 s / 10 s |
-| `ClienteAuth` | Login y logout |
-| `ClienteCatalogos` | Paginación, altas, edición y cambios de estado de catálogos |
-| `ClientePagos` | Cargos, historial, registro de pago, detalle, recibo y anulación |
+| `ClienteConfig` | Resuelve y valida `latch.api.baseUrl` / `LATCH_API_BASE_URL` |
+| `ClienteLatch` | Inicia la URL base y expone los subclientes HTTP |
+| `SesionCliente` | Identidad en memoria del cliente FX (sin contraseñas ni BD) |
+| `ClienteApi` | GET/POST/PUT/PATCH/DELETE + binarios, token en memoria, timeouts 5 s / 10 s y 60 s para reportes |
+| `ClienteAuth` | Login, cambio de contraseña y logout |
+| `ClienteCatalogos` | Paginación, CRUD completo, historial/coincidencias de inquilinos, garantías y eliminaciones físicas |
+| `ClientePagos` | Cargos (CRUD + H1), historial, registro de pago, detalle, recibo y anulación |
 | `ClienteMantenimiento` | Solicitudes de mantenimiento, transiciones y gastos de propiedad |
-| `ClienteTasas` | Consulta y registro de tasas |
+| `ClienteTasas` | Consulta, registro y autorización de tasas |
+| `ClienteAdmin` | Usuarios, configuración/emisor, auditoría y respaldos |
+| `ClienteAdjuntos` | Consulta, subida binaria (≤ 5 MiB), descarga y desactivación de adjuntos |
+| `ClienteReportes` | Generación remota, render PNG bajo demanda, descarga PDF/XLSX, limpieza y búsqueda de recibos |
 | `ClienteValidaciones` | Validaciones |
-| `ErrorClienteException` | Error controlado con código y mensaje del servidor |
+| `ErrorClienteException` | Error controlado con código, estado HTTP (`0 SIN_CONEXION` si API caída) y mensaje |
 
 Las llamadas se ejecutan en `javafx.concurrent.Task` mediante
 `util.TareasSegundoPlano`, nunca en el hilo de JavaFX. El token no se registra

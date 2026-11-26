@@ -1,8 +1,6 @@
 # Revisión de seguridad — Latch
 
-Documento de cierre de la Fase 5. Resume los controles implementados, cómo se
-verifican y los riesgos que quedan aceptados para una aplicación académica de
-escritorio.
+Controles de seguridad y comprobaciones para la instalación local de Latch.
 
 ## Modelo de amenazas
 
@@ -66,14 +64,20 @@ en errores o logs, duplicación de cobros y manipulación de importes.
 
 ### Entrada y salida
 
-- `Content-Type: application/json` obligatorio (`415`).
-- Cuerpo limitado a 256 KiB, comprobando `Content-Length` y el flujo real
-  (`413`).
+- `Content-Type: application/json` obligatorio en rutas JSON (`415`).
+- Cuerpo JSON limitado a 256 KiB comprobando `Content-Length` y el flujo real (`413`).
+- Excepción explícita y acotada a **5 MiB** únicamente en `POST /api/v1/adjuntos`, validando contenido binario y firmas (magic bytes PNG/JPEG/PDF) en servidor (`AdjuntoService`).
 - Consultas HQL siempre parametrizadas; no se concatenan valores.
 - Importes como `BigDecimal` con escala 2 y `HALF_EVEN`; tasas con escala 8.
-- Errores uniformes sin SQLSTATE, nombres de tablas, stack traces ni causas
-  técnicas.
+- Errores uniformes sin SQLSTATE, nombres de tablas, stack traces ni causas técnicas.
 - Sin CORS, con `Cache-Control: no-store` y `X-Content-Type-Options: nosniff`.
+
+### Procesos independientes y despliegue WAR
+
+- **Dos procesos JVM independientes**: `latch-api` (`ROOT.war` para Apache Tomcat 11) y `latch-cliente` (JavaFX 21), vinculados únicamente por HTTP sobre `127.0.0.1` y los DTOs puros de `latch-contrato`.
+- `latch-cliente` carece por diseño de Spring, Hibernate, PostgreSQL, JasperReports y BouncyCastle en su classpath y en su `module-info.java`; tampoco conoce credenciales ni URL JDBC.
+- `latch-api` excluye JavaFX y las dependencias de Tomcat embebido (`spring-boot-starter-tomcat` `provided`), delegando el puerto al conector Apache Tomcat 11 configurado exclusivamente en `127.0.0.1`.
+- `FiltroApi` normaliza `request.getContextPath()` antes de validar `/api/v1/...`, conservando intactas la validación de `Host` (`127.0.0.1:<puerto>`), la autenticación previa a `404`/`405`, la ausencia de CORS y el plazo de recepción de 30 s tanto en raíz (`""`) como en subcontexto (`/latch-api`).
 
 ### Escrituras financieras
 
@@ -134,8 +138,10 @@ ambos lados del umbral de cinco minutos y el bloqueo. `ApiValidacionesTest`
 comprueba el rechazo de `valor` por encima de 255 caracteres y el manejo de un
 `mesesMinimos` extremo sin propagar `DateTimeException`.
 
-La evidencia de regresión de Spring MVC y PostgreSQL se registra en
-[el cierre técnico de la fase 5](migracion-spring-fase-5.md).
+`WarDespliegueTomcatIT` verifica el despliegue de `ROOT.war` sobre Tomcat 11.
+`AislamientoDosJvmIT` verifica la comunicación entre API y cliente en JVM
+separadas. El perfil `verify -Ppostgres` ejecuta la integración de persistencia,
+migraciones y respaldo en PostgreSQL desechable.
 
 ## Riesgos residuales aceptados
 
@@ -145,9 +151,7 @@ La evidencia de regresión de Spring MVC y PostgreSQL se registra en
 | Token en memoria del proceso | Requisito de sesión local | Expiración de 15 min y `logout` |
 | Sin refresh token | Simplicidad y superficie mínima | Reautenticación al expirar |
 | Credenciales de BD en `.env` | Configuración local del equipo | `.env` ignorado por Git; permisos del sistema operativo |
-| Huecos en la numeración de recibos | `GenerationType.IDENTITY` con rollback | Documentado; no afecta la unicidad |
 | Un solo nodo | Aplicación de escritorio | La tabla de idempotencia es compartida si se agregara otro nodo |
-| Operaciones de escritorio sin ruta HTTP | Alcance de 36 operaciones | Los servicios locales aplican permisos dentro de sus transacciones |
 
 ## Recomendaciones futuras
 
