@@ -1,7 +1,6 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
 
-import lombok.RequiredArgsConstructor;
-
+import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
@@ -21,79 +20,76 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.LatchApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PropiedadResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.UnidadRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.UnidadResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteCatalogos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propiedad;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Unidad;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ReporteService;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.UnidadService;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.SesionCliente;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.contrato.util.FormatoMoneda;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AccionesTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AtajosLista;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.BarraErrorContextual;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.DialogoFormulario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.DialogosAdjuntos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.MensajesUi;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PanelEstadoTabla;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.RecargadorVista;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.util.VistaPreviaReporte;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.sql.SQLException;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
-/** Inventario de unidades con filtros locales y operaciones fuera del hilo FX. */
-@RequiredArgsConstructor
+/** Inventario de unidades con filtros locales y operaciones HTTP fuera del hilo FX. */
 public class UnidadController {
     @FXML private VBox rootView;
     @FXML private HBox eliminarTooltipHost;
-    @FXML private Button btnGenerarReporte;
     @FXML private Button btnNuevo;
-    @FXML private Button btnRefrescar;
     @FXML private Button btnLimpiar;
     @FXML private Button btnEliminar;
     @FXML private Label lblTitulo;
     @FXML private Label lblContador;
     @FXML private Label lblErrorConsulta;
     @FXML private TextField txtBuscar;
-    @FXML private TableView<Unidad> tblUnidades;
-    @FXML private TableColumn<Unidad, String> colPropiedad;
-    @FXML private TableColumn<Unidad, String> colCodigo;
-    @FXML private TableColumn<Unidad, String> colTipo;
-    @FXML private TableColumn<Unidad, String> colEstado;
-    @FXML private TableColumn<Unidad, String> colCanon;
-    @FXML private TableColumn<Unidad, String> colDescripcion;
-    @FXML private TableColumn<Unidad, Void> colAcciones;
+    @FXML private TableView<UnidadResponse> tblUnidades;
+    @FXML private TableColumn<UnidadResponse, String> colPropiedad;
+    @FXML private TableColumn<UnidadResponse, String> colCodigo;
+    @FXML private TableColumn<UnidadResponse, String> colTipo;
+    @FXML private TableColumn<UnidadResponse, String> colEstado;
+    @FXML private TableColumn<UnidadResponse, String> colCanon;
+    @FXML private TableColumn<UnidadResponse, String> colDescripcion;
+    @FXML private TableColumn<UnidadResponse, Void> colAcciones;
 
-    private final ReporteService reporteService = new ReporteService();
-    private final ClienteCatalogos catalogos = new ClienteCatalogos(ClienteLatch.api());
-    private final UnidadService unidadService;
-    private final ObservableList<Unidad> registros = FXCollections.observableArrayList();
-    private final FilteredList<Unidad> filtrados = new FilteredList<>(registros, item -> true);
-    private List<Propiedad> propiedadesDisponibles = List.of();
-    private Unidad seleccionada;
-    private final boolean permisoEliminar = SesionUsuario.esPropietario();
-    private long versionConsulta;
+    private final ClienteCatalogos catalogos = ClienteLatch.catalogos();
+    private final ObservableList<UnidadResponse> registros = FXCollections.observableArrayList();
+    private final FilteredList<UnidadResponse> filtrados = new FilteredList<>(registros, item -> true);
+    private List<PropiedadResponse> propiedadesDisponibles = List.of();
+    private UnidadResponse seleccionada;
+    private final boolean permisoEliminar = SesionCliente.getActual().esPropietario();
+    private RecargadorVista recargador;
+    private BarraErrorContextual barraError;
 
-    private record DatosTabla(List<Propiedad> propiedades, List<Unidad> unidades) { }
+    private record DatosTabla(List<PropiedadResponse> propiedades, List<UnidadResponse> unidades) { }
 
-    public UnidadController() {
-        this(HelloApplication.instancia().getComposicion().unidades());
-    }
     @FXML public void initialize() {
         lblTitulo.setGraphic(Iconos.crear(Iconos.Nombre.UNIDAD, 20));
-        Iconos.asignar(btnRefrescar, Iconos.Nombre.ACTUALIZAR, 16);
-        if (btnGenerarReporte != null) {
-            Iconos.asignar(btnGenerarReporte, Iconos.Nombre.REPORTE, 16);
-            btnGenerarReporte.setTooltip(new Tooltip("Vista previa y exportación PDF del catálogo de unidades"));
-        }
+        recargador = RecargadorVista.paraNodo(rootView, LatchApplication.instancia().getTareas());
+        barraError = BarraErrorContextual.envolver(lblErrorConsulta);
         Iconos.asignar(btnNuevo, Iconos.Nombre.MAS, 16);
-        btnNuevo.disableProperty().bind(btnRefrescar.disableProperty());
+        if (permisoEliminar) {
+            btnNuevo.disableProperty().bind(recargador.cargandoProperty());
+        } else {
+            btnNuevo.setDisable(true);
+            btnNuevo.setTooltip(new Tooltip("Solo el propietario puede registrar unidades."));
+        }
         Iconos.asignar(btnLimpiar, Iconos.Nombre.CERRAR, 14);
         Iconos.asignar(btnEliminar, Iconos.Nombre.ELIMINAR, 16);
         Tooltip.install(eliminarTooltipHost, new Tooltip(permisoEliminar
@@ -101,16 +97,17 @@ public class UnidadController {
         btnEliminar.setDisable(true);
         tblUnidades.setItems(filtrados);
         tblUnidades.setPlaceholder(PanelEstadoTabla.crear("Cargando unidades", "El inventario aparecerá al terminar la consulta.", null, null));
-        colPropiedad.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getPropiedadNombre()));
-        colCodigo.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getCodigo()));
-        colTipo.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getTipo()));
-        colEstado.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getEstado()));
+        colPropiedad.setCellValueFactory(c -> new ReadOnlyStringWrapper(c.getValue().propiedadNombre()));
+        colCodigo.setCellValueFactory(c -> new ReadOnlyStringWrapper(c.getValue().codigo()));
+        colTipo.setCellValueFactory(c -> new ReadOnlyStringWrapper(c.getValue().tipo()));
+        colEstado.setCellValueFactory(c -> new ReadOnlyStringWrapper(c.getValue().estado()));
         colEstado.setCellFactory(FormatoTabla.estado());
-        colCanon.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getCanonFormateado()));
+        colCanon.setCellValueFactory(c -> new ReadOnlyStringWrapper(formatearCanon(c.getValue())));
         colCanon.setCellFactory(FormatoTabla.numerica());
-        colDescripcion.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getDescripcion()));
-        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>(
-                "Editar unidad", this::abrirEdicion, Iconos.Nombre.EDITAR)));
+        colDescripcion.setCellValueFactory(c -> new ReadOnlyStringWrapper(c.getValue().descripcion()));
+        AccionesTabla.configurar(colAcciones, List.of(
+                new AccionesTabla.Accion<>("Editar unidad", this::abrirEdicion, Iconos.Nombre.EDITAR),
+                new AccionesTabla.Accion<>("Fotografía", this::abrirFotografia, Iconos.Nombre.VER)));
         tblUnidades.getSelectionModel().selectedItemProperty().addListener((obs, anterior, actual) -> {
             seleccionada = actual;
             btnEliminar.setDisable(actual == null || !permisoEliminar);
@@ -121,57 +118,73 @@ public class UnidadController {
         cargarDatos();
     }
 
+    public void aplicarFiltroInicial(String texto) {
+        if (texto == null || texto.isBlank() || txtBuscar == null) {
+            return;
+        }
+        txtBuscar.setText(texto.strip());
+        aplicarFiltro(texto.strip());
+    }
+
     private void aplicarFiltro(String texto) {
         String filtro = texto == null ? "" : texto.strip().toLowerCase(Locale.ROOT);
         filtrados.setPredicate(unidad -> filtro.isEmpty()
-                || contiene(unidad.getCodigo(), filtro) || contiene(unidad.getPropiedadNombre(), filtro)
-                || contiene(unidad.getTipo(), filtro) || contiene(unidad.getDescripcion(), filtro));
+                || contiene(unidad.codigo(), filtro) || contiene(unidad.propiedadNombre(), filtro)
+                || contiene(unidad.tipo(), filtro) || contiene(unidad.descripcion(), filtro));
         lblContador.setText(filtrados.size() + (filtrados.size() == 1 ? " registro" : " registros"));
         tblUnidades.setPlaceholder(PanelEstadoTabla.crear(filtro.isEmpty() ? "Aún no hay unidades" : "No hay coincidencias",
                 filtro.isEmpty() ? "Las unidades registradas aparecerán aquí." : "Prueba con otro término o limpia la búsqueda.",
-                filtro.isEmpty() ? "Nueva unidad" : "Limpiar búsqueda",
-                filtro.isEmpty() ? this::handleNuevo : this::limpiarFiltros));
+                filtro.isEmpty() ? (permisoEliminar ? "Nueva unidad" : null) : "Limpiar búsqueda",
+                filtro.isEmpty() ? (permisoEliminar ? this::handleNuevo : null) : this::limpiarFiltros));
     }
 
     public void cargarDatos() {
-        btnRefrescar.setDisable(true);
-        long version = ++versionConsulta;
-        Task<DatosTabla> tarea = new Task<>() {
-            @Override protected DatosTabla call() throws SQLException {
-                return new DatosTabla(catalogos.propiedades(true), catalogos.unidades());
-            }
-        };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
-            if (version != versionConsulta) return;
-            propiedadesDisponibles = datos.propiedades();
-            registros.setAll(datos.unidades());
-            aplicarFiltro(txtBuscar.getText());
-            ocultarError();
-            btnRefrescar.setDisable(false);
-        }, error -> {
-            if (version == versionConsulta) {
-                lblErrorConsulta.setText("No se pudieron cargar las unidades. Vuelve a intentarlo.");
-                lblErrorConsulta.setVisible(true); lblErrorConsulta.setManaged(true);
-                tblUnidades.setPlaceholder(PanelEstadoTabla.crear("No se pudieron cargar las unidades",
-                        "Vuelve a intentarlo.", "Reintentar", this::cargarDatos));
-            }
-            btnRefrescar.setDisable(false);
-        });
+        recargador.recargar(
+                () -> new DatosTabla(catalogos.propiedades(true), catalogos.unidades()),
+                datos -> {
+                    propiedadesDisponibles = datos.propiedades();
+                    RecargadorVista.conservarSeleccionPorId(tblUnidades, UnidadResponse::id, () -> {
+                        registros.setAll(datos.unidades());
+                        aplicarFiltro(txtBuscar.getText());
+                    });
+                    ocultarError();
+                },
+                error -> {
+                    barraError.mostrar("No se pudieron cargar las unidades. Vuelve a intentarlo.", this::cargarDatos);
+                    if (registros.isEmpty()) {
+                        tblUnidades.setPlaceholder(PanelEstadoTabla.crear("No se pudieron cargar las unidades",
+                                "Vuelve a intentarlo.", "Reintentar", this::cargarDatos));
+                    }
+                });
     }
 
-    @FXML public void refrescarTabla() { cargarDatos(); }
     @FXML public void handleNuevo() {
-        if (!btnNuevo.isDisabled()) abrirFormulario(null);
+        if (permisoEliminar && !btnNuevo.isDisabled()) abrirFormulario(null);
     }
-    private void abrirEdicion(Unidad unidad) { abrirFormulario(unidad); }
+    private void abrirEdicion(UnidadResponse unidad) { abrirFormulario(unidad); }
 
-    private void abrirFormulario(Unidad existente) {
+    private void abrirFotografia(UnidadResponse unidad) {
+        if (unidad == null || unidad.id() == null) return;
+        Window propietario = tblUnidades.getScene() == null ? null : tblUnidades.getScene().getWindow();
+        DialogosAdjuntos.mostrarFotoUnidad(
+                propietario,
+                unidad.codigo() + " · " + unidad.propiedadNombre(),
+                ClienteLatch.adjuntos(),
+                UUID.fromString(unidad.id()));
+    }
+
+    private void abrirFormulario(UnidadResponse existente) {
+        if (existente == null && !permisoEliminar) return;
         try {
-            FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource("unidad-form.fxml"));
+            FXMLLoader loader = new FXMLLoader(LatchApplication.class.getResource("unidad-form.fxml"));
             Node contenido = loader.load();
             UnidadFormController formulario = loader.getController();
+            formulario.establecerValidadorServidor(ClienteLatch.validaciones());
             formulario.establecerPropiedades(propiedadesDisponibles);
-            if (existente != null) formulario.cargar(existente);
+            if (existente != null) {
+                formulario.cargar(existente);
+                formulario.aplicarModoAsistente(!permisoEliminar);
+            }
             Window propietario = tblUnidades.getScene() == null ? null : tblUnidades.getScene().getWindow();
             boolean nueva = existente == null;
             Dialog<ButtonType> dialogo = DialogoFormulario.crear(nueva ? "Nueva unidad" : "Editar unidad",
@@ -183,18 +196,19 @@ public class UnidadController {
                 evento.consume();
                 if (!formulario.validar()) return;
                 UnidadFormController.Datos datos = formulario.datos();
+                UUID id = nueva ? null : UUID.fromString(existente.id());
                 accion.setDisable(true); accion.setText("Guardando unidad…");
                 Task<Void> tarea = new Task<>() {
-                    @Override protected Void call() throws SQLException {
-                        catalogos.guardarUnidad(nueva ? null : existente.getId(),
-                                new UnidadRequest(datos.propiedad().getId().toString(), datos.codigo(),
-                            datos.descripcion(), datos.tipo(), datos.estado(),
-                            datos.canon() == null ? null : datos.canon().toPlainString(),
-                            datos.moneda(), nueva ? null : existente.getVersion()));
+                    @Override protected Void call() {
+                        catalogos.guardarUnidad(id, new UnidadRequest(
+                                datos.propiedad().id(), datos.codigo(), datos.descripcion(),
+                                datos.tipo(), datos.estado(),
+                                datos.canon() == null ? null : datos.canon().toPlainString(),
+                                datos.moneda(), nueva ? null : existente.version()));
                         return null;
                     }
                 };
-                TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+                TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ignorado -> {
                     formulario.marcarLimpio(); DialogoFormulario.cerrar(dialogo);
                     AlertaUtil.mostrarExito(nueva ? "Unidad registrada" : "Unidad actualizada",
                             nueva ? "La unidad quedó registrada." : "Los cambios quedaron guardados.");
@@ -218,26 +232,30 @@ public class UnidadController {
     }
 
     @FXML public void handleEliminar() {
-        Unidad unidad = seleccionada;
+        UnidadResponse unidad = seleccionada;
         if (unidad == null || !permisoEliminar) return;
-        String registro = "Unidad: " + unidad.getCodigo() + " · " + unidad.getPropiedadNombre();
+        String registro = "Unidad: " + unidad.codigo() + " · " + unidad.propiedadNombre();
         if (!AlertaUtil.mostrarConfirmacionDestructiva("Eliminar unidad", registro,
                 "El registro se eliminará físicamente si no tiene contratos o cargos asociados.", "Eliminar unidad")) return;
         btnEliminar.setDisable(true);
+        UUID id = UUID.fromString(unidad.id());
         Task<Void> tarea = new Task<>() {
-            @Override protected Void call() throws SQLException { unidadService.eliminar(unidad.getId()); return null; }
+            @Override protected Void call() {
+                catalogos.eliminarUnidad(id);
+                return null;
+            }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ignorado -> {
             seleccionada = null;
             AlertaUtil.mostrarExito("Unidad eliminada", "El registro de la unidad se eliminó.");
             cargarDatos();
         }, error -> {
             btnEliminar.setDisable(seleccionada == null || !permisoEliminar);
-            if (error instanceof SecurityException) {
+            if (error instanceof ErrorClienteException api && api.getEstado() == 403) {
                 AlertaUtil.mostrarAdvertencia("No tienes permiso", "Solo el propietario puede eliminar unidades.");
-            } else if (error instanceof IllegalStateException) {
+            } else if (error instanceof ErrorClienteException api && api.getEstado() == 409) {
                 AlertaUtil.mostrarAdvertencia("La unidad tiene registros asociados",
-                        "No se puede eliminar mientras tenga contratos o cargos. Puedes marcarla como Inactiva.");
+                        api.getMessage() + " Puedes marcarla como Inactiva.");
             } else {
                 AlertaUtil.mostrarError("No se pudo eliminar la unidad", "Revisa las relaciones asociadas e inténtalo de nuevo.");
             }
@@ -245,36 +263,15 @@ public class UnidadController {
     }
 
     @FXML public void limpiarFiltros() { txtBuscar.clear(); }
-    private void ocultarError() { lblErrorConsulta.setText(""); lblErrorConsulta.setVisible(false); lblErrorConsulta.setManaged(false); }
+    private void ocultarError() { barraError.ocultar(); }
     private static boolean contiene(String texto, String filtro) {
         return texto != null && texto.toLowerCase(Locale.ROOT).contains(filtro);
     }
+    private static String formatearCanon(UnidadResponse unidad) {
+        if (unidad == null || unidad.canonReferencia() == null || unidad.canonReferencia().isBlank()) return "";
+        return FormatoMoneda.formatear(unidad.moneda(), new BigDecimal(unidad.canonReferencia()));
+    }
     private static String mensajeError(Throwable error) {
-        if (error instanceof ErrorClienteException) return error.getMessage();
-        if (error instanceof IllegalArgumentException || error instanceof SecurityException
-                || error instanceof IllegalStateException) return error.getMessage();
-        return "No se pudo guardar la unidad. Revisa los datos e inténtalo de nuevo.";
+        return MensajesUi.traducir(error, "No se pudo guardar la unidad. Revisa los datos e inténtalo de nuevo.");
     }
-
-    @FXML
-    public void handleGenerarReporte() {
-        List<Unidad> unidadesActuales = tblUnidades == null
-                ? List.of()
-                : List.copyOf(tblUnidades.getItems());
-
-        if (unidadesActuales.isEmpty()) {
-            AlertaUtil.mostrarAdvertencia("Sin datos",
-                    "No hay unidades en la tabla para generar el reporte.");
-            return;
-        }
-
-        Window ventana = tblUnidades == null || tblUnidades.getScene() == null
-                ? null
-                : tblUnidades.getScene().getWindow();
-        VistaPreviaReporte.generarYMostrar(btnGenerarReporte, ventana,
-                () -> reporteService.generarDocumentoUnidades(unidadesActuales));
-    }
-
-
-
 }

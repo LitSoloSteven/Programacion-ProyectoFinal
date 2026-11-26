@@ -68,4 +68,3 @@ public final class AccionesTabla {
         columna.setCellValueFactory(param -> new javafx.beans.property.ReadOnlyObjectWrapper<>(null));
     }
 }
-

@@ -4,8 +4,9 @@ import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.util.Callback;
 
-import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
 /** Factories compartidas para fechas, cifras e insignias en TableView. */
@@ -24,14 +25,40 @@ public final class FormatoTabla {
         };
     }
 
-    public static <S> Callback<TableColumn<S, Timestamp>, TableCell<S, Timestamp>> fechaHora() {
+    public static <S> Callback<TableColumn<S, String>, TableCell<S, String>> fechaIso() {
         return columna -> new TableCell<>() {
-            @Override protected void updateItem(Timestamp valor, boolean vacia) {
+            @Override protected void updateItem(String valor, boolean vacia) {
                 super.updateItem(valor, vacia);
-                setText(vacia || valor == null ? null : FECHA.format(valor.toLocalDateTime().toLocalDate()));
+                setText(vacia || valor == null || valor.isBlank() ? null : formatearIsoFecha(valor));
                 setGraphic(null);
             }
         };
+    }
+
+    public static <S> Callback<TableColumn<S, String>, TableCell<S, String>> fechaHoraIso(ZoneId zona) {
+        return columna -> new TableCell<>() {
+            @Override protected void updateItem(String valor, boolean vacia) {
+                super.updateItem(valor, vacia);
+                setText(vacia || valor == null || valor.isBlank() ? null : formatearIsoInstante(valor, zona));
+                setGraphic(null);
+            }
+        };
+    }
+
+    private static String formatearIsoFecha(String valor) {
+        try {
+            return FECHA.format(LocalDate.parse(valor.strip()));
+        } catch (RuntimeException ignored) {
+            return valor;
+        }
+    }
+
+    private static String formatearIsoInstante(String valor, ZoneId zona) {
+        try {
+            return FECHA.format(Instant.parse(valor.strip()).atZone(zona).toLocalDate());
+        } catch (RuntimeException ignored) {
+            return formatearIsoFecha(valor);
+        }
     }
 
     public static <S> Callback<TableColumn<S, String>, TableCell<S, String>> numerica() {
@@ -70,4 +97,3 @@ public final class FormatoTabla {
         };
     }
 }
-

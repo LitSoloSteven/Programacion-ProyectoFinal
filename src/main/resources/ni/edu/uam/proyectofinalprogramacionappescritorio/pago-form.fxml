@@ -5,6 +5,7 @@
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.DatePicker?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.RadioButton?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.ColumnConstraints?>
@@ -21,6 +22,7 @@
             <Label fx:id="lblResumenError" managed="false" styleClass="field-error"
                    text="" visible="false" wrapText="true" />
             <VBox fx:id="panelEdicion" spacing="16.0">
+                <Label styleClass="field-help" text="Los campos con * son obligatorios." wrapText="true" />
                 <Label styleClass="section-title" text="Destino del pago" />
                 <VBox spacing="6.0">
                     <Label styleClass="field-label" text="Contrato / inquilino *" />
@@ -33,7 +35,7 @@
                     <columnConstraints><ColumnConstraints percentWidth="65.0" /><ColumnConstraints percentWidth="35.0" /></columnConstraints>
                     <VBox spacing="6.0" GridPane.columnIndex="0">
                         <Label styleClass="field-label" text="Monto *" />
-                        <TextField fx:id="txtMonto" promptText="0.00" styleClass="field" />
+                        <TextField fx:id="txtMonto" promptText="Ej. 450.00 (hasta 2 dec.)" styleClass="field" />
                         <Label fx:id="lblErrorMonto" managed="false" minHeight="18.0"
                                styleClass="field-error" text="" visible="false" wrapText="true" />
                     </VBox>
@@ -43,7 +45,7 @@
                     </VBox>
                     <VBox spacing="6.0" GridPane.columnIndex="0" GridPane.rowIndex="1">
                         <Label styleClass="field-label" text="Fecha *" />
-                        <DatePicker fx:id="dpFechaPago" maxWidth="Infinity" styleClass="field" />
+                        <DatePicker fx:id="dpFechaPago" maxWidth="Infinity" promptText="AAAA-MM-DD" styleClass="field" />
                         <Label fx:id="lblErrorFecha" managed="false" minHeight="18.0"
                                styleClass="field-error" text="" visible="false" wrapText="true" />
                     </VBox>
@@ -52,16 +54,32 @@
                         <ComboBox fx:id="cmbMetodo" maxWidth="Infinity" styleClass="field" />
                     </VBox>
                 </GridPane>
+                <Label styleClass="section-title" text="Aplicación a cargos" />
+                <VBox spacing="8.0">
+                    <HBox spacing="16.0">
+                        <RadioButton fx:id="rbAplicacionAutomatica" selected="true"
+                                     text="Automática (cargos vencidos más antiguos)" />
+                        <RadioButton fx:id="rbAplicacionManual"
+                                     text="Selección manual" />
+                    </HBox>
+                    <VBox fx:id="panelDistribucionManual" managed="false" spacing="6.0" visible="false">
+                        <Label fx:id="lblInfoCargos" styleClass="field-help"
+                               text="Selecciona los cargos del contrato y el monto en moneda contractual." wrapText="true" />
+                        <VBox fx:id="listaCargosContainer" spacing="6.0" />
+                    </VBox>
+                    <Label fx:id="lblErrorDistribucion" managed="false" minHeight="18.0"
+                           styleClass="field-error" text="" visible="false" wrapText="true" />
+                </VBox>
                 <Label styleClass="section-title" text="Comprobante" />
                 <VBox spacing="6.0">
                     <Label styleClass="field-label" text="Referencia" />
-                    <TextField fx:id="txtReferencia" promptText="Número de transferencia o comprobante" styleClass="field" />
+                    <TextField fx:id="txtReferencia" promptText="Número de transferencia o comprobante (hasta 100 car.)" styleClass="field" />
                     <Label fx:id="lblErrorReferencia" managed="false" minHeight="18.0"
                            styleClass="field-error" text="" visible="false" wrapText="true" />
                 </VBox>
                 <VBox spacing="6.0">
                     <Label styleClass="field-label" text="Observaciones" />
-                    <TextField fx:id="txtNotas" promptText="Detalles adicionales" styleClass="field" />
+                    <TextField fx:id="txtNotas" promptText="Detalles adicionales (opcional)" styleClass="field" />
                 </VBox>
             </VBox>
             <VBox fx:id="panelRevision" managed="false" spacing="14.0" styleClass="review-panel" visible="false">
@@ -81,6 +99,8 @@
                     <Label fx:id="lblRevisionReferencia" styleClass="review-value" wrapText="true" GridPane.columnIndex="1" GridPane.rowIndex="4" />
                     <Label styleClass="field-label" text="Observaciones" GridPane.columnIndex="0" GridPane.rowIndex="5" />
                     <Label fx:id="lblRevisionNotas" styleClass="review-value" wrapText="true" GridPane.columnIndex="1" GridPane.rowIndex="5" />
+                    <Label styleClass="field-label" text="Aplicación" GridPane.columnIndex="0" GridPane.rowIndex="6" />
+                    <Label fx:id="lblRevisionAplicacion" styleClass="review-value" wrapText="true" GridPane.columnIndex="1" GridPane.rowIndex="6" />
                 </GridPane>
                 <HBox alignment="CENTER_LEFT">
                     <Button onAction="#mostrarEdicion" styleClass="button-secondary" text="Volver" />

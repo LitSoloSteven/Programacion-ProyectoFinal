@@ -2,21 +2,23 @@ package ni.edu.uam.proyectofinalprogramacionappescritorio.cliente;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonParseException;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.ErrorApi;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.comun.dto.ErrorApi;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.contrato.SaludResponse;
 
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.lang.reflect.Type;
+import java.util.Map;
 import java.util.Objects;
 
 /**
- * Cliente HTTP compartido por la interfaz JavaFX. Usa tiempos acotados y
- * conserva el token Bearer en memoria; nunca lo escribe en logs.
+ * Cliente HTTP síncrono sobre java.net.http.HttpClient. Gestiona token Bearer,
+ * expiración 401 (excepto en login), cuerpos JSON y binarios acotados.
  */
 public final class ClienteApi {
     private static final Duration CONEXION = Duration.ofSeconds(5);
@@ -26,28 +28,23 @@ public final class ClienteApi {
     private final HttpClient http;
     private final Gson gson = new Gson();
     private volatile String token;
-    private volatile Runnable alExpirar = () -> {};
+    private volatile Runnable alExpirar = () -> { };
+
+    public ClienteApi(String baseUrl) {
+        this.baseUrl = ClienteConfig.normalizar(baseUrl);
+        this.http = HttpClient.newBuilder().connectTimeout(CONEXION).build();
+    }
+
+    public String baseUrl() {
+        return baseUrl;
+    }
 
     void alExpirar(Runnable accion) {
         alExpirar = Objects.requireNonNull(accion);
     }
 
-    public boolean sesionActiva() {
-        return token != null;
-    }
-
-    private synchronized boolean descartarToken(String usado) {
-        if (!Objects.equals(token, usado)) return false;
-        token = null;
-        return true;
-    }
-
-    public ClienteApi(String baseUrl) {
-        Objects.requireNonNull(baseUrl, "Falta la dirección del servicio local.");
-        this.baseUrl = baseUrl.endsWith("/")
-                ? baseUrl.substring(0, baseUrl.length() - 1)
-                : baseUrl;
-        this.http = HttpClient.newBuilder().connectTimeout(CONEXION).build();
+    public synchronized boolean sesionActiva() {
+        return token != null && !token.isBlank();
     }
 
     public synchronized void establecerToken(String token) {
@@ -65,6 +62,18 @@ public final class ClienteApi {
         return actual;
     }
 
+    private synchronized boolean descartarToken(String tokenUsado) {
+        if (token == null || !token.equals(tokenUsado)) {
+            return false;
+        }
+        token = null;
+        return true;
+    }
+
+    public SaludResponse getSalud() {
+        return get("/api/v1/salud", SaludResponse.class);
+    }
+
     public <T> T get(String ruta, Class<T> tipo) {
         return get(ruta, (Type) tipo);
     }
@@ -73,12 +82,31 @@ public final class ClienteApi {
         return enviar(construir(ruta).GET().build(), tipo);
     }
 
+    public byte[] getBytes(String ruta) {
+        HttpRequest peticion = construirConToken(ruta, token, "*/*", TOTAL).GET().build();
+        return enviarBinario(peticion);
+    }
+
     public <T> T post(String ruta, Object cuerpo, Class<T> tipo) {
-        HttpRequest peticion = construir(ruta)
+        return post(ruta, cuerpo, tipo, TOTAL);
+    }
+
+    public <T> T post(String ruta, Object cuerpo, Class<T> tipo, Duration timeout) {
+        HttpRequest peticion = construirConToken(ruta, token, "application/json", timeout)
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(
-                        gson.toJson(cuerpo), StandardCharsets.UTF_8))
+                .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(cuerpo), StandardCharsets.UTF_8))
                 .build();
+        return enviar(peticion, tipo);
+    }
+
+    public <T> T postBytes(String ruta, byte[] bytes, Map<String, String> cabeceras, Class<T> tipo) {
+        Objects.requireNonNull(bytes, "Falta el contenido binario.");
+        HttpRequest.Builder builder = construirConToken(ruta, token, "application/json", Duration.ofSeconds(30))
+                .header("Content-Type", "application/octet-stream");
+        if (cabeceras != null) {
+            cabeceras.forEach(builder::header);
+        }
+        HttpRequest peticion = builder.POST(HttpRequest.BodyPublishers.ofByteArray(bytes)).build();
         return enviar(peticion, tipo);
     }
 
@@ -91,8 +119,7 @@ public final class ClienteApi {
         HttpRequest peticion = construir(ruta)
                 .header("Content-Type", "application/json")
                 .header(nombreCabecera, valorCabecera)
-                .POST(HttpRequest.BodyPublishers.ofString(
-                        gson.toJson(cuerpo), StandardCharsets.UTF_8))
+                .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(cuerpo), StandardCharsets.UTF_8))
                 .build();
         return enviar(peticion, tipo);
     }
@@ -104,8 +131,7 @@ public final class ClienteApi {
     public <T> T put(String ruta, Object cuerpo, Class<T> tipo) {
         HttpRequest peticion = construir(ruta)
                 .header("Content-Type", "application/json")
-                .PUT(HttpRequest.BodyPublishers.ofString(
-                        gson.toJson(cuerpo), StandardCharsets.UTF_8))
+                .PUT(HttpRequest.BodyPublishers.ofString(gson.toJson(cuerpo), StandardCharsets.UTF_8))
                 .build();
         return enviar(peticion, tipo);
     }
@@ -113,10 +139,14 @@ public final class ClienteApi {
     public <T> T patch(String ruta, Object cuerpo, Class<T> tipo) {
         HttpRequest peticion = construir(ruta)
                 .header("Content-Type", "application/json")
-                .method("PATCH", HttpRequest.BodyPublishers.ofString(
-                        gson.toJson(cuerpo), StandardCharsets.UTF_8))
+                .method("PATCH", HttpRequest.BodyPublishers.ofString(gson.toJson(cuerpo), StandardCharsets.UTF_8))
                 .build();
         return enviar(peticion, tipo);
+    }
+
+    public void delete(String ruta) {
+        HttpRequest peticion = construir(ruta).DELETE().build();
+        enviar(peticion, Void.class);
     }
 
     /**
@@ -124,23 +154,21 @@ public final class ClienteApi {
      * Se usa para revocar una sesión ya descartada localmente.
      */
     public void postSinContenidoConToken(String ruta, Object cuerpo, String tokenExplicito) {
-        HttpRequest peticion = construirConToken(ruta, tokenExplicito)
+        HttpRequest peticion = construirConToken(ruta, tokenExplicito, "application/json", TOTAL)
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(
-                        gson.toJson(cuerpo), StandardCharsets.UTF_8))
+                .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(cuerpo), StandardCharsets.UTF_8))
                 .build();
         enviar(peticion, Void.class);
     }
 
     private HttpRequest.Builder construir(String ruta) {
-        return construirConToken(ruta, token);
+        return construirConToken(ruta, token, "application/json", TOTAL);
     }
 
-    private HttpRequest.Builder construirConToken(String ruta, String tokenExplicito) {
-        HttpRequest.Builder constructor = HttpRequest.newBuilder(
-                        URI.create(baseUrl + ruta))
-                .timeout(TOTAL)
-                .header("Accept", "application/json");
+    private HttpRequest.Builder construirConToken(String ruta, String tokenExplicito, String accept, Duration timeout) {
+        HttpRequest.Builder constructor = HttpRequest.newBuilder(URI.create(baseUrl + ruta))
+                .timeout(timeout == null ? TOTAL : timeout)
+                .header("Accept", accept);
         if (tokenExplicito != null && !tokenExplicito.isBlank()) {
             constructor.header("Authorization", "Bearer " + tokenExplicito);
         }
@@ -158,35 +186,62 @@ public final class ClienteApi {
                 }
                 return gson.fromJson(respuesta.body(), tipo);
             }
-            if (estado == 401 && !peticion.uri().getPath().equals("/api/v1/auth/login")) {
-                peticion.headers().firstValue("Authorization")
-                        .map(valor -> valor.substring("Bearer ".length()))
-                        .filter(this::descartarToken)
-                        .ifPresent(usado -> alExpirar.run());
-            }
-            throw error(respuesta);
+            manejarExpiracion(peticion, estado);
+            throw errorTexto(estado, respuesta.body());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new ErrorClienteException(0, "INTERRUMPIDO",
-                    "La operación fue cancelada.");
+            throw new ErrorClienteException(0, "INTERRUMPIDO", "La operación fue cancelada.");
         } catch (IOException e) {
             throw new ErrorClienteException(0, "SIN_CONEXION",
-                    "No se pudo conectar con el servicio local de Latch.");
+                    "No se pudo conectar con el servidor Latch en " + baseUrl + ".");
         }
     }
 
-    private ErrorClienteException error(HttpResponse<String> respuesta) {
+    private byte[] enviarBinario(HttpRequest peticion) {
         try {
-            ErrorApi.Cuerpo cuerpo = gson.fromJson(respuesta.body(), ErrorApi.Cuerpo.class);
+            HttpResponse<byte[]> respuesta = http.send(peticion, HttpResponse.BodyHandlers.ofByteArray());
+            int estado = respuesta.statusCode();
+            if (estado >= 200 && estado < 300) {
+                return respuesta.body();
+            }
+            manejarExpiracion(peticion, estado);
+            String cuerpoTexto = respuesta.body() == null ? ""
+                    : new String(respuesta.body(), StandardCharsets.UTF_8);
+            throw errorTexto(estado, cuerpoTexto);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ErrorClienteException(0, "INTERRUMPIDO", "La descarga fue cancelada.");
+        } catch (IOException e) {
+            throw new ErrorClienteException(0, "SIN_CONEXION",
+                    "No se pudo conectar con el servidor Latch en " + baseUrl + ".");
+        }
+    }
+
+    private void manejarExpiracion(HttpRequest peticion, int estado) {
+        String ruta = peticion.uri().getPath();
+        if (estado == 401 && (ruta == null || !ruta.endsWith("/api/v1/auth/login"))) {
+            boolean descartado = peticion.headers().firstValue("Authorization")
+                    .filter(valor -> valor.startsWith("Bearer "))
+                    .map(valor -> valor.substring("Bearer ".length()))
+                    .filter(this::descartarToken)
+                    .isPresent();
+            if (descartado) {
+                SesionCliente.cerrarSesion();
+                alExpirar.run();
+            }
+        }
+    }
+
+    private ErrorClienteException errorTexto(int estado, String cuerpoTexto) {
+        try {
+            ErrorApi.Cuerpo cuerpo = gson.fromJson(cuerpoTexto, ErrorApi.Cuerpo.class);
             if (cuerpo != null && cuerpo.error() != null) {
-                return new ErrorClienteException(respuesta.statusCode(),
-                        cuerpo.error().codigo(), cuerpo.error().mensaje());
+                return new ErrorClienteException(estado, cuerpo.error().codigo(), cuerpo.error().mensaje());
             }
         } catch (JsonParseException ignored) {
             // Se usa el mensaje genérico de abajo.
         }
-        return new ErrorClienteException(respuesta.statusCode(), "ERROR_API",
-                "El servicio local respondió con un error ("
-                        + respuesta.statusCode() + ").");
+        return new ErrorClienteException(estado, "ERROR_API",
+                "El servidor respondió con un error (" + estado + ").");
     }
 }

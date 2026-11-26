@@ -1,22 +1,26 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
 
 import javafx.fxml.FXML;
-import javafx.scene.control.DatePicker;
 import javafx.scene.control.Button;
+import javafx.scene.control.Control;
+import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ValidacionFormulario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.tasas.dto.TasaResponse;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.TipoCambio;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.RelojService;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoTasa;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.contrato.ConstantesLatch;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.contrato.util.FormatoTasa;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ValidacionFormulario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.ValidacionFormulario.CampoValidado;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
-/** Campos y validación de los dos diálogos del módulo de tasas. */
+/** Campos y validación en vivo de los dos diálogos del módulo de tasas. */
 public class TasaFormController {
     public record Datos(LocalDate fecha, BigDecimal tasa, String fuente) { }
 
@@ -35,16 +39,20 @@ public class TasaFormController {
     @FXML private Label lblErrorFuente;
     @FXML private Label lblErrorMotivo;
 
+    private final Set<Control> tocados = new HashSet<>();
     private TasaResponse tasaSeleccionada;
+    private boolean inicializando = true;
     private String estadoInicial = "";
 
     @FXML public void initialize() {
-        dpFecha.setValue(LocalDate.now(RelojService.ZONA_OPERATIVA));
+        dpFecha.setValue(LocalDate.now(ConstantesLatch.ZONA_OPERATIVA));
         lblBandaInformativa.setText("Banda de referencia: "
-                + FormatoTasa.formatear(TipoCambio.BANDA_MINIMA) + "–"
-                + FormatoTasa.formatear(TipoCambio.BANDA_MAXIMA) + " NIO/USD.");
+                + FormatoTasa.formatear(ConstantesLatch.BANDA_TASA_MINIMA) + "–"
+                + FormatoTasa.formatear(ConstantesLatch.BANDA_TASA_MAXIMA) + " NIO/USD.");
         mostrarRegistro();
         limpiarErrores();
+        configurarValidacionEnVivo();
+        inicializando = false;
         marcarLimpio();
     }
 
@@ -56,62 +64,69 @@ public class TasaFormController {
         panelRegistro.setManaged(true);
     }
 
+    public void mostrarEdicion(TasaResponse tasa) {
+        mostrarRegistro();
+        inicializando = true;
+        try {
+            dpFecha.setValue(LocalDate.parse(tasa.fecha()));
+            dpFecha.setDisable(true);
+            txtTasa.setText(tasa.nioPorUsd());
+            txtFuente.setText(tasa.fuente());
+            tocados.clear();
+            limpiarErrores();
+            marcarLimpio();
+        } finally {
+            inicializando = false;
+        }
+    }
+
     public void mostrarAutorizacion(TasaResponse tasa) {
-        tasaSeleccionada = tasa;
-        panelRegistro.setVisible(false);
-        panelRegistro.setManaged(false);
-        panelAutorizacion.setVisible(true);
-        panelAutorizacion.setManaged(true);
-        lblTasaSeleccionada.setText(fechaVisible(tasa.fecha()) + " · "
-                + FormatoTasa.formatear(new BigDecimal(tasa.nioPorUsd())) + " NIO/USD");
-        lblFuenteSeleccionada.setText("Fuente: " + tasa.fuente());
-        txtMotivo.clear();
-        limpiarErrores();
-        marcarLimpio();
+        inicializando = true;
+        try {
+            tasaSeleccionada = tasa;
+            panelRegistro.setVisible(false);
+            panelRegistro.setManaged(false);
+            panelAutorizacion.setVisible(true);
+            panelAutorizacion.setManaged(true);
+            lblTasaSeleccionada.setText(fechaVisible(tasa.fecha()) + " · "
+                    + FormatoTasa.formatear(new BigDecimal(tasa.nioPorUsd())) + " NIO/USD");
+            lblFuenteSeleccionada.setText("Fuente: " + tasa.fuente());
+            txtMotivo.clear();
+            tocados.clear();
+            limpiarErrores();
+            marcarLimpio();
+        } finally {
+            inicializando = false;
+        }
     }
 
     public boolean validarRegistro() {
-        limpiarErrores();
-        boolean valido = true;
-        int errores = 0;
-        if (dpFecha.getValue() == null) {
-            error(lblErrorFecha, "Selecciona la fecha de la tasa.");
-            errores++; valido = false;
-        } else if (dpFecha.getValue().isAfter(LocalDate.now(RelojService.ZONA_OPERATIVA))) {
-            error(lblErrorFecha, "La tasa no puede corresponder a una fecha futura.");
-            errores++; valido = false;
+        tocados.addAll(List.of(dpFecha, txtTasa, txtFuente));
+        boolean valido = validarFecha()
+                & validarTasa()
+                & validarFuente();
+        if (!valido) {
+            ValidacionFormulario.mostrarYEnfocar(lblResumenError, List.of(
+                    new CampoValidado(dpFecha, lblErrorFecha),
+                    new CampoValidado(txtTasa, lblErrorTasa),
+                    new CampoValidado(txtFuente, lblErrorFuente)));
+        } else {
+            ValidacionFormulario.sincronizarResumenSiVisible(lblResumenError,
+                    lblErrorFecha, lblErrorTasa, lblErrorFuente, lblErrorMotivo);
         }
-        try {
-            BigDecimal valor = new BigDecimal(txtTasa.getText().strip().replace(',', '.'));
-            if (valor.signum() <= 0) throw new NumberFormatException();
-        } catch (RuntimeException error) {
-            error(lblErrorTasa, "Escribe una tasa decimal mayor que cero.");
-            errores++; valido = false;
-        }
-        if (txtFuente.getText() == null || txtFuente.getText().isBlank()) {
-            error(lblErrorFuente, "Indica la fuente de la tasa.");
-            errores++; valido = false;
-        } else if (txtFuente.getText().length() > 500) {
-            error(lblErrorFuente, "La fuente admite hasta 500 caracteres.");
-            errores++; valido = false;
-        }
-        if (!valido) ValidacionFormulario.mostrar(lblResumenError, lblErrorFecha, lblErrorTasa, lblErrorFuente, lblErrorMotivo);
         return valido;
     }
 
     public boolean validarMotivo() {
-        limpiarErrores();
-        if (txtMotivo.getText() == null || txtMotivo.getText().isBlank()) {
-            error(lblErrorMotivo, "Escribe el motivo de autorización.");
-            ValidacionFormulario.mostrar(lblResumenError, lblErrorMotivo);
-            return false;
+        tocados.add(txtMotivo);
+        boolean valido = validarTextoMotivo();
+        if (!valido) {
+            ValidacionFormulario.mostrarYEnfocar(lblResumenError, List.of(
+                    new CampoValidado(txtMotivo, lblErrorMotivo)));
+        } else {
+            ValidacionFormulario.sincronizarResumenSiVisible(lblResumenError, lblErrorMotivo);
         }
-        if (txtMotivo.getText().length() > 500) {
-            error(lblErrorMotivo, "El motivo admite hasta 500 caracteres.");
-            ValidacionFormulario.mostrar(lblResumenError, lblErrorMotivo);
-            return false;
-        }
-        return true;
+        return valido;
     }
 
     public Datos datos() {
@@ -133,25 +148,84 @@ public class TasaFormController {
         lblResumenError.setManaged(true);
     }
 
+    private void configurarValidacionEnVivo() {
+        ValidacionFormulario.vincularSelector(dpFecha, () -> alEditar(dpFecha, this::validarFecha));
+        ValidacionFormulario.vincularTexto(txtTasa, () -> alEditar(txtTasa, this::validarTasa));
+        ValidacionFormulario.vincularTexto(txtFuente, () -> alEditar(txtFuente, this::validarFuente));
+        ValidacionFormulario.vincularTexto(txtMotivo, () -> alEditar(txtMotivo, this::validarTextoMotivo));
+    }
+
+    private void alEditar(Control control, Runnable validador) {
+        if (inicializando) return;
+        tocados.add(control);
+        validador.run();
+        ValidacionFormulario.sincronizarResumenSiVisible(lblResumenError,
+                lblErrorFecha, lblErrorTasa, lblErrorFuente, lblErrorMotivo);
+    }
+
+    private boolean validarFecha() {
+        LocalDate fecha = dpFecha.getValue();
+        String msg = null;
+        if (fecha == null) {
+            msg = "Selecciona la fecha de la tasa.";
+        } else if (fecha.isAfter(LocalDate.now(ConstantesLatch.ZONA_OPERATIVA))) {
+            msg = "La tasa no puede corresponder a una fecha futura.";
+        }
+        ValidacionFormulario.marcarCampo(dpFecha, lblErrorFecha, msg);
+        return msg == null;
+    }
+
+    private boolean validarTasa() {
+        String msg = null;
+        try {
+            BigDecimal valor = new BigDecimal(txtTasa.getText().strip().replace(',', '.'));
+            if (valor.signum() <= 0 || valor.stripTrailingZeros().scale() > 8) {
+                throw new NumberFormatException();
+            }
+        } catch (RuntimeException error) {
+            msg = "Escribe una tasa decimal mayor que cero con hasta ocho decimales.";
+        }
+        ValidacionFormulario.marcarCampo(txtTasa, lblErrorTasa, msg);
+        return msg == null;
+    }
+
+    private boolean validarFuente() {
+        String fuente = txtFuente.getText();
+        String msg = null;
+        if (fuente == null || fuente.isBlank()) {
+            msg = "Indica la fuente de la tasa.";
+        } else if (fuente.length() > 500) {
+            msg = "La fuente admite hasta 500 caracteres.";
+        }
+        ValidacionFormulario.marcarCampo(txtFuente, lblErrorFuente, msg);
+        return msg == null;
+    }
+
+    private boolean validarTextoMotivo() {
+        String motivo = txtMotivo.getText();
+        String msg = null;
+        if (motivo == null || motivo.isBlank()) {
+            msg = "Escribe el motivo de autorización.";
+        } else if (motivo.length() > 500) {
+            msg = "El motivo admite hasta 500 caracteres.";
+        }
+        ValidacionFormulario.marcarCampo(txtMotivo, lblErrorMotivo, msg);
+        return msg == null;
+    }
+
     private String instantanea() {
         return dpFecha.getValue() + "|" + txtTasa.getText() + "|" + txtFuente.getText() + "|" + txtMotivo.getText();
     }
 
     private void limpiarErrores() {
-        for (Label etiqueta : List.of(lblResumenError, lblErrorFecha, lblErrorTasa, lblErrorFuente, lblErrorMotivo)) {
-            etiqueta.setText("");
-            etiqueta.setVisible(false);
-            etiqueta.setManaged(true);
-        }
-    }
-
-    private void error(Label etiqueta, String mensaje) {
-        etiqueta.setText(mensaje);
-        etiqueta.setVisible(true);
-        etiqueta.setManaged(true);
+        ValidacionFormulario.limpiarCampos(lblResumenError,
+                new CampoValidado(dpFecha, lblErrorFecha),
+                new CampoValidado(txtTasa, lblErrorTasa),
+                new CampoValidado(txtFuente, lblErrorFuente),
+                new CampoValidado(txtMotivo, lblErrorMotivo));
     }
 
     private static String fechaVisible(String fecha) {
-        return LocalDate.parse(fecha).format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+        return LocalDate.parse(fecha).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
     }
 }

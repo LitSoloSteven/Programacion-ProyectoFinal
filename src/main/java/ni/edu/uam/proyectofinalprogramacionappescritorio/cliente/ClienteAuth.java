@@ -1,5 +1,7 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.cliente;
 
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.dto.CambiarPasswordRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.dto.CambiarPasswordResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.dto.LoginRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.auth.dto.LoginResponse;
 
@@ -14,9 +16,27 @@ public final class ClienteAuth {
     }
 
     public LoginResponse login(String usuario, String password) {
+        return login(usuario, password, null);
+    }
+
+    public LoginResponse login(String usuario, String password, String nuevaPassword) {
         LoginResponse respuesta = api.post("/api/v1/auth/login",
-                new LoginRequest(usuario, password), LoginResponse.class);
+                new LoginRequest(usuario, password, nuevaPassword), LoginResponse.class);
         api.establecerToken(respuesta.token());
+        if (respuesta.usuarioId() != null && respuesta.nombre() != null && respuesta.rol() != null) {
+            SesionCliente.iniciar(respuesta.usuarioId(), respuesta.nombre(), respuesta.rol());
+        }
+        return respuesta;
+    }
+
+    public CambiarPasswordResponse cambiarPassword(char[] passwordActual, char[] nuevaPassword) {
+        String actual = passwordActual == null ? "" : new String(passwordActual);
+        String nueva = nuevaPassword == null ? "" : new String(nuevaPassword);
+        CambiarPasswordResponse respuesta = api.post("/api/v1/auth/cambiar-password",
+                new CambiarPasswordRequest(actual, nueva), CambiarPasswordResponse.class);
+        if (respuesta != null && respuesta.token() != null) {
+            api.establecerToken(respuesta.token());
+        }
         return respuesta;
     }
 
@@ -31,6 +51,8 @@ public final class ClienteAuth {
 
     /** Extrae el token local de forma atómica y lo revoca en el servidor. */
     public void logout() {
-        logout(api.tomarToken());
+        String token = api.tomarToken();
+        SesionCliente.cerrarSesion();
+        logout(token);
     }
 }

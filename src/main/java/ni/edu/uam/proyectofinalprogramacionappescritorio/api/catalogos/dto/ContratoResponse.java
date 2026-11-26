@@ -15,5 +15,9 @@ public record ContratoResponse(
         String depositoPactado,
         String garantiaSaldo,
         String estado,
-        long version) {
+        long version,
+        String predecesorId,
+        String terminadoEl,
+        String motivoCierre,
+        String garantiaEstado) {
 }

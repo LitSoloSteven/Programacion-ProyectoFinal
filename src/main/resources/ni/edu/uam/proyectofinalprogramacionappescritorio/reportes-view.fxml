@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.DatePicker?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.FlowPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:id="rootView"
+      fx:controller="ni.edu.uam.proyectofinalprogramacionappescritorio.controller.ReportesController"
+      spacing="14.0" styleClass="view-container">
+
+    <HBox alignment="CENTER_LEFT" spacing="16.0" styleClass="page-header">
+        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+            <Label fx:id="lblTitulo" styleClass="page-title" text="Centro de Reportes" />
+            <Label styleClass="page-subtitle" wrapText="true"
+                   text="Consulta, previsualiza y exporta comprobantes e informes con filtros, fecha de corte y totales separados por moneda." />
+        </VBox>
+    </HBox>
+
+    <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="content-area" VBox.vgrow="ALWAYS">
+        <VBox spacing="14.0">
+            <VBox spacing="12.0" styleClass="review-panel">
+                <Label styleClass="section-title" text="1. Selección del documento" />
+                <HBox alignment="CENTER_LEFT" spacing="12.0">
+                    <ComboBox fx:id="cmbCategoriaReporte" prefWidth="210.0" styleClass="field"
+                              accessibleText="Filtrar documentos por categoría" />
+                    <ComboBox fx:id="cmbTipoReporte" prefWidth="330.0" styleClass="field"
+                              accessibleText="Seleccionar documento" />
+                    <Label fx:id="lblDescripcionReporte" styleClass="field-help" wrapText="true" HBox.hgrow="ALWAYS"
+                           text="Selecciona un documento del catálogo." />
+                </HBox>
+                <Label fx:id="lblFormatosDisponibles" styleClass="field-help" wrapText="true"
+                       text="Formatos disponibles: PDF y Excel (XLSX)" />
+            </VBox>
+
+            <VBox fx:id="panelFiltros" spacing="12.0" styleClass="review-panel">
+                <Label styleClass="section-title" text="2. Parámetros y filtros" />
+                <Label fx:id="lblSinFiltros" styleClass="field-help" wrapText="true" visible="false" managed="false"
+                       text="Este documento incluye todos los registros actuales del módulo." />
+
+                <FlowPane fx:id="flowFiltros" hgap="14.0" vgap="12.0">
+                    <VBox fx:id="boxPeriodo" prefWidth="260.0" spacing="4.0">
+                        <Label styleClass="field-label" text="Período" />
+                        <ComboBox fx:id="cmbPeriodo" maxWidth="Infinity" styleClass="field" />
+                    </VBox>
+
+                    <VBox fx:id="boxFechaCorte" prefWidth="240.0" spacing="4.0">
+                        <Label styleClass="field-label" text="Fecha de corte" />
+                        <DatePicker fx:id="dpFechaCorte" maxWidth="Infinity" styleClass="field" />
+                    </VBox>
+
+                    <VBox fx:id="boxDesde" prefWidth="220.0" spacing="4.0">
+                        <Label styleClass="field-label" text="Desde" />
+                        <DatePicker fx:id="dpDesde" maxWidth="Infinity" styleClass="field" />
+                    </VBox>
+
+                    <VBox fx:id="boxHasta" prefWidth="220.0" spacing="4.0">
+                        <Label styleClass="field-label" text="Hasta" />
+                        <DatePicker fx:id="dpHasta" maxWidth="Infinity" styleClass="field" />
+                    </VBox>
+
+                    <VBox fx:id="boxUmbralDias" prefWidth="200.0" spacing="4.0">
+                        <Label styleClass="field-label" text="Umbral (días)" />
+                        <TextField fx:id="txtUmbralDias" promptText="30" styleClass="field" />
+                    </VBox>
+
+                    <VBox fx:id="boxMoneda" prefWidth="200.0" spacing="4.0">
+                        <Label styleClass="field-label" text="Moneda" />
+                        <ComboBox fx:id="cmbMoneda" maxWidth="Infinity" styleClass="field" />
+                    </VBox>
+
+                    <VBox fx:id="boxPropiedad" prefWidth="280.0" spacing="4.0">
+                        <Label styleClass="field-label" text="Propiedad" />
+                        <ComboBox fx:id="cmbPropiedad" maxWidth="Infinity" styleClass="field" />
+                    </VBox>
+
+                    <VBox fx:id="boxUnidad" prefWidth="280.0" spacing="4.0">
+                        <Label styleClass="field-label" text="Unidad" />
+                        <ComboBox fx:id="cmbUnidad" maxWidth="Infinity" styleClass="field" />
+                    </VBox>
+
+                    <VBox fx:id="boxTipoUnidad" prefWidth="230.0" spacing="4.0">
+                        <Label styleClass="field-label" text="Tipo de unidad" />
+                        <ComboBox fx:id="cmbTipoUnidad" maxWidth="Infinity" styleClass="field" />
+                    </VBox>
+
+                    <VBox fx:id="boxEstadoUnidad" prefWidth="230.0" spacing="4.0">
+                        <Label styleClass="field-label" text="Estado de unidad" />
+                        <ComboBox fx:id="cmbEstadoUnidad" maxWidth="Infinity" styleClass="field" />
+                    </VBox>
+
+                    <VBox fx:id="boxFiltroContrato" prefWidth="280.0" spacing="4.0">
+                        <Label styleClass="field-label" text="Buscar contrato" />
+                        <TextField fx:id="txtBuscarContrato" promptText="Inquilino, unidad o estado" styleClass="search-field" />
+                    </VBox>
+
+                    <VBox fx:id="boxContrato" prefWidth="340.0" spacing="4.0">
+                        <Label styleClass="field-label" text="Contrato" />
+                        <ComboBox fx:id="cmbContrato" maxWidth="Infinity" styleClass="field" />
+                    </VBox>
+
+                    <VBox fx:id="boxEstadoContrato" prefWidth="230.0" spacing="4.0">
+                        <Label styleClass="field-label" text="Estado de contrato" />
+                        <ComboBox fx:id="cmbEstadoContrato" maxWidth="Infinity" styleClass="field" />
+                    </VBox>
+
+                    <VBox fx:id="boxInquilino" prefWidth="280.0" spacing="4.0">
+                        <Label styleClass="field-label" text="Inquilino" />
+                        <ComboBox fx:id="cmbInquilino" maxWidth="Infinity" styleClass="field" />
+                    </VBox>
+
+                    <VBox fx:id="boxEstadoInquilino" prefWidth="220.0" spacing="4.0">
+                        <Label styleClass="field-label" text="Estado de inquilino" />
+                        <ComboBox fx:id="cmbEstadoInquilino" maxWidth="Infinity" styleClass="field" />
+                    </VBox>
+
+                    <VBox fx:id="boxEstadoMantenimiento" prefWidth="230.0" spacing="4.0">
+                        <Label styleClass="field-label" text="Estado de solicitud" />
+                        <ComboBox fx:id="cmbEstadoMantenimiento" maxWidth="Infinity" styleClass="field" />
+                    </VBox>
+
+                    <VBox fx:id="boxPrioridadMantenimiento" prefWidth="200.0" spacing="4.0">
+                        <Label styleClass="field-label" text="Prioridad" />
+                        <ComboBox fx:id="cmbPrioridadMantenimiento" maxWidth="Infinity" styleClass="field" />
+                    </VBox>
+
+                    <VBox fx:id="boxOrigenTasa" prefWidth="260.0" spacing="4.0">
+                        <Label styleClass="field-label" text="Fuente / origen de tasa" />
+                        <TextField fx:id="txtOrigenTasa" promptText="Ej. BCN, ExchangeRate-API" styleClass="field" />
+                    </VBox>
+
+                    <VBox fx:id="boxTextoBusqueda" prefWidth="320.0" spacing="4.0">
+                        <Label fx:id="lblTextoBusqueda" styleClass="field-label" text="Búsqueda" />
+                        <TextField fx:id="txtTextoBusqueda" promptText="Filtrar registros…" styleClass="search-field" />
+                    </VBox>
+                </FlowPane>
+
+                <VBox fx:id="boxBuscadorRecibos" managed="false" spacing="10.0" visible="false">
+                    <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
+                        <TextField fx:id="txtNumeroRecibo" prefWidth="140.0" promptText="N.º de recibo"
+                                   styleClass="field" accessibleText="Número de recibo" />
+                        <TextField fx:id="txtBuscarRecibo" HBox.hgrow="ALWAYS"
+                                   promptText="Buscar por inquilino, contrato, referencia o método"
+                                   styleClass="search-field" accessibleText="Buscar recibo por datos del pago" />
+                        <Button fx:id="btnLimpiarRecibos" onAction="#handleLimpiarRecibos"
+                                minWidth="-Infinity" styleClass="button-secondary" text="Limpiar" />
+                    </HBox>
+                    <Label fx:id="lblResumenRecibos" styleClass="secondary-text" wrapText="true"
+                           text="Selecciona un recibo de la tabla o escribe su número." />
+                    <TableView fx:id="tblRecibos" prefHeight="195.0" styleClass="data-table">
+                        <placeholder><Label text="No se encontraron recibos con ese criterio." /></placeholder>
+                        <columns>
+                            <TableColumn fx:id="colReciboNumero" minWidth="95.0" prefWidth="105.0" text="N.º Recibo" />
+                            <TableColumn fx:id="colReciboFecha" minWidth="105.0" prefWidth="115.0" text="Fecha" />
+                            <TableColumn fx:id="colReciboInquilino" minWidth="180.0" prefWidth="210.0" text="Inquilino" />
+                            <TableColumn fx:id="colReciboUnidad" minWidth="160.0" prefWidth="190.0" text="Unidad" />
+                            <TableColumn fx:id="colReciboMonto" minWidth="125.0" prefWidth="140.0" text="Monto" />
+                            <TableColumn fx:id="colReciboEstado" minWidth="105.0" prefWidth="115.0" text="Estado" />
+                        </columns>
+                    </TableView>
+                </VBox>
+            </VBox>
+        </VBox>
+    </ScrollPane>
+
+    <Label fx:id="lblEstadoH5" styleClass="field-help" managed="false" visible="false" wrapText="true" />
+    <Label fx:id="lblError" styleClass="field-error" managed="false" visible="false" wrapText="true" />
+
+    <HBox alignment="CENTER_LEFT" spacing="12.0" styleClass="toolbar">
+        <Button fx:id="btnVistaPrevia" onAction="#handleVistaPrevia"
+                styleClass="button-primary" text="Vista previa" minWidth="-Infinity" />
+        <Button fx:id="btnExportarPdf" onAction="#handleExportarPdf"
+                styleClass="button-secondary" text="Exportar PDF…" minWidth="-Infinity" />
+        <Button fx:id="btnExportarXlsx" onAction="#handleExportarXlsx"
+                styleClass="button-secondary" text="Exportar XLSX…" minWidth="-Infinity" />
+        <Button fx:id="btnCancelarH5" onAction="#handleCancelarH5"
+                styleClass="button-destructive" text="Cancelar tarea"
+                visible="false" managed="false" minWidth="-Infinity" />
+    </HBox>
+</VBox>

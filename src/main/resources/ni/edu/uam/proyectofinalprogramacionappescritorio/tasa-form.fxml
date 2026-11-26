@@ -15,22 +15,23 @@
     <Label fx:id="lblResumenError" managed="false" styleClass="field-error"
            text="" visible="false" wrapText="true" />
     <VBox fx:id="panelRegistro" spacing="14.0">
+        <Label styleClass="field-help" text="Los campos con * son obligatorios. La fecha no puede ser futura." wrapText="true" />
         <Label styleClass="section-title" text="Registrar tasa informativa" />
         <GridPane hgap="16.0" vgap="8.0">
             <columnConstraints><ColumnConstraints percentWidth="32.0" /><ColumnConstraints percentWidth="33.0" /><ColumnConstraints percentWidth="35.0" /></columnConstraints>
             <VBox spacing="6.0" GridPane.columnIndex="0">
                 <Label styleClass="field-label" text="Fecha *" />
-                <DatePicker fx:id="dpFecha" maxWidth="Infinity" styleClass="field" />
+                <DatePicker fx:id="dpFecha" maxWidth="Infinity" promptText="AAAA-MM-DD" styleClass="field" />
                 <Label fx:id="lblErrorFecha" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
             </VBox>
             <VBox spacing="6.0" GridPane.columnIndex="1">
                 <Label styleClass="field-label" text="Tasa NIO por USD *" />
-                <TextField fx:id="txtTasa" promptText="36.75000000" styleClass="field" />
+                <TextField fx:id="txtTasa" promptText="Ej. 36.75000000 (hasta 8 dec.)" styleClass="field" />
                 <Label fx:id="lblErrorTasa" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
             </VBox>
             <VBox spacing="6.0" GridPane.columnIndex="2">
                 <Label styleClass="field-label" text="Fuente *" />
-                <TextField fx:id="txtFuente" promptText="BCN" styleClass="field" />
+                <TextField fx:id="txtFuente" promptText="Ej. BCN (hasta 500 car.)" styleClass="field" />
                 <Label fx:id="lblErrorFuente" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
             </VBox>
         </GridPane>
@@ -42,7 +43,7 @@
         <Label fx:id="lblFuenteSeleccionada" styleClass="field-help" wrapText="true" />
         <Label fx:id="lblBandaInformativa" styleClass="field-help" wrapText="true" />
         <Label styleClass="field-label" text="Motivo de autorización *" />
-        <TextField fx:id="txtMotivo" promptText="Explica por qué autorizas esta tasa" styleClass="field" />
+        <TextField fx:id="txtMotivo" promptText="Explica por qué autorizas esta tasa (hasta 500 car.)" styleClass="field" />
         <Label fx:id="lblErrorMotivo" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
     </VBox>
 </VBox>

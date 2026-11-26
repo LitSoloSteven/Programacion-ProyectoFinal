@@ -2,7 +2,9 @@ package ni.edu.uam.proyectofinalprogramacionappescritorio.util;
 
 import org.junit.jupiter.api.Test;
 import javafx.scene.control.Label;
+import javafx.scene.Scene;
 import javafx.scene.layout.HBox;
+import javafx.scene.paint.Color;
 import javafx.application.Platform;
 
 import java.util.List;
@@ -50,6 +52,25 @@ class InsigniaEstadoTest {
     }
 
     @Test
+    void estadoPendienteAplicaTextoClaroAlLabelEnAmbosTemas() {
+        enHiloFx(() -> {
+            for (String tema : List.of("theme-light", "theme-dark")) {
+                HBox insignia = InsigniaEstado.crear("Pendiente");
+                HBox raiz = new HBox(insignia);
+                raiz.getStyleClass().add(tema);
+                Scene escena = new Scene(raiz);
+                escena.getStylesheets().add(getClass().getResource(
+                        "/ni/edu/uam/proyectofinalprogramacionappescritorio/estilos.css").toExternalForm());
+                raiz.applyCss();
+                Label etiqueta = (Label) insignia.getChildren().get(1);
+                assertEquals(Color.web("#E6E9EF"), etiqueta.getTextFill(), tema);
+                assertEquals(Color.web("#1F3B5C"), insignia.getBackground().getFills().getFirst().getFill(), tema);
+            }
+            return null;
+        });
+    }
+
+    @Test
     void estadoNoMapeadoConservaSuTextoCrudo() {
         assertEquals("Estado nuevo", InsigniaEstado.textoVisible("Estado nuevo"));
     }
@@ -64,4 +85,3 @@ class InsigniaEstadoTest {
         }
     }
 }
-

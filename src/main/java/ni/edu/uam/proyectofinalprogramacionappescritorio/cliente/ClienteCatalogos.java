@@ -1,59 +1,102 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.cliente;
 
-import lombok.RequiredArgsConstructor;
-
 import com.google.gson.reflect.TypeToken;
+import lombok.RequiredArgsConstructor;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.*;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.*;
 
-import java.math.BigDecimal;
-import java.sql.Timestamp;
-import java.time.Instant;
-import java.time.LocalDate;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
-import java.util.function.Function;
 
-/** Adapta los catálogos HTTP a las filas y formularios existentes de JavaFX. */
+/** Cliente HTTP puro de catálogos (sin dependencias a modelo.* ni Hibernate). */
 @RequiredArgsConstructor
 public final class ClienteCatalogos {
     private static final int TAMANO = 50;
     private final ClienteApi api;
 
-    public List<Propiedad> propiedades(boolean soloActivas) {
-        return listar("propiedades", soloActivas ? "&activa=true" : "",
-                PropiedadResponse.class, ClienteCatalogos::propiedad);
+    public List<PropiedadResponse> propiedades(boolean soloActivas) {
+        return listar("propiedades", soloActivas ? "&activa=true" : "", PropiedadResponse.class);
     }
 
-    public List<Unidad> unidades() {
-        return listar("unidades", "", UnidadResponse.class, ClienteCatalogos::unidad);
+    public PropiedadResponse propiedad(UUID id) {
+        return api.get(ruta("propiedades") + "/" + id, PropiedadResponse.class);
     }
 
-    public List<Inquilino> inquilinos(boolean soloActivos) {
-        return listar("inquilinos", soloActivos ? "&activo=true" : "",
-                InquilinoResponse.class, ClienteCatalogos::inquilino);
+    public List<UnidadResponse> unidades() {
+        return listar("unidades", "", UnidadResponse.class);
     }
 
-    public List<Contrato> contratos(boolean soloVigentes) {
-        return listar("contratos", soloVigentes ? "&estado=Vigente" : "",
-                ContratoResponse.class, ClienteCatalogos::contrato);
+    public UnidadResponse unidad(UUID id) {
+        return api.get(ruta("unidades") + "/" + id, UnidadResponse.class);
     }
 
-    public void guardarPropiedad(UUID id, PropiedadRequest solicitud) {
-        guardar("propiedades", id, solicitud);
+    public List<InquilinoResponse> inquilinos(boolean soloActivos) {
+        return listar("inquilinos", soloActivos ? "&activo=true" : "", InquilinoResponse.class);
     }
 
-    public void guardarUnidad(UUID id, UnidadRequest solicitud) {
-        guardar("unidades", id, solicitud);
+    public InquilinoResponse inquilino(UUID id) {
+        return api.get(ruta("inquilinos") + "/" + id, InquilinoResponse.class);
     }
 
-    public void guardarInquilino(UUID id, InquilinoRequest solicitud) {
-        guardar("inquilinos", id, solicitud);
+    public HistorialInquilinoResponse historialInquilino(UUID id) {
+        return api.get(ruta("inquilinos") + "/" + id + "/historial", HistorialInquilinoResponse.class);
     }
 
-    public void guardarContrato(UUID id, ContratoRequest solicitud) {
-        guardar("contratos", id, solicitud);
+    public List<InquilinoResponse> coincidenciasIdentificacion(String identificacion, UUID excluirId) {
+        if (identificacion == null || identificacion.isBlank()) {
+            return List.of();
+        }
+        StringBuilder url = new StringBuilder(ruta("inquilinos"))
+                .append("/coincidencias?identificacion=")
+                .append(URLEncoder.encode(identificacion.strip(), StandardCharsets.UTF_8));
+        if (excluirId != null) {
+            url.append("&excluirId=").append(excluirId);
+        }
+        InquilinoResponse[] arr = api.get(url.toString(), InquilinoResponse[].class);
+        return arr == null ? List.of() : Arrays.asList(arr);
+    }
+
+    public List<ContratoResponse> contratos(boolean soloVigentes) {
+        return listar("contratos", soloVigentes ? "&estado=Vigente" : "", ContratoResponse.class);
+    }
+
+    public ContratoResponse contrato(UUID id) {
+        return api.get(ruta("contratos") + "/" + id, ContratoResponse.class);
+    }
+
+    public PropiedadResponse guardarPropiedad(UUID id, PropiedadRequest solicitud) {
+        return guardar("propiedades", id, solicitud, PropiedadResponse.class);
+    }
+
+    public UnidadResponse guardarUnidad(UUID id, UnidadRequest solicitud) {
+        return guardar("unidades", id, solicitud, UnidadResponse.class);
+    }
+
+    public InquilinoResponse guardarInquilino(UUID id, InquilinoRequest solicitud) {
+        return guardar("inquilinos", id, solicitud, InquilinoResponse.class);
+    }
+
+    public ContratoResponse guardarContrato(UUID id, ContratoRequest solicitud) {
+        return guardar("contratos", id, solicitud, ContratoResponse.class);
+    }
+
+    public void eliminarPropiedad(UUID id) {
+        api.delete(ruta("propiedades") + "/" + id);
+    }
+
+    public void eliminarUnidad(UUID id) {
+        api.delete(ruta("unidades") + "/" + id);
+    }
+
+    public void eliminarInquilino(UUID id) {
+        api.delete(ruta("inquilinos") + "/" + id);
+    }
+
+    public void eliminarContrato(UUID id) {
+        api.delete(ruta("contratos") + "/" + id);
     }
 
     public void darDeBajaInquilino(UUID id) {
@@ -64,23 +107,55 @@ public final class ClienteCatalogos {
         api.patch(ruta("contratos") + "/" + id, new ContratoEstadoRequest("Terminado"), Void.class);
     }
 
-    private void guardar(String recurso, UUID id, Object cuerpo) {
-        String ruta = ruta(recurso);
-        if (id == null) {
-            api.post(ruta, cuerpo, Void.class);
-        } else {
-            api.put(ruta + "/" + id, cuerpo, Void.class);
-        }
+    public ContratoResponse activarContrato(UUID id, long version) {
+        return api.post(ruta("contratos") + "/" + id + "/activar",
+                new ContratoVersionRequest(version), ContratoResponse.class);
     }
 
-    private <R, T> List<T> listar(String recurso, String filtros, Class<R> tipo,
-                                   Function<R, T> convertir) {
+    public ContratoResponse cancelarBorrador(UUID id, long version, String motivo) {
+        return api.post(ruta("contratos") + "/" + id + "/cancelar",
+                new ContratoCancelarRequest(version, motivo), ContratoResponse.class);
+    }
+
+    public ContratoResponse renovarContrato(UUID anteriorId, ContratoRenovarRequest solicitud) {
+        return api.post(ruta("contratos") + "/" + anteriorId + "/renovar",
+                solicitud, ContratoResponse.class);
+    }
+
+    public ContratoResponse terminarContratoConCierre(UUID id, ContratoTerminarRequest solicitud) {
+        return api.post(ruta("contratos") + "/" + id + "/terminar",
+                solicitud, ContratoResponse.class);
+    }
+
+    public GarantiaResumenResponse obtenerGarantia(UUID contratoId) {
+        return api.get(ruta("contratos") + "/" + contratoId + "/garantia", GarantiaResumenResponse.class);
+    }
+
+    public List<GarantiaListadoItemResponse> listarGarantias() {
+        GarantiaListadoItemResponse[] arr = api.get("/api/v1/garantias", GarantiaListadoItemResponse[].class);
+        return arr == null ? List.of() : Arrays.asList(arr);
+    }
+
+    public GarantiaResumenResponse liquidarGarantia(UUID contratoId, UUID liquidacionId,
+                                                    GarantiaLiquidacionRequest solicitud) {
+        return api.postConCabecera(
+                ruta("contratos") + "/" + contratoId + "/garantia/movimientos",
+                solicitud, GarantiaResumenResponse.class,
+                "Idempotency-Key", liquidacionId.toString());
+    }
+
+    private <T> T guardar(String recurso, UUID id, Object cuerpo, Class<T> tipo) {
+        String base = ruta(recurso);
+        return id == null ? api.post(base, cuerpo, tipo) : api.put(base + "/" + id, cuerpo, tipo);
+    }
+
+    private <R> List<R> listar(String recurso, String filtros, Class<R> tipo) {
         var tipoPagina = TypeToken.getParameterized(PaginaResponse.class, tipo).getType();
-        List<T> filas = new ArrayList<>();
+        List<R> filas = new ArrayList<>();
         for (int pagina = 1; ; pagina++) {
             PaginaResponse<R> respuesta = api.get(
                     ruta(recurso) + "?pagina=" + pagina + "&tamano=" + TAMANO + filtros, tipoPagina);
-            respuesta.elementos().stream().map(convertir).forEach(filas::add);
+            filas.addAll(respuesta.elementos());
             if (respuesta.elementos().isEmpty() || (long) pagina * TAMANO >= respuesta.total()) {
                 return filas;
             }
@@ -89,44 +164,5 @@ public final class ClienteCatalogos {
 
     private static String ruta(String recurso) {
         return "/api/v1/" + recurso;
-    }
-
-    private static Propiedad propiedad(PropiedadResponse datos) {
-        Propiedad fila = new Propiedad(UUID.fromString(datos.id()), datos.nombre(), datos.direccion(),
-                datos.activa(), instante(datos.creadoEn()), datos.version());
-        if (datos.propietarioNombre() != null) {
-            fila.setPropietario(new Propietario(null, datos.propietarioNombre(),
-                    datos.propietarioCorreo(), datos.propietarioTelefono()));
-        }
-        return fila;
-    }
-
-    private static Unidad unidad(UnidadResponse datos) {
-        Unidad fila = new Unidad(UUID.fromString(datos.id()), UUID.fromString(datos.propiedadId()),
-                datos.propiedadNombre(), datos.codigo(), datos.tipo(), datos.estado(),
-                decimal(datos.canonReferencia()), datos.moneda(), datos.version());
-        fila.setDescripcion(datos.descripcion());
-        return fila;
-    }
-
-    private static Inquilino inquilino(InquilinoResponse datos) {
-        return new Inquilino(UUID.fromString(datos.id()), datos.nombre(), datos.identificacion(),
-                datos.telefono(), datos.correo(), datos.contactoEmergencia(), datos.activo(),
-                instante(datos.creadoEn()), datos.version());
-    }
-
-    private static Contrato contrato(ContratoResponse datos) {
-        return new Contrato(UUID.fromString(datos.id()), UUID.fromString(datos.unidadId()), datos.unidadInfo(),
-                UUID.fromString(datos.inquilinoId()), datos.inquilinoNombre(), LocalDate.parse(datos.inicio()),
-                LocalDate.parse(datos.fin()), decimal(datos.canon()), datos.moneda(), datos.diaPago(),
-                decimal(datos.depositoPactado()), datos.estado(), datos.version());
-    }
-
-    private static Timestamp instante(String valor) {
-        return valor == null ? null : Timestamp.from(Instant.parse(valor));
-    }
-
-    private static BigDecimal decimal(String valor) {
-        return valor == null ? null : new BigDecimal(valor);
     }
 }

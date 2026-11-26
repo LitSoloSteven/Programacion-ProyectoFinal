@@ -6,28 +6,33 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tooltip;
+import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.image.WritableImage;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.Window;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.DocumentoReporte;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.LatchApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.reportes.dto.DocumentoReporteResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.contrato.ConstantesLatch;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.contrato.OperacionCanceladaException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.GestorH5Reportes;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.util.RenderizadorVistaPreviaReporte;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.VistaPreviaReporte;
 
 import java.awt.Desktop;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
 
-/** Controlador del diálogo reutilizable de vista previa de reportes. */
+/** Controlador del diálogo reutilizable de vista previa de reportes (PAN-16 / H5). */
 public class VistaPreviaReporteController {
 
     private static final int MAX_PAGINAS_CACHE = 8;
@@ -40,25 +45,28 @@ public class VistaPreviaReporteController {
     @FXML private Button btnZoomMas;
     @FXML private Button btnZoomCien;
     @FXML private Button btnAjustarAncho;
+    @FXML private Button btnCancelarExportacion;
+    @FXML private Button btnExportarXlsx;
     @FXML private Button btnExportarPdf;
     @FXML private Button btnCerrar;
     @FXML private ScrollPane spHoja;
     @FXML private ImageView imgPagina;
     @FXML private Label lblEstado;
 
-    private final Map<ClavePagina, WritableImage> cachePaginas = new LinkedHashMap<>(16, 0.75f, true) {
+    private final Map<ClavePagina, Image> cachePaginas = new LinkedHashMap<>(16, 0.75f, true) {
         @Override
-        protected boolean removeEldestEntry(Map.Entry<ClavePagina, WritableImage> eldest) {
+        protected boolean removeEldestEntry(Map.Entry<ClavePagina, Image> eldest) {
             return size() > MAX_PAGINAS_CACHE;
         }
     };
 
-    private DocumentoReporte documento;
+    private DocumentoReporteResponse documento;
     private int totalPaginas;
     private int paginaActual;
-    private float escalaActual = RenderizadorVistaPreviaReporte.ZOOM_INICIAL;
+    private float escalaActual = ConstantesLatch.ZOOM_INICIAL;
     private long solicitudRenderId;
     private boolean exportando;
+    private GestorH5Reportes.EjecucionH5 ejecucionExportacion;
 
     @FXML
     public void initialize() {
@@ -66,39 +74,41 @@ public class VistaPreviaReporteController {
             Iconos.asignar(btnExportarPdf, Iconos.Nombre.DESCARGAR, 16);
             btnExportarPdf.setTooltip(new Tooltip("Guardar este reporte como archivo PDF"));
         }
+        if (btnExportarXlsx != null) {
+            Iconos.asignar(btnExportarXlsx, Iconos.Nombre.DESCARGAR, 16);
+            btnExportarXlsx.setTooltip(new Tooltip("Guardar este reporte como libro tabular Excel (.xlsx)"));
+        }
+        if (btnCancelarExportacion != null) {
+            Iconos.asignar(btnCancelarExportacion, Iconos.Nombre.CERRAR, 16);
+            btnCancelarExportacion.setTooltip(new Tooltip("Cancelar la exportación en curso"));
+        }
         if (btnCerrar != null) {
             Iconos.asignar(btnCerrar, Iconos.Nombre.CERRAR, 16);
             btnCerrar.setTooltip(new Tooltip("Cerrar la vista previa"));
         }
-        if (btnAnterior != null) {
-            btnAnterior.setTooltip(new Tooltip("Página anterior"));
-        }
-        if (btnSiguiente != null) {
-            btnSiguiente.setTooltip(new Tooltip("Siguiente página"));
-        }
-        if (btnZoomMenos != null) {
-            btnZoomMenos.setTooltip(new Tooltip("Reducir acercamiento"));
-        }
-        if (btnZoomMas != null) {
-            btnZoomMas.setTooltip(new Tooltip("Aumentar acercamiento"));
-        }
-        if (btnZoomCien != null) {
-            btnZoomCien.setTooltip(new Tooltip("Restablecer zoom al 100%"));
-        }
-        if (btnAjustarAncho != null) {
-            btnAjustarAncho.setTooltip(new Tooltip("Ajustar el ancho de la hoja a la ventana"));
-        }
+        if (btnAnterior != null) btnAnterior.setTooltip(new Tooltip("Página anterior"));
+        if (btnSiguiente != null) btnSiguiente.setTooltip(new Tooltip("Siguiente página"));
+        if (btnZoomMenos != null) btnZoomMenos.setTooltip(new Tooltip("Reducir acercamiento"));
+        if (btnZoomMas != null) btnZoomMas.setTooltip(new Tooltip("Aumentar acercamiento"));
+        if (btnZoomCien != null) btnZoomCien.setTooltip(new Tooltip("Restablecer zoom al 100%"));
+        if (btnAjustarAncho != null) btnAjustarAncho.setTooltip(new Tooltip("Ajustar el ancho de la hoja a la ventana"));
     }
 
-    public void inicializarDocumento(DocumentoReporte documento) {
+    public void inicializarDocumento(DocumentoReporteResponse documento) {
         this.documento = Objects.requireNonNull(documento, "Falta el documento del reporte.");
         cachePaginas.clear();
         solicitudRenderId++;
         exportando = false;
 
-        totalPaginas = RenderizadorVistaPreviaReporte.totalPaginas(documento.jasperPrint());
+        totalPaginas = documento.totalPaginas();
         paginaActual = 0;
-        escalaActual = RenderizadorVistaPreviaReporte.ZOOM_INICIAL;
+        escalaActual = ConstantesLatch.ZOOM_INICIAL;
+
+        if (btnExportarXlsx != null) {
+            boolean admiteXlsx = documento.admiteXlsx();
+            btnExportarXlsx.setVisible(admiteXlsx);
+            btnExportarXlsx.setManaged(admiteXlsx);
+        }
 
         if (totalPaginas == 0) {
             if (imgPagina != null) {
@@ -117,9 +127,7 @@ public class VistaPreviaReporteController {
 
     @FXML
     public void handleAnterior() {
-        if (totalPaginas <= 0 || paginaActual <= 0) {
-            return;
-        }
+        if (totalPaginas <= 0 || paginaActual <= 0) return;
         paginaActual--;
         actualizarControles();
         cargarPaginaActual();
@@ -127,9 +135,7 @@ public class VistaPreviaReporteController {
 
     @FXML
     public void handleSiguiente() {
-        if (totalPaginas <= 0 || paginaActual >= totalPaginas - 1) {
-            return;
-        }
+        if (totalPaginas <= 0 || paginaActual >= totalPaginas - 1) return;
         paginaActual++;
         actualizarControles();
         cargarPaginaActual();
@@ -137,88 +143,153 @@ public class VistaPreviaReporteController {
 
     @FXML
     public void handleZoomMenos() {
-        aplicarZoom(escalaActual - RenderizadorVistaPreviaReporte.ZOOM_PASO);
+        aplicarZoom(escalaActual - ConstantesLatch.ZOOM_PASO);
     }
 
     @FXML
     public void handleZoomMas() {
-        aplicarZoom(escalaActual + RenderizadorVistaPreviaReporte.ZOOM_PASO);
+        aplicarZoom(escalaActual + ConstantesLatch.ZOOM_PASO);
     }
 
     @FXML
     public void handleZoomCien() {
-        aplicarZoom(RenderizadorVistaPreviaReporte.ZOOM_INICIAL);
+        aplicarZoom(ConstantesLatch.ZOOM_INICIAL);
     }
 
     @FXML
     public void handleAjustarAncho() {
-        if (documento == null || totalPaginas <= 0) {
-            return;
-        }
-        double anchoDisponible = spHoja != null && spHoja.getViewportBounds().getWidth() > 0
-                ? spHoja.getViewportBounds().getWidth()
-                : (spHoja != null ? spHoja.getWidth() : 960.0);
-        aplicarZoom(RenderizadorVistaPreviaReporte.calcularZoomAjustarAncho(
-                documento.jasperPrint(), anchoDisponible));
+        if (documento == null || totalPaginas <= 0) return;
+        double anchoDisp = spHoja != null && spHoja.getWidth() > 0 ? spHoja.getWidth() : 800.0;
+        double anchoUtil = Math.max(200.0, anchoDisp - 48.0);
+        aplicarZoom((float) (anchoUtil / Math.max(1, documento.anchoPagina())));
     }
 
     @FXML
     public void handleExportarPdf() {
-        if (documento == null || totalPaginas <= 0 || exportando) {
+        iniciarExportacion(false);
+    }
+
+    @FXML
+    public void handleExportarXlsx() {
+        iniciarExportacion(true);
+    }
+
+    @FXML
+    public void handleCancelarExportacion() {
+        if (ejecucionExportacion != null) {
+            ejecucionExportacion.solicitarCancelacion();
+            if (btnCancelarExportacion != null) {
+                btnCancelarExportacion.setDisable(true);
+                btnCancelarExportacion.setText("Cancelando…");
+            }
+        }
+    }
+
+    private void iniciarExportacion(boolean comoXlsx) {
+        if (documento == null || (!comoXlsx && totalPaginas <= 0) || exportando) {
             return;
         }
 
         FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Exportar reporte a PDF");
-        fileChooser.setInitialFileName(documento.nombreArchivoSugerido());
-        fileChooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("Documento PDF (*.pdf)", "*.pdf")
-        );
+        fileChooser.setTitle(comoXlsx ? "Exportar reporte a XLSX" : "Exportar reporte a PDF");
+        fileChooser.setInitialFileName(comoXlsx
+                ? documento.nombreArchivoXlsx()
+                : documento.nombreArchivoPdf());
+        fileChooser.getExtensionFilters().add(comoXlsx
+                ? new FileChooser.ExtensionFilter("Libro Excel (*.xlsx)", "*.xlsx")
+                : new FileChooser.ExtensionFilter("Documento PDF (*.pdf)", "*.pdf"));
 
-        Window ventana = obtenerVentana();
-        File archivoDestino = fileChooser.showSaveDialog(ventana);
+        File archivoDestino = fileChooser.showSaveDialog(obtenerVentana());
         if (archivoDestino == null) {
             return;
         }
 
-        Path rutaDestino = archivoDestino.toPath();
-        DocumentoReporte documentoActual = documento;
-        String textoOriginal = btnExportarPdf != null ? btnExportarPdf.getText() : "Exportar PDF…";
-        exportando = true;
-        if (btnExportarPdf != null) {
-            btnExportarPdf.setDisable(true);
-            btnExportarPdf.setText("Exportando…");
+        final GestorH5Reportes.EjecucionH5 ejecucion;
+        try {
+            ejecucion = GestorH5Reportes.iniciar(comoXlsx ? "Exportación XLSX" : "Exportación PDF");
+        } catch (IllegalStateException ocupada) {
+            AlertaUtil.mostrarAdvertencia("Exportación en curso", ocupada.getMessage());
+            return;
         }
 
-        Task<Path> tareaExportar = new Task<>() {
+        Path rutaDestino = archivoDestino.toPath();
+        String documentoId = documento.documentoId();
+        ejecucionExportacion = ejecucion;
+        exportando = true;
+        actualizarEstadoExportacion(true, comoXlsx);
+
+        Task<VistaPreviaReporte.ResultadoPublicacion> tareaExportar = new Task<>() {
             @Override
-            protected Path call() throws Exception {
-                VistaPreviaReporte.exportarPdfAtomico(documentoActual.jasperPrint(), rutaDestino);
-                return rutaDestino;
+            protected VistaPreviaReporte.ResultadoPublicacion call() throws Exception {
+                try {
+                    return comoXlsx
+                            ? VistaPreviaReporte.exportarXlsxAtomico(
+                                    documentoId, rutaDestino, ejecucion::estaCancelada)
+                            : VistaPreviaReporte.exportarPdfAtomico(
+                                    documentoId, rutaDestino, ejecucion::estaCancelada);
+                } finally {
+                    ejecucion.close();
+                }
             }
         };
 
         TareasJavaFx.ejecutar(
-                HelloApplication.instancia().getTareas(),
+                LatchApplication.instancia().getTareas(),
                 tareaExportar,
-                destinoFinal -> {
+                resultado -> {
+                    ejecucion.close();
+                    ejecucionExportacion = null;
                     exportando = false;
-                    restaurarBotonExportar(textoOriginal);
-                    AlertaUtil.mostrarExito("PDF exportado",
-                            "El reporte se guardó correctamente en " + destinoFinal.getFileName() + ".");
-                    abrirSiEsPosible(destinoFinal);
+                    actualizarEstadoExportacion(false, comoXlsx);
+                    String titulo = comoXlsx ? "XLSX exportado" : "PDF exportado";
+                    String mensaje = resultado.publicadoAntesDeCancelar()
+                            ? "La exportación concluyó antes de aplicar la cancelación y se publicó en "
+                            + resultado.rutaFinal().getFileName() + "."
+                            : "El reporte se guardó correctamente en " + resultado.rutaFinal().getFileName() + ".";
+                    AlertaUtil.mostrarExito(titulo, mensaje);
+                    abrirSiEsPosible(resultado.rutaFinal());
                 },
                 error -> {
+                    ejecucion.close();
+                    ejecucionExportacion = null;
                     exportando = false;
-                    restaurarBotonExportar(textoOriginal);
-                    AlertaUtil.mostrarError("Error al exportar",
-                            "No se pudo guardar el archivo PDF en disco.");
+                    actualizarEstadoExportacion(false, comoXlsx);
+                    Throwable causa = extraerCausa(error);
+                    if (causa instanceof OperacionCanceladaException) {
+                        AlertaUtil.mostrarExito("Exportación cancelada", OperacionCanceladaException.MSG_089);
+                    } else if (causa instanceof IllegalArgumentException) {
+                        AlertaUtil.mostrarAdvertencia("Exportación no disponible", causa.getMessage());
+                    } else {
+                        AlertaUtil.mostrarError("Error al exportar",
+                                "No se pudo guardar el archivo en disco. El archivo previo (si existía) se conservó intacto.");
+                    }
                 }
         );
     }
 
+    private void actualizarEstadoExportacion(boolean enCurso, boolean comoXlsx) {
+        if (btnExportarPdf != null) {
+            btnExportarPdf.setDisable(enCurso || totalPaginas <= 0);
+            btnExportarPdf.setText(enCurso && !comoXlsx ? "Exportando…" : "Exportar PDF…");
+        }
+        if (btnExportarXlsx != null) {
+            boolean admite = documento != null && documento.admiteXlsx();
+            btnExportarXlsx.setDisable(enCurso || !admite || totalPaginas <= 0);
+            btnExportarXlsx.setText(enCurso && comoXlsx ? "Exportando…" : "Exportar XLSX…");
+        }
+        if (btnCancelarExportacion != null) {
+            btnCancelarExportacion.setVisible(enCurso);
+            btnCancelarExportacion.setManaged(enCurso);
+            btnCancelarExportacion.setDisable(!enCurso);
+            btnCancelarExportacion.setText("Cancelar");
+        }
+    }
+
     @FXML
     public void handleCerrar() {
+        if (ejecucionExportacion != null) {
+            ejecucionExportacion.solicitarCancelacion();
+        }
         Window ventana = obtenerVentana();
         if (ventana instanceof Stage stage) {
             stage.close();
@@ -226,6 +297,10 @@ public class VistaPreviaReporteController {
     }
 
     public void liberarRecursos() {
+        if (ejecucionExportacion != null) {
+            ejecucionExportacion.solicitarCancelacion();
+        }
+        String docId = documento == null ? null : documento.documentoId();
         solicitudRenderId++;
         cachePaginas.clear();
         if (imgPagina != null) {
@@ -234,28 +309,33 @@ public class VistaPreviaReporteController {
         documento = null;
         totalPaginas = 0;
         paginaActual = 0;
+        if (docId != null && !docId.isBlank()) {
+            Thread limpieza = new Thread(() -> {
+                try {
+                    ClienteLatch.reportes().eliminar(docId);
+                } catch (RuntimeException ignored) {
+                    // Mejor esfuerzo al liberar la sesión temporal en el servidor.
+                }
+            }, "latch-limpiar-reporte");
+            limpieza.setDaemon(true);
+            limpieza.start();
+        }
     }
 
     private void aplicarZoom(float nuevaEscala) {
-        if (totalPaginas <= 0) {
-            return;
-        }
-        float acotada = RenderizadorVistaPreviaReporte.acotarZoom(nuevaEscala);
-        if (Math.round(acotada * 100) == Math.round(escalaActual * 100)) {
-            return;
-        }
+        if (totalPaginas <= 0) return;
+        float acotada = ConstantesLatch.acotarZoom(nuevaEscala);
+        if (Math.round(acotada * 100) == Math.round(escalaActual * 100)) return;
         escalaActual = acotada;
         actualizarControles();
         cargarPaginaActual();
     }
 
     private void cargarPaginaActual() {
-        if (documento == null || totalPaginas <= 0) {
-            return;
-        }
+        if (documento == null || totalPaginas <= 0) return;
         int porcentaje = Math.round(escalaActual * 100);
         ClavePagina clave = new ClavePagina(paginaActual, porcentaje);
-        WritableImage enCache = cachePaginas.get(clave);
+        Image enCache = cachePaginas.get(clave);
         if (enCache != null) {
             mostrarImagen(enCache);
             return;
@@ -264,30 +344,27 @@ public class VistaPreviaReporteController {
         long idSolicitud = ++solicitudRenderId;
         int indice = paginaActual;
         float escala = escalaActual;
-        DocumentoReporte doc = documento;
+        String documentoId = documento.documentoId();
         mostrarEstado("Renderizando página " + (indice + 1) + " de " + totalPaginas + "…");
 
-        Task<WritableImage> tareaRender = new Task<>() {
+        Task<Image> tareaRender = new Task<>() {
             @Override
-            protected WritableImage call() {
-                return RenderizadorVistaPreviaReporte.renderizarPagina(doc.jasperPrint(), indice, escala);
+            protected Image call() {
+                byte[] png = ClienteLatch.reportes().paginaPng(documentoId, indice, escala);
+                return new Image(new ByteArrayInputStream(png));
             }
         };
 
         TareasJavaFx.ejecutar(
-                HelloApplication.instancia().getTareas(),
+                LatchApplication.instancia().getTareas(),
                 tareaRender,
                 imagen -> {
-                    if (idSolicitud != solicitudRenderId || documento == null) {
-                        return;
-                    }
+                    if (idSolicitud != solicitudRenderId || documento == null) return;
                     cachePaginas.put(clave, imagen);
                     mostrarImagen(imagen);
                 },
                 error -> {
-                    if (idSolicitud != solicitudRenderId) {
-                        return;
-                    }
+                    if (idSolicitud != solicitudRenderId) return;
                     if (imgPagina != null) {
                         imgPagina.setImage(null);
                         imgPagina.setVisible(false);
@@ -297,7 +374,7 @@ public class VistaPreviaReporteController {
         );
     }
 
-    private void mostrarImagen(WritableImage imagen) {
+    private void mostrarImagen(Image imagen) {
         ocultarEstado();
         if (imgPagina != null) {
             imgPagina.setImage(imagen);
@@ -317,33 +394,19 @@ public class VistaPreviaReporteController {
         if (lblZoom != null) {
             lblZoom.setText(Math.round(escalaActual * 100) + "%");
         }
-        if (btnAnterior != null) {
-            btnAnterior.setDisable(!hayPaginas || paginaActual <= 0);
-        }
-        if (btnSiguiente != null) {
-            btnSiguiente.setDisable(!hayPaginas || paginaActual >= totalPaginas - 1);
-        }
+        if (btnAnterior != null) btnAnterior.setDisable(!hayPaginas || paginaActual <= 0);
+        if (btnSiguiente != null) btnSiguiente.setDisable(!hayPaginas || paginaActual >= totalPaginas - 1);
         if (btnZoomMenos != null) {
-            btnZoomMenos.setDisable(!hayPaginas || escalaActual <= RenderizadorVistaPreviaReporte.ZOOM_MIN + 0.001f);
+            btnZoomMenos.setDisable(!hayPaginas || escalaActual <= ConstantesLatch.ZOOM_MIN + 0.001f);
         }
         if (btnZoomMas != null) {
-            btnZoomMas.setDisable(!hayPaginas || escalaActual >= RenderizadorVistaPreviaReporte.ZOOM_MAX - 0.001f);
+            btnZoomMas.setDisable(!hayPaginas || escalaActual >= ConstantesLatch.ZOOM_MAX - 0.001f);
         }
-        if (btnZoomCien != null) {
-            btnZoomCien.setDisable(!hayPaginas);
-        }
-        if (btnAjustarAncho != null) {
-            btnAjustarAncho.setDisable(!hayPaginas);
-        }
-        if (btnExportarPdf != null && !exportando) {
-            btnExportarPdf.setDisable(!hayPaginas);
-        }
-    }
-
-    private void restaurarBotonExportar(String textoOriginal) {
-        if (btnExportarPdf != null) {
-            btnExportarPdf.setText(textoOriginal);
-            btnExportarPdf.setDisable(totalPaginas <= 0);
+        if (btnZoomCien != null) btnZoomCien.setDisable(!hayPaginas);
+        if (btnAjustarAncho != null) btnAjustarAncho.setDisable(!hayPaginas);
+        if (btnExportarPdf != null && !exportando) btnExportarPdf.setDisable(!hayPaginas);
+        if (btnExportarXlsx != null && !exportando) {
+            btnExportarXlsx.setDisable(!hayPaginas || documento == null || !documento.admiteXlsx());
         }
     }
 
@@ -363,13 +426,17 @@ public class VistaPreviaReporteController {
     }
 
     private Window obtenerVentana() {
-        if (btnCerrar != null && btnCerrar.getScene() != null) {
-            return btnCerrar.getScene().getWindow();
-        }
-        if (spHoja != null && spHoja.getScene() != null) {
-            return spHoja.getScene().getWindow();
-        }
+        if (btnCerrar != null && btnCerrar.getScene() != null) return btnCerrar.getScene().getWindow();
+        if (spHoja != null && spHoja.getScene() != null) return spHoja.getScene().getWindow();
         return null;
+    }
+
+    private static Throwable extraerCausa(Throwable error) {
+        Throwable actual = error;
+        while (actual instanceof ExecutionException && actual.getCause() != null) {
+            actual = actual.getCause();
+        }
+        return actual;
     }
 
     private static void abrirSiEsPosible(Path destino) {

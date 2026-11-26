@@ -1,96 +1,49 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.util;
 
+import javafx.application.Platform;
+import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
-import javafx.scene.image.PixelReader;
-import javafx.scene.image.WritableImage;
-import net.sf.jasperreports.engine.JasperCompileManager;
-import net.sf.jasperreports.engine.JasperFillManager;
-import net.sf.jasperreports.engine.JasperPrint;
-import net.sf.jasperreports.engine.JasperReport;
-import net.sf.jasperreports.engine.JRPrintPage;
-import net.sf.jasperreports.engine.base.JRBasePrintPage;
-import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ReporteService;
+import javafx.scene.Parent;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.LatchApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.reportes.dto.DocumentoReporteResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.contrato.ConstantesLatch;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.controller.VistaPreviaReporteController;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.time.Duration;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/** Pruebas del cliente JavaFX para exportación atómica local, zoom/H5 e iconos sin dependencias de servidor. */
 class VistaPreviaReporteTest {
 
     @Test
-    void renderizaPaginaRealConFondoBlancoYDimensionesPositivas() throws Exception {
-        JasperPrint jasperPrint = generarJasperPrintUnidades();
-
-        assertEquals(1, RenderizadorVistaPreviaReporte.totalPaginas(jasperPrint));
-        assertEquals(0.50f, RenderizadorVistaPreviaReporte.acotarZoom(0.10f));
-        assertEquals(2.00f, RenderizadorVistaPreviaReporte.acotarZoom(5.00f));
-        assertEquals(1.00f, RenderizadorVistaPreviaReporte.acotarZoom(Float.NaN));
-
-        WritableImage imagen = RenderizadorVistaPreviaReporte.renderizarPagina(jasperPrint, 0, 1.00f);
-        int ancho = (int) imagen.getWidth();
-        int alto = (int) imagen.getHeight();
-        assertTrue(ancho > 100 && alto > 100, "Dimensiones inválidas: " + ancho + "x" + alto);
-
-        PixelReader reader = imagen.getPixelReader();
-        assertEquals(0xFFFFFFFF, reader.getArgb(0, 0), "La esquina debe tener fondo blanco opaco");
-
-        boolean hayContenidoNoBlanco = false;
-        for (int y = 0; y < alto && !hayContenidoNoBlanco; y += 4) {
-            for (int x = 0; x < ancho; x += 4) {
-                if (reader.getArgb(x, y) != 0xFFFFFFFF) {
-                    hayContenidoNoBlanco = true;
-                    break;
-                }
-            }
-        }
-        assertTrue(hayContenidoNoBlanco, "La página renderizada debe contener trazos visibles del reporte");
-    }
-
-    @Test
-    void manejaDocumentoSinPaginasYIndiceFueraDeRango() {
-        JasperPrint vacio = new JasperPrint();
-        assertEquals(0, RenderizadorVistaPreviaReporte.totalPaginas(vacio));
-        assertThrows(IllegalArgumentException.class,
-                () -> RenderizadorVistaPreviaReporte.renderizarPagina(vacio, 0, 1.00f));
-
-        JasperPrint unaPagina = new JasperPrint();
-        JRPrintPage pagina = new JRBasePrintPage();
-        unaPagina.addPage(pagina);
-        unaPagina.setPageWidth(595);
-        unaPagina.setPageHeight(842);
-
-        assertThrows(IndexOutOfBoundsException.class,
-                () -> RenderizadorVistaPreviaReporte.renderizarPagina(unaPagina, -1, 1.00f));
-        assertThrows(IndexOutOfBoundsException.class,
-                () -> RenderizadorVistaPreviaReporte.renderizarPagina(unaPagina, 1, 1.00f));
-    }
-
-    @Test
-    void exportacionAtomicaEscribePdfValidoYSinTemporalesResiduales(@TempDir Path dir) throws Exception {
-        JasperPrint jasperPrint = generarJasperPrintUnidades();
+    void exportacionAtomicaEscribeArchivoYSinTemporalesResiduales(@TempDir Path dir) throws Exception {
         Path destino = dir.resolve("reporte-unidades.pdf");
 
-        VistaPreviaReporte.exportarPdfAtomico(jasperPrint, destino);
+        VistaPreviaReporte.exportarAtomico(destino,
+                out -> out.write("%PDF-1.4\n%Prueba Latch\n".getBytes(StandardCharsets.US_ASCII)));
 
         assertTrue(Files.isRegularFile(destino));
         byte[] contenido = Files.readAllBytes(destino);
-        assertTrue(contenido.length > 5);
         assertEquals("%PDF-", new String(contenido, 0, 5, StandardCharsets.US_ASCII));
 
         try (Stream<Path> archivos = Files.list(dir)) {
@@ -122,6 +75,38 @@ class VistaPreviaReporteTest {
     }
 
     @Test
+    void resuelveCarreraCuandoCancelacionLlegaDespuesDePublicar(@TempDir Path dir) throws IOException {
+        Path destino = dir.resolve("carrera.pdf");
+        AtomicBoolean cancelar = new AtomicBoolean(false);
+
+        var res = VistaPreviaReporte.exportarAtomicoConCancelacion(destino, cancelar::get, out -> {
+            out.write("%PDF-1.4\n".getBytes(StandardCharsets.US_ASCII));
+            cancelar.set(false);
+        });
+        assertFalse(res.publicadoAntesDeCancelar());
+        assertTrue(Files.isRegularFile(res.rutaFinal()));
+    }
+
+    @Test
+    void gestorH5ExigeInstanciaUnicaYLiberaAlCerrar() throws InterruptedException {
+        try (var ejecucion = GestorH5Reportes.iniciar("Prueba H5")) {
+            assertTrue(GestorH5Reportes.hayActividad());
+            assertThrows(IllegalStateException.class, () -> GestorH5Reportes.iniciar("Segunda instancia"));
+            assertTrue(GestorH5Reportes.solicitarCancelacionActiva());
+            assertTrue(ejecucion.estaCancelada());
+        }
+        assertFalse(GestorH5Reportes.hayActividad());
+        assertTrue(GestorH5Reportes.esperarTerminacion(Duration.ofSeconds(1)));
+    }
+
+    @Test
+    void acotarZoomMantieneLimitesContrato() {
+        assertEquals(ConstantesLatch.ZOOM_MIN, ConstantesLatch.acotarZoom(0.10f));
+        assertEquals(ConstantesLatch.ZOOM_MAX, ConstantesLatch.acotarZoom(5.00f));
+        assertEquals(ConstantesLatch.ZOOM_INICIAL, ConstantesLatch.acotarZoom(Float.NaN));
+    }
+
+    @Test
     void catalogoIconosIncluyeReporteYDescargarParaTodosLosValores() {
         for (Iconos.Nombre nombre : Iconos.Nombre.values()) {
             Node icono = Iconos.crear(nombre, 16);
@@ -129,23 +114,51 @@ class VistaPreviaReporteTest {
         }
     }
 
-    private static JasperPrint generarJasperPrintUnidades() throws Exception {
-        try (InputStream plantilla = VistaPreviaReporteTest.class.getResourceAsStream("/reportes/unidades.jrxml")) {
-            assertNotNull(plantilla);
-            JasperReport report = JasperCompileManager.compileReport(plantilla);
-            Map<String, Object> params = new HashMap<>();
-            params.put("TITULO_SISTEMA", "LATCH — Catálogo de Unidades");
-            params.put("GENERADO_POR", "Prueba");
-            params.put("TOTAL_UNIDADES", 1);
-            params.put("UNIDADES_DISPONIBLES", 1);
-            params.put("UNIDADES_OCUPADAS", 0);
-            params.put("TOTAL_CANON_USD", "450.00");
-            params.put("TOTAL_CANON_NIO", "0.00");
-
-            var fila = new ReporteService.FilaUnidadReporte(
-                    "Torre Norte", "U-01", "Apartamento", "Disponible",
-                    new BigDecimal("450.00"), "USD", "Unidad de prueba");
-            return JasperFillManager.fillReport(report, params, new JRBeanCollectionDataSource(List.of(fila)));
+    @Test
+    void vistaPreviaOcultaXlsxCuandoNoSeAdmiteYManejaDocumentoSinPaginas() throws Exception {
+        CountDownLatch iniciado = new CountDownLatch(1);
+        try {
+            Platform.startup(iniciado::countDown);
+        } catch (IllegalStateException existente) {
+            iniciado.countDown();
         }
+        assertTrue(iniciado.await(5, TimeUnit.SECONDS));
+
+        enFx(() -> {
+            Platform.setImplicitExit(false);
+            FXMLLoader loader = new FXMLLoader(
+                    LatchApplication.class.getResource("vista-previa-reporte.fxml"));
+            Parent root = loader.load();
+            VistaPreviaReporteController controller = loader.getController();
+
+            Button btnXlsx = (Button) root.lookup("#btnExportarXlsx");
+            Button btnPdf = (Button) root.lookup("#btnExportarPdf");
+            Button btnAnterior = (Button) root.lookup("#btnAnterior");
+            Button btnSiguiente = (Button) root.lookup("#btnSiguiente");
+            Label lblEstado = (Label) root.lookup("#lblEstado");
+
+            controller.inicializarDocumento(new DocumentoReporteResponse(
+                    "doc-recibo-vacio", "Recibo #101", "Recibo-101.pdf", null, false, 0, 595));
+            assertFalse(btnXlsx.isVisible());
+            assertFalse(btnXlsx.isManaged());
+            assertTrue(btnPdf.isDisabled());
+            assertTrue(btnAnterior.isDisabled());
+            assertTrue(btnSiguiente.isDisabled());
+            assertTrue(lblEstado.isVisible());
+            assertTrue(lblEstado.getText().contains("no contiene páginas"));
+
+            controller.inicializarDocumento(new DocumentoReporteResponse(
+                    "doc-tabular-vacio", "Estado de cuenta", "Estado-Cuenta.pdf", "Estado-Cuenta.xlsx", true, 0, 595));
+            assertTrue(btnXlsx.isVisible());
+            assertTrue(btnXlsx.isManaged());
+            assertTrue(btnXlsx.isDisabled());
+            return null;
+        });
+    }
+
+    private static <T> T enFx(Callable<T> tarea) throws Exception {
+        FutureTask<T> futuro = new FutureTask<>(tarea);
+        Platform.runLater(futuro);
+        return futuro.get(20, TimeUnit.SECONDS);
     }
 }

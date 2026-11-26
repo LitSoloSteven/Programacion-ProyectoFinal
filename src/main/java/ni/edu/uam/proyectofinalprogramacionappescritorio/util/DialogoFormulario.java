@@ -18,6 +18,12 @@ public final class DialogoFormulario {
     public static Dialog<ButtonType> crear(String titulo, Node contenido, Window propietario,
                                            double ancho, double altoMaximo,
                                            String textoAccion) {
+        return crear(titulo, contenido, propietario, ancho, altoMaximo, textoAccion, false);
+    }
+
+    public static Dialog<ButtonType> crear(String titulo, Node contenido, Window propietario,
+                                           double ancho, double altoMaximo,
+                                           String textoAccion, boolean destructiva) {
         Dialog<ButtonType> dialogo = new Dialog<>();
         dialogo.setTitle(titulo);
         if (propietario != null) dialogo.initOwner(propietario);
@@ -32,10 +38,13 @@ public final class DialogoFormulario {
         Node botonAccion = pane.lookupButton(pane.getButtonTypes().getFirst());
         Node botonCancelar = pane.lookupButton(pane.getButtonTypes().get(1));
         if (botonAccion instanceof ButtonBase boton) {
-            boton.getStyleClass().add("button-primary");
-            Iconos.asignar(boton, Iconos.Nombre.CONFIRMACION, 14);
+            boton.getStyleClass().add(destructiva ? "button-destructive" : "button-primary");
+            Iconos.asignar(boton, destructiva ? Iconos.Nombre.ELIMINAR : Iconos.Nombre.CONFIRMACION, 14);
         }
-        if (botonCancelar instanceof ButtonBase boton) Iconos.asignar(boton, Iconos.Nombre.CERRAR, 14);
+        if (botonCancelar instanceof ButtonBase boton) {
+            boton.getStyleClass().add("button-secondary");
+            Iconos.asignar(boton, Iconos.Nombre.CERRAR, 14);
+        }
         TemaAplicacion.aplicar(pane);
         dialogo.setOnShown(evento -> {
             TransicionesUI.entrada(pane);
@@ -116,4 +125,3 @@ public final class DialogoFormulario {
         }
     }
 }
-

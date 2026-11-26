@@ -17,6 +17,7 @@
         <VBox spacing="16.0" styleClass="form-dialog-content">
             <padding><Insets bottom="20.0" left="20.0" right="20.0" top="36.0" /></padding>
             <Label fx:id="lblResumenError" managed="false" styleClass="field-error" text="" visible="false" wrapText="true" />
+            <Label styleClass="field-help" text="Los campos con * son obligatorios. La vigencia mínima del contrato es de un mes." wrapText="true" />
             <Label styleClass="section-title" text="Partes" />
             <VBox spacing="8.0">
                 <Label styleClass="field-label" text="Unidad / inmueble *" />
@@ -30,16 +31,16 @@
                 <columnConstraints><ColumnConstraints percentWidth="50.0" /><ColumnConstraints percentWidth="50.0" /></columnConstraints>
                 <VBox spacing="6.0" GridPane.columnIndex="0">
                     <Label styleClass="field-label" text="Fecha de inicio *" />
-                    <DatePicker fx:id="dpInicio" maxWidth="Infinity" styleClass="field" />
+                    <DatePicker fx:id="dpInicio" maxWidth="Infinity" promptText="AAAA-MM-DD" styleClass="field" />
                 </VBox>
                 <VBox spacing="6.0" GridPane.columnIndex="1">
                     <Label styleClass="field-label" text="Fecha de finalización *" />
-                    <DatePicker fx:id="dpFin" maxWidth="Infinity" styleClass="field" />
+                    <DatePicker fx:id="dpFin" maxWidth="Infinity" promptText="AAAA-MM-DD" styleClass="field" />
                 </VBox>
                 <Label fx:id="lblErrorFechas" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" GridPane.columnSpan="2" GridPane.rowIndex="1" />
                 <VBox spacing="6.0" GridPane.columnIndex="0" GridPane.rowIndex="2">
                     <Label styleClass="field-label" text="Canon mensual *" />
-                    <TextField fx:id="txtCanon" promptText="0.00" styleClass="field" />
+                    <TextField fx:id="txtCanon" promptText="Ej. 450.00 (hasta 2 dec.)" styleClass="field" />
                     <Label fx:id="lblErrorCanon" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
                 </VBox>
                 <VBox spacing="6.0" GridPane.columnIndex="1" GridPane.rowIndex="2">
@@ -48,7 +49,7 @@
                 </VBox>
                 <VBox spacing="6.0" GridPane.columnIndex="0" GridPane.rowIndex="3">
                     <Label styleClass="field-label" text="Día límite de pago *" />
-                    <TextField fx:id="txtDiaPago" promptText="1–31" styleClass="field" />
+                    <TextField fx:id="txtDiaPago" promptText="Entre 1 y 31" styleClass="field" />
                     <Label fx:id="lblErrorDiaPago" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
                 </VBox>
                 <VBox spacing="6.0" GridPane.columnIndex="1" GridPane.rowIndex="3">
@@ -59,7 +60,7 @@
             <Label styleClass="section-title" text="Garantía" />
             <VBox spacing="6.0">
                 <Label styleClass="field-label" text="Depósito pactado" />
-                <TextField fx:id="txtDeposito" promptText="0.00" styleClass="field" />
+                <TextField fx:id="txtDeposito" promptText="0.00 (opcional)" styleClass="field" />
                 <Label fx:id="lblErrorDeposito" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
             </VBox>
         </VBox>

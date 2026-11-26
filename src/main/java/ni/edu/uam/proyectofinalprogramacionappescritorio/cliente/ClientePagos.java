@@ -5,14 +5,23 @@ import java.util.concurrent.ConcurrentMap;
 import com.google.gson.reflect.TypeToken;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PaginaResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.AnulacionRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.CargoDetalleResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.CargoListaResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.CargoRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.CarteraResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.EstadoCuentaResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.GeneracionMesRequest;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoDetalleResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoListaResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PrevisualizacionLoteResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.ReciboResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.ResultadoLoteResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.ResultadoRevisionH2Response;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.RevisionMoraRequest;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoRegistroResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.pagos.dto.PagoRequest;
 
@@ -84,6 +93,81 @@ public final class ClientePagos {
             ruta += "?corte=" + corte;
         }
         return api.get().get(ruta, EstadoCuentaResponse.class);
+    }
+
+    public CarteraResponse consultarCartera(LocalDate corte, String contratoId,
+                                            YearMonth periodo, String moneda, String texto) {
+        StringBuilder ruta = new StringBuilder("/api/v1/cargos/cartera");
+        char separador = '?';
+        if (corte != null) {
+            ruta.append(separador).append("corte=").append(corte);
+            separador = '&';
+        }
+        if (contratoId != null && !contratoId.isBlank()) {
+            ruta.append(separador).append("contratoId=")
+                    .append(URLEncoder.encode(contratoId.strip(), StandardCharsets.UTF_8));
+            separador = '&';
+        }
+        if (periodo != null) {
+            ruta.append(separador).append("periodo=").append(periodo);
+            separador = '&';
+        }
+        if (moneda != null && !moneda.isBlank()) {
+            ruta.append(separador).append("moneda=")
+                    .append(URLEncoder.encode(moneda.strip(), StandardCharsets.UTF_8));
+            separador = '&';
+        }
+        if (texto != null && !texto.isBlank()) {
+            ruta.append(separador).append("texto=")
+                    .append(URLEncoder.encode(texto.strip(), StandardCharsets.UTF_8));
+        }
+        return api.get().get(ruta.toString(), CarteraResponse.class);
+    }
+
+    public PrevisualizacionLoteResponse previsualizarGeneracionMes(YearMonth periodo) {
+        String query = periodo == null ? "" : "?periodo=" + periodo;
+        return api.get().get("/api/v1/cargos/generacion-mes/vista-previa" + query,
+                PrevisualizacionLoteResponse.class);
+    }
+
+    public ResultadoLoteResponse generarMes(YearMonth periodo) {
+        Objects.requireNonNull(periodo, "Falta el período.");
+        return api.get().post("/api/v1/cargos/generacion-mes",
+                new GeneracionMesRequest(periodo.toString()), ResultadoLoteResponse.class);
+    }
+
+    public ResultadoRevisionH2Response revisarMora(LocalDate fecha) {
+        return api.get().post("/api/v1/cargos/revisar-mora",
+                new RevisionMoraRequest(fecha == null ? null : fecha.toString()),
+                ResultadoRevisionH2Response.class);
+    }
+
+    public CargoDetalleResponse obtenerCargo(UUID id) {
+        Objects.requireNonNull(id, "Falta el identificador del cargo.");
+        return api.get().get("/api/v1/cargos/" + id, CargoDetalleResponse.class);
+    }
+
+    public CargoDetalleResponse crearCargo(CargoRequest solicitud) {
+        Objects.requireNonNull(solicitud, "Faltan los datos del cargo.");
+        return api.get().post("/api/v1/cargos", solicitud, CargoDetalleResponse.class);
+    }
+
+    public CargoDetalleResponse actualizarCargo(UUID id, CargoRequest solicitud) {
+        Objects.requireNonNull(id, "Falta el identificador del cargo.");
+        Objects.requireNonNull(solicitud, "Faltan los datos del cargo.");
+        return api.get().put("/api/v1/cargos/" + id, solicitud, CargoDetalleResponse.class);
+    }
+
+    public void anularCargo(String cargoId, String motivo) {
+        api.get().post("/api/v1/cargos/" + URLEncoder.encode(cargoId.strip(), StandardCharsets.UTF_8)
+                + "/anulacion", new AnulacionRequest(motivo), Void.class);
+    }
+
+    public void revertirAplicacionCredito(String aplicacionId, String motivo) {
+        api.get().post("/api/v1/pagos/aplicaciones/"
+                        + URLEncoder.encode(aplicacionId.strip(), StandardCharsets.UTF_8)
+                        + "/reversion",
+                new AnulacionRequest(motivo), Void.class);
     }
 
     private <T> PaginaResponse<T> listar(String ruta, int pagina, String texto, Class<T> tipo) {

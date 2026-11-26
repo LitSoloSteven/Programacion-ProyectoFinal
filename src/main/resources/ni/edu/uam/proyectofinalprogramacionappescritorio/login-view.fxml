@@ -2,16 +2,21 @@
 
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.PasswordField?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 
 <StackPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
            fx:controller="ni.edu.uam.proyectofinalprogramacionappescritorio.controller.LoginController"
-           prefHeight="520.0" prefWidth="440.0" styleClass="login-root">
-    <VBox alignment="CENTER_LEFT" maxWidth="400.0" spacing="16.0" styleClass="login-card">
+           prefHeight="580.0" prefWidth="460.0" styleClass="login-root">
+    <Region fx:id="auroraFondo" focusTraversable="false" maxHeight="340.0" maxWidth="340.0"
+            mouseTransparent="true" styleClass="aurora-layer" StackPane.alignment="TOP_LEFT" />
+    <VBox alignment="CENTER_LEFT" maxWidth="400.0" spacing="14.0" styleClass="login-card">
         <padding><Insets bottom="24.0" left="24.0" right="24.0" top="24.0" /></padding>
         <VBox alignment="CENTER_LEFT" spacing="6.0">
             <Label styleClass="login-brand" text="Latch" />
@@ -19,14 +24,14 @@
             <Label styleClass="login-subtitle" text="Accede a la administración de alquileres y contratos." wrapText="true" />
         </VBox>
         <VBox spacing="6.0">
-            <Label styleClass="field-label" text="Nombre de usuario" />
+            <Label styleClass="field-label" text="Nombre de usuario *" />
             <TextField fx:id="txtUsuario" accessibleText="Nombre de usuario"
                        promptText="Escribe tu nombre de usuario" styleClass="field" />
             <Label fx:id="lblErrorUsuario" managed="false" minHeight="18.0"
                    styleClass="field-error" text="" visible="false" wrapText="true" />
         </VBox>
         <VBox spacing="6.0">
-            <Label styleClass="field-label" text="Contraseña" />
+            <Label styleClass="field-label" text="Contraseña *" />
             <PasswordField fx:id="txtPassword" accessibleText="Contraseña"
                            onAction="#handleLogin" promptText="Escribe tu contraseña" styleClass="field" />
             <Label fx:id="lblErrorPassword" managed="false" minHeight="18.0"
@@ -35,6 +40,13 @@
         <Button fx:id="btnIngresar" defaultButton="true" maxWidth="Infinity"
                 onAction="#handleLogin" prefHeight="44.0" styleClass="button-primary"
                 text="Ingresar" />
+        <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="login-toolbar">
+            <Button fx:id="btnTemaLogin" accessibleText="Cambiar tema de color en acceso"
+                    onAction="#handleCambiarTemaLogin" styleClass="button-secondary" text="Tema oscuro" />
+            <CheckBox fx:id="chkSinEfectosLogin" accessibleText="Activar o desactivar modalidad sin efectos"
+                      onAction="#handleSinEfectosLogin" text="Sin efectos" />
+        </HBox>
+        <Label fx:id="lblAvisoPreferencia" managed="false" styleClass="field-help"
+               text="" visible="false" wrapText="true" />
     </VBox>
 </StackPane>
-

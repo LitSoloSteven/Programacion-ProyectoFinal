@@ -12,7 +12,7 @@ import javafx.util.Duration;
 
 import java.lang.ref.WeakReference;
 
-/** Toast breve y cerrable para éxitos de operación. */
+/** Toast breve, no bloqueante y cerrable para éxitos y advertencias de operación. */
 public final class Notificaciones {
     private static WeakReference<StackPane> anfitrion = new WeakReference<>(null);
 
@@ -24,16 +24,28 @@ public final class Notificaciones {
 
     /** Devuelve false si no hay un anfitrión visible y debe usarse el diálogo alternativo. */
     public static boolean mostrarExito(String mensaje) {
+        return mostrar(mensaje, Iconos.Nombre.CONFIRMACION, "toast");
+    }
+
+    /** Muestra un aviso no bloqueante dentro de la ventana activa si existe un anfitrión registrado. */
+    public static boolean mostrarAdvertencia(String mensaje) {
+        return mostrar(mensaje, Iconos.Nombre.ADVERTENCIA, "toast-warning");
+    }
+
+    private static boolean mostrar(String mensaje, Iconos.Nombre iconoNombre, String claseExtra) {
         StackPane root = anfitrion.get();
-        if (root == null || root.getScene() == null) return false;
+        if (root == null || root.getScene() == null || mensaje == null || mensaje.isBlank()) return false;
         HBox toast = new HBox(10);
         toast.getStyleClass().add("toast");
+        if (claseExtra != null && !"toast".equals(claseExtra)) {
+            toast.getStyleClass().add(claseExtra);
+        }
         toast.setAlignment(Pos.CENTER_LEFT);
         toast.setMaxWidth(440);
         toast.setMaxHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
         toast.setAccessibleText(mensaje);
 
-        javafx.scene.Node icono = Iconos.crear(Iconos.Nombre.CONFIRMACION, 16);
+        javafx.scene.Node icono = Iconos.crear(iconoNombre, 16);
         icono.getStyleClass().add("toast-icon");
         Label texto = new Label(mensaje);
         texto.setWrapText(true);
@@ -68,4 +80,3 @@ public final class Notificaciones {
         return true;
     }
 }
-

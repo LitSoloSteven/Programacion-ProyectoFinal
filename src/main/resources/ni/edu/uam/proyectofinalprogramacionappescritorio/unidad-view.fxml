@@ -16,9 +16,6 @@
             <Label fx:id="lblTitulo" styleClass="page-title" text="Unidades" />
             <Label styleClass="page-subtitle" text="Inventario, disponibilidad y canon base." />
         </VBox>
-        <Button fx:id="btnRefrescar" onAction="#refrescarTabla" styleClass="button-secondary" text="Actualizar" />
-        <Button fx:id="btnGenerarReporte" onAction="#handleGenerarReporte"
-                minWidth="-Infinity" styleClass="button-secondary" text="Reporte" />
         <Button fx:id="btnNuevo" onAction="#handleNuevo" styleClass="button-primary" text="Nueva unidad" />
     </HBox>
     <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">

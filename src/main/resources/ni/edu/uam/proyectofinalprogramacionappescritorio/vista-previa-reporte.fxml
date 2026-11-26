@@ -6,74 +6,91 @@
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.HBox?>
-<?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.StackPane?>
 
 <BorderPane xmlns="http://javafx.com/javafx/21"
             xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="ni.edu.uam.proyectofinalprogramacionappescritorio.controller.VistaPreviaReporteController"
             styleClass="view-container, preview-root"
-            prefWidth="1040.0"
+            prefWidth="1060.0"
             prefHeight="740.0">
 
     <top>
-        <HBox styleClass="toolbar, preview-toolbar" spacing="8.0" alignment="CENTER_LEFT">
-            <Button fx:id="btnAnterior"
-                    text="Anterior"
-                    styleClass="button-secondary"
-                    minWidth="-Infinity"
-                    onAction="#handleAnterior"/>
-            <Label fx:id="lblPaginacion"
-                   text="Página 0 de 0"
-                   styleClass="secondary-text, numeric"
-                   minWidth="-Infinity"/>
-            <Button fx:id="btnSiguiente"
-                    text="Siguiente"
-                    styleClass="button-secondary"
-                    minWidth="-Infinity"
-                    onAction="#handleSiguiente"/>
+        <FlowPane styleClass="preview-toolbar" hgap="12.0" vgap="8.0" alignment="CENTER_LEFT">
+            <HBox styleClass="toolbar" spacing="8.0" alignment="CENTER_LEFT">
+                <Button fx:id="btnAnterior"
+                        text="Anterior"
+                        styleClass="button-secondary"
+                        minWidth="-Infinity"
+                        onAction="#handleAnterior"/>
+                <Label fx:id="lblPaginacion"
+                       text="Página 0 de 0"
+                       styleClass="secondary-text, numeric"
+                       minWidth="-Infinity"/>
+                <Button fx:id="btnSiguiente"
+                        text="Siguiente"
+                        styleClass="button-secondary"
+                        minWidth="-Infinity"
+                        onAction="#handleSiguiente"/>
 
-            <Separator orientation="VERTICAL"/>
+                <Separator orientation="VERTICAL"/>
 
-            <Button fx:id="btnZoomMenos"
-                    text="-"
-                    styleClass="button-secondary"
-                    minWidth="-Infinity"
-                    onAction="#handleZoomMenos"/>
-            <Label fx:id="lblZoom"
-                   text="100%"
-                   styleClass="secondary-text, numeric"
-                   minWidth="-Infinity"/>
-            <Button fx:id="btnZoomMas"
-                    text="+"
-                    styleClass="button-secondary"
-                    minWidth="-Infinity"
-                    onAction="#handleZoomMas"/>
-            <Button fx:id="btnZoomCien"
-                    text="100%"
-                    styleClass="button-secondary"
-                    minWidth="-Infinity"
-                    onAction="#handleZoomCien"/>
-            <Button fx:id="btnAjustarAncho"
-                    text="Ajustar ancho"
-                    styleClass="button-secondary"
-                    minWidth="-Infinity"
-                    onAction="#handleAjustarAncho"/>
+                <Button fx:id="btnZoomMenos"
+                        text="-"
+                        accessibleText="Reducir acercamiento"
+                        styleClass="button-secondary"
+                        minWidth="-Infinity"
+                        onAction="#handleZoomMenos"/>
+                <Label fx:id="lblZoom"
+                       text="100%"
+                       styleClass="secondary-text, numeric"
+                       minWidth="-Infinity"/>
+                <Button fx:id="btnZoomMas"
+                        text="+"
+                        accessibleText="Aumentar acercamiento"
+                        styleClass="button-secondary"
+                        minWidth="-Infinity"
+                        onAction="#handleZoomMas"/>
+                <Button fx:id="btnZoomCien"
+                        text="100%"
+                        accessibleText="Restablecer zoom al 100 por ciento"
+                        styleClass="button-secondary"
+                        minWidth="-Infinity"
+                        onAction="#handleZoomCien"/>
+                <Button fx:id="btnAjustarAncho"
+                        text="Ajustar ancho"
+                        styleClass="button-secondary"
+                        minWidth="-Infinity"
+                        onAction="#handleAjustarAncho"/>
+            </HBox>
 
-            <Region HBox.hgrow="ALWAYS"/>
-
-            <Button fx:id="btnExportarPdf"
-                    text="Exportar PDF…"
-                    styleClass="button-primary"
-                    minWidth="-Infinity"
-                    onAction="#handleExportarPdf"/>
-            <Button fx:id="btnCerrar"
-                    text="Cerrar"
-                    styleClass="button-secondary"
-                    minWidth="-Infinity"
-                    onAction="#handleCerrar"/>
-        </HBox>
+            <HBox styleClass="toolbar" spacing="8.0" alignment="CENTER_LEFT">
+                <Button fx:id="btnCancelarExportacion"
+                        text="Cancelar"
+                        styleClass="button-destructive"
+                        minWidth="-Infinity"
+                        visible="false"
+                        managed="false"
+                        onAction="#handleCancelarExportacion"/>
+                <Button fx:id="btnExportarXlsx"
+                        text="Exportar XLSX…"
+                        styleClass="button-secondary"
+                        minWidth="-Infinity"
+                        onAction="#handleExportarXlsx"/>
+                <Button fx:id="btnExportarPdf"
+                        text="Exportar PDF…"
+                        styleClass="button-primary"
+                        minWidth="-Infinity"
+                        onAction="#handleExportarPdf"/>
+                <Button fx:id="btnCerrar"
+                        text="Cerrar"
+                        styleClass="button-secondary"
+                        minWidth="-Infinity"
+                        onAction="#handleCerrar"/>
+            </HBox>
+        </FlowPane>
     </top>
 
     <center>

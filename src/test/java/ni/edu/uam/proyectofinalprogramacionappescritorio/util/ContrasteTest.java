@@ -51,4 +51,3 @@ class ContrasteTest {
         return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
     }
 }
-

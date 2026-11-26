@@ -9,23 +9,30 @@ import javafx.scene.control.Button;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
-import net.sf.jasperreports.engine.JasperExportManager;
-import net.sf.jasperreports.engine.JasperPrint;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.LatchApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.reportes.dto.DocumentoReporteResponse;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.contrato.OperacionCanceladaException;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.controller.VistaPreviaReporteController;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.dto.DocumentoReporte;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
-/** Helper central para generar, previsualizar y exportar reportes PDF de forma atómica. */
+/** Apertura no bloqueante del visor de reportes HTTP y exportación atómica local. */
 public final class VistaPreviaReporte {
 
     private static final String FXML_VISTA_PREVIA =
@@ -33,27 +40,50 @@ public final class VistaPreviaReporte {
 
     private VistaPreviaReporte() { }
 
+    public record ResultadoPublicacion(Path rutaFinal, boolean publicadoAntesDeCancelar) { }
+
     public static void generarYMostrar(Button botonDisparador,
                                        Window owner,
-                                       Supplier<DocumentoReporte> generador) {
+                                       Supplier<DocumentoReporteResponse> generador) {
         Objects.requireNonNull(generador, "Falta el generador del reporte.");
+
+        final GestorH5Reportes.EjecucionH5 ejecucion;
+        try {
+            ejecucion = GestorH5Reportes.iniciar("Generación de reporte");
+        } catch (IllegalStateException ocupada) {
+            AlertaUtil.mostrarAdvertencia("Reporte en curso", ocupada.getMessage());
+            return;
+        }
+
         String textoOriginal = botonDisparador != null ? botonDisparador.getText() : null;
         if (botonDisparador != null) {
             botonDisparador.setDisable(true);
             botonDisparador.setText("Generando…");
         }
 
-        Task<DocumentoReporte> tarea = new Task<>() {
+        Task<DocumentoReporteResponse> tarea = new Task<>() {
             @Override
-            protected DocumentoReporte call() {
-                return generador.get();
+            protected DocumentoReporteResponse call() {
+                try {
+                    if (ejecucion.estaCancelada()) {
+                        throw new OperacionCanceladaException();
+                    }
+                    DocumentoReporteResponse doc = generador.get();
+                    if (ejecucion.estaCancelada()) {
+                        throw new OperacionCanceladaException();
+                    }
+                    return doc;
+                } finally {
+                    ejecucion.close();
+                }
             }
         };
 
         TareasJavaFx.ejecutar(
-                HelloApplication.instancia().getTareas(),
+                LatchApplication.instancia().getTareas(),
                 tarea,
                 documento -> {
+                    ejecucion.close();
                     restaurarBoton(botonDisparador, textoOriginal);
                     if (documento == null) {
                         AlertaUtil.mostrarError("Error de reporte",
@@ -63,13 +93,19 @@ public final class VistaPreviaReporte {
                     mostrar(owner, documento);
                 },
                 error -> {
+                    ejecucion.close();
                     restaurarBoton(botonDisparador, textoOriginal);
-                    AlertaUtil.mostrarError("Error al generar reporte", sanitizarError(error));
+                    Throwable causa = extraerCausa(error);
+                    if (causa instanceof OperacionCanceladaException) {
+                        AlertaUtil.mostrarExito("Reporte cancelado", OperacionCanceladaException.MSG_089);
+                    } else {
+                        AlertaUtil.mostrarError("Error al generar reporte", sanitizarError(error));
+                    }
                 }
         );
     }
 
-    public static void mostrar(Window owner, DocumentoReporte documento) {
+    public static void mostrar(Window owner, DocumentoReporteResponse documento) {
         Objects.requireNonNull(documento, "Falta el documento del reporte.");
         Runnable abrir = () -> {
             try {
@@ -83,8 +119,8 @@ public final class VistaPreviaReporte {
                 Stage stage = new Stage();
                 stage.setTitle(documento.titulo());
                 stage.setScene(scene);
-                stage.setMinWidth(820);
-                stage.setMinHeight(600);
+                stage.setMinWidth(860);
+                stage.setMinHeight(620);
                 if (owner != null) {
                     stage.initOwner(owner);
                     stage.initModality(Modality.WINDOW_MODAL);
@@ -104,15 +140,39 @@ public final class VistaPreviaReporte {
         }
     }
 
-    public static void exportarPdfAtomico(JasperPrint jasperPrint, Path destino) throws IOException {
-        Objects.requireNonNull(jasperPrint, "Falta el documento JasperPrint.");
-        Objects.requireNonNull(destino, "Falta la ruta de destino.");
-        exportarAtomico(destino, out -> JasperExportManager.exportReportToPdfStream(jasperPrint, out));
+    public static ResultadoPublicacion exportarPdfAtomico(String documentoId,
+                                                          Path destino,
+                                                          BooleanSupplier cancelado) throws IOException {
+        Objects.requireNonNull(documentoId, "Falta el identificador del documento.");
+        return exportarAtomicoConCancelacion(destino, cancelado, out -> {
+            byte[] pdf = ClienteLatch.reportes().exportarPdf(documentoId);
+            out.write(pdf);
+        });
     }
 
-    static void exportarAtomico(Path destino, EscritorPdf escritor) throws IOException {
+    public static ResultadoPublicacion exportarXlsxAtomico(String documentoId,
+                                                           Path destino,
+                                                           BooleanSupplier cancelado) throws IOException {
+        Objects.requireNonNull(documentoId, "Falta el identificador del documento.");
+        return exportarAtomicoConCancelacion(destino, cancelado, out -> {
+            byte[] xlsx = ClienteLatch.reportes().exportarXlsx(documentoId);
+            out.write(xlsx);
+        });
+    }
+
+    public static void exportarAtomico(Path destino, EscritorPdf escritor) throws IOException {
+        exportarAtomicoConCancelacion(destino, null, escritor);
+    }
+
+    public static ResultadoPublicacion exportarAtomicoConCancelacion(Path destino,
+                                                                     BooleanSupplier cancelado,
+                                                                     EscritorPdf escritor) throws IOException {
         Objects.requireNonNull(destino, "Falta la ruta de destino.");
-        Objects.requireNonNull(escritor, "Falta el escritor del PDF.");
+        Objects.requireNonNull(escritor, "Falta el escritor del reporte.");
+
+        if (cancelado != null && cancelado.getAsBoolean()) {
+            throw new OperacionCanceladaException();
+        }
 
         Path destinoAbsoluto = destino.toAbsolutePath().normalize();
         Path directorio = destinoAbsoluto.getParent();
@@ -127,21 +187,65 @@ public final class VistaPreviaReporte {
             try (OutputStream salida = Files.newOutputStream(temporal)) {
                 escritor.escribir(salida);
             }
-            try {
-                Files.move(temporal, destinoAbsoluto,
-                        StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            } catch (AtomicMoveNotSupportedException fallback) {
-                Files.move(temporal, destinoAbsoluto, StandardCopyOption.REPLACE_EXISTING);
+            if (cancelado != null && cancelado.getAsBoolean()) {
+                throw new OperacionCanceladaException();
             }
+            publicarConVerificacion(temporal, destinoAbsoluto);
             movido = true;
+            boolean cancelacionTardia = cancelado != null && cancelado.getAsBoolean();
+            return new ResultadoPublicacion(destinoAbsoluto, cancelacionTardia);
+        } catch (OperacionCanceladaException cancelacion) {
+            throw cancelacion;
         } catch (IOException error) {
             throw error;
         } catch (Exception error) {
-            throw new IOException("Falló la exportación del PDF.", error);
+            throw new IOException("Falló la exportación del reporte.", error);
         } finally {
             if (!movido) {
-                Files.deleteIfExists(temporal);
+                try {
+                    Files.deleteIfExists(temporal);
+                } catch (IOException ignored) {
+                    // Mejor esfuerzo al limpiar temporal incompleto.
+                }
             }
+        }
+    }
+
+    private static void publicarConVerificacion(Path temporal, Path destinoAbsoluto) throws IOException {
+        try {
+            Files.move(temporal, destinoAbsoluto,
+                    StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (AtomicMoveNotSupportedException fallback) {
+            long tamanoEsperado = Files.size(temporal);
+            byte[] hashEsperado = sha256(temporal);
+            Path preparacion = Files.createTempFile(destinoAbsoluto.getParent(), ".latch-pub-", ".tmp");
+            try {
+                Files.copy(temporal, preparacion, StandardCopyOption.REPLACE_EXISTING);
+                if (Files.size(preparacion) != tamanoEsperado
+                        || !Arrays.equals(hashEsperado, sha256(preparacion))) {
+                    throw new IOException("La verificación de integridad de la copia falló antes de publicar.");
+                }
+                Files.move(preparacion, destinoAbsoluto, StandardCopyOption.REPLACE_EXISTING);
+                Files.deleteIfExists(temporal);
+            } finally {
+                Files.deleteIfExists(preparacion);
+            }
+        }
+    }
+
+    private static byte[] sha256(Path archivo) throws IOException {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            try (InputStream in = Files.newInputStream(archivo);
+                 DigestInputStream dis = new DigestInputStream(in, digest)) {
+                byte[] buffer = new byte[8192];
+                while (dis.read(buffer) != -1) {
+                    // Lectura secuencial para huella
+                }
+            }
+            return digest.digest();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 no disponible en este runtime.", e);
         }
     }
 
@@ -154,11 +258,20 @@ public final class VistaPreviaReporte {
         }
     }
 
+    private static Throwable extraerCausa(Throwable error) {
+        Throwable actual = error;
+        while (actual instanceof ExecutionException && actual.getCause() != null) {
+            actual = actual.getCause();
+        }
+        return actual;
+    }
+
     private static String sanitizarError(Throwable error) {
-        Throwable causa = error instanceof ExecutionException && error.getCause() != null
-                ? error.getCause()
-                : error;
-        if (causa instanceof IllegalArgumentException || causa instanceof SecurityException) {
+        Throwable causa = extraerCausa(error);
+        if (causa instanceof ErrorClienteException
+                || causa instanceof IllegalArgumentException
+                || causa instanceof SecurityException
+                || causa instanceof OperacionCanceladaException) {
             String mensaje = causa.getMessage();
             if (mensaje != null && !mensaje.isBlank()) {
                 return mensaje;
@@ -168,7 +281,7 @@ public final class VistaPreviaReporte {
     }
 
     @FunctionalInterface
-    interface EscritorPdf {
+    public interface EscritorPdf {
         void escribir(OutputStream out) throws Exception;
     }
 }

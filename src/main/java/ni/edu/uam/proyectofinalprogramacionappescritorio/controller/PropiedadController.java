@@ -1,7 +1,6 @@
 package ni.edu.uam.proyectofinalprogramacionappescritorio.controller;
 
-import lombok.RequiredArgsConstructor;
-
+import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
@@ -21,71 +20,66 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.HelloApplication;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.LatchApplication;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PropiedadRequest;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.api.catalogos.dto.PropiedadResponse;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteCatalogos;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ClienteLatch;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.ErrorClienteException;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.modelo.Propiedad;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ConflictoDatosException;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.PropiedadService;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.ReporteService;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.service.SesionUsuario;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.cliente.SesionCliente;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.contrato.ConstantesLatch;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AccionesTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AlertaUtil;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.AtajosLista;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.BarraErrorContextual;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.DialogoFormulario;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.FormatoTabla;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.Iconos;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.MensajesUi;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.PanelEstadoTabla;
+import ni.edu.uam.proyectofinalprogramacionappescritorio.util.RecargadorVista;
 import ni.edu.uam.proyectofinalprogramacionappescritorio.util.TareasJavaFx;
-import ni.edu.uam.proyectofinalprogramacionappescritorio.util.VistaPreviaReporte;
 
 import java.io.IOException;
-import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
-/** Lista de propiedades y responsable del ciclo de guardado con PropiedadService. */
-@RequiredArgsConstructor
+/** Lista de propiedades comunicada exclusivamente mediante ClienteCatalogos HTTP. */
 public class PropiedadController {
     @FXML private VBox rootView;
-    @FXML private Button btnGenerarReportePropiedades;
     @FXML private HBox eliminarTooltipHost;
     @FXML private Button btnNuevo;
-    @FXML private Button btnRefrescar;
     @FXML private Button btnLimpiar;
     @FXML private Button btnEliminar;
     @FXML private Label lblTitulo;
     @FXML private Label lblContador;
     @FXML private Label lblErrorConsulta;
     @FXML private TextField txtBuscar;
-    @FXML private TableView<Propiedad> tblPropiedades;
-    @FXML private TableColumn<Propiedad, String> colNombre;
-    @FXML private TableColumn<Propiedad, String> colDireccion;
-    @FXML private TableColumn<Propiedad, String> colEstado;
-    @FXML private TableColumn<Propiedad, Timestamp> colFecha;
-    @FXML private TableColumn<Propiedad, Void> colAcciones;
+    @FXML private TableView<PropiedadResponse> tblPropiedades;
+    @FXML private TableColumn<PropiedadResponse, String> colNombre;
+    @FXML private TableColumn<PropiedadResponse, String> colDireccion;
+    @FXML private TableColumn<PropiedadResponse, String> colEstado;
+    @FXML private TableColumn<PropiedadResponse, String> colFecha;
+    @FXML private TableColumn<PropiedadResponse, Void> colAcciones;
 
-    private final ClienteCatalogos catalogos = new ClienteCatalogos(ClienteLatch.api());
-    private final ReporteService reporteService = new ReporteService();
-    private final PropiedadService propiedadService;
-    private final ObservableList<Propiedad> registros = FXCollections.observableArrayList();
-    private final FilteredList<Propiedad> filtrados = new FilteredList<>(registros, item -> true);
-    private Propiedad seleccionada;
-    private final boolean permisoEliminar = SesionUsuario.esPropietario();
-    private long versionConsulta;
+    private final ClienteCatalogos catalogos = ClienteLatch.catalogos();
+    private final ObservableList<PropiedadResponse> registros = FXCollections.observableArrayList();
+    private final FilteredList<PropiedadResponse> filtrados = new FilteredList<>(registros, item -> true);
+    private PropiedadResponse seleccionada;
+    private final boolean permisoEliminar = SesionCliente.getActual().esPropietario();
+    private RecargadorVista recargador;
+    private BarraErrorContextual barraError;
 
-    public PropiedadController() { this(HelloApplication.instancia().getComposicion().propiedades()); }
     @FXML public void initialize() {
         lblTitulo.setGraphic(Iconos.crear(Iconos.Nombre.PROPIEDAD, 20));
-        Iconos.asignar(btnRefrescar, Iconos.Nombre.ACTUALIZAR, 16);
-        if (btnGenerarReportePropiedades != null) {
-            Iconos.asignar(btnGenerarReportePropiedades, Iconos.Nombre.REPORTE, 16);
-            btnGenerarReportePropiedades.setTooltip(new Tooltip("Vista previa y exportación PDF del inventario de propiedades y unidades"));
-        }
+        recargador = RecargadorVista.paraNodo(rootView, LatchApplication.instancia().getTareas());
+        barraError = BarraErrorContextual.envolver(lblErrorConsulta);
         Iconos.asignar(btnNuevo, Iconos.Nombre.MAS, 16);
+        if (!permisoEliminar) {
+            btnNuevo.setDisable(true);
+            btnNuevo.setTooltip(new Tooltip("Solo el propietario puede registrar propiedades."));
+        }
         Iconos.asignar(btnLimpiar, Iconos.Nombre.CERRAR, 14);
         Iconos.asignar(btnEliminar, Iconos.Nombre.ELIMINAR, 16);
         Tooltip.install(eliminarTooltipHost, new Tooltip(permisoEliminar
@@ -94,14 +88,15 @@ public class PropiedadController {
         tblPropiedades.setItems(filtrados);
         tblPropiedades.setPlaceholder(PanelEstadoTabla.crear("Cargando propiedades",
                 "El listado aparecerá al terminar la consulta.", null, null));
-        colNombre.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getNombre()));
-        colDireccion.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getDireccion()));
-        colEstado.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyStringWrapper(c.getValue().getEstadoTexto()));
+        colNombre.setCellValueFactory(c -> new ReadOnlyStringWrapper(c.getValue().nombre()));
+        colDireccion.setCellValueFactory(c -> new ReadOnlyStringWrapper(c.getValue().direccion()));
+        colEstado.setCellValueFactory(c -> new ReadOnlyStringWrapper(c.getValue().activa() ? "Activa" : "Inactiva"));
         colEstado.setCellFactory(FormatoTabla.estado());
-        colFecha.setCellValueFactory(c -> new javafx.beans.property.ReadOnlyObjectWrapper<>(c.getValue().getCreadoEn()));
-        colFecha.setCellFactory(FormatoTabla.fechaHora());
-        AccionesTabla.configurar(colAcciones, List.of(new AccionesTabla.Accion<>(
-                "Editar propiedad", this::abrirEdicion, Iconos.Nombre.EDITAR)));
+        colFecha.setCellValueFactory(c -> new ReadOnlyStringWrapper(c.getValue().creadoEn()));
+        colFecha.setCellFactory(FormatoTabla.fechaHoraIso(ConstantesLatch.ZONA_OPERATIVA));
+        AccionesTabla.configurar(colAcciones, permisoEliminar
+                ? List.of(new AccionesTabla.Accion<>("Editar propiedad", this::abrirEdicion, Iconos.Nombre.EDITAR))
+                : List.of());
         tblPropiedades.getSelectionModel().selectedItemProperty().addListener((obs, anterior, actual) -> {
             seleccionada = actual;
             btnEliminar.setDisable(actual == null || !permisoEliminar);
@@ -115,52 +110,44 @@ public class PropiedadController {
     private void aplicarFiltro(String texto) {
         String filtro = texto == null ? "" : texto.strip().toLowerCase(Locale.ROOT);
         filtrados.setPredicate(propiedad -> filtro.isEmpty()
-                || propiedad.getNombre().toLowerCase(Locale.ROOT).contains(filtro)
-                || propiedad.getDireccion().toLowerCase(Locale.ROOT).contains(filtro));
+                || propiedad.nombre().toLowerCase(Locale.ROOT).contains(filtro)
+                || propiedad.direccion().toLowerCase(Locale.ROOT).contains(filtro));
         lblContador.setText(filtrados.size() + (filtrados.size() == 1 ? " registro" : " registros"));
         tblPropiedades.setPlaceholder(PanelEstadoTabla.crear(filtro.isEmpty() ? "Aún no hay propiedades" : "No hay coincidencias",
                 filtro.isEmpty() ? "Las propiedades registradas aparecerán aquí." : "Prueba con otro término o limpia la búsqueda.",
-                filtro.isEmpty() ? "Nueva propiedad" : "Limpiar búsqueda",
-                filtro.isEmpty() ? this::handleNuevo : this::limpiarFiltros));
+                filtro.isEmpty() ? (permisoEliminar ? "Nueva propiedad" : null) : "Limpiar búsqueda",
+                filtro.isEmpty() ? (permisoEliminar ? this::handleNuevo : null) : this::limpiarFiltros));
     }
 
     public void cargarDatos() {
-        btnRefrescar.setDisable(true);
-        long version = ++versionConsulta;
-        Task<List<Propiedad>> tarea = new Task<>() {
-            @Override protected List<Propiedad> call() throws SQLException { return catalogos.propiedades(false); }
-        };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, datos -> {
-            if (version != versionConsulta) return;
-            registros.setAll(datos);
-            aplicarFiltro(txtBuscar.getText());
+        recargador.recargar(() -> catalogos.propiedades(false), datos -> {
+            RecargadorVista.conservarSeleccionPorId(tblPropiedades, PropiedadResponse::id, () -> {
+                registros.setAll(datos);
+                aplicarFiltro(txtBuscar.getText());
+            });
             ocultarError();
-            btnRefrescar.setDisable(false);
         }, error -> {
-            if (version == versionConsulta) {
-                lblErrorConsulta.setText("No se pudieron cargar las propiedades. Vuelve a intentarlo.");
-                lblErrorConsulta.setVisible(true);
-                lblErrorConsulta.setManaged(true);
+            barraError.mostrar("No se pudieron cargar las propiedades. Vuelve a intentarlo.", this::cargarDatos);
+            if (registros.isEmpty()) {
                 tblPropiedades.setPlaceholder(PanelEstadoTabla.crear("No se pudieron cargar las propiedades",
                         "Vuelve a intentarlo.", "Reintentar", this::cargarDatos));
             }
-            btnRefrescar.setDisable(false);
         });
     }
 
-    @FXML public void refrescarTabla() { cargarDatos(); }
-    @FXML public void handleNuevo() { abrirFormulario(null); }
-    private void abrirEdicion(Propiedad propiedad) { abrirFormulario(propiedad); }
+    @FXML public void handleNuevo() { if (permisoEliminar) abrirFormulario(null); }
+    private void abrirEdicion(PropiedadResponse propiedad) { if (permisoEliminar) abrirFormulario(propiedad); }
 
-    private void abrirFormulario(Propiedad existente) {
+    private void abrirFormulario(PropiedadResponse existente) {
         try {
-            FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource("propiedad-form.fxml"));
+            FXMLLoader loader = new FXMLLoader(LatchApplication.class.getResource("propiedad-form.fxml"));
             Node contenido = loader.load();
             PropiedadFormController formulario = loader.getController();
+            formulario.establecerValidadorServidor(ClienteLatch.validaciones());
             if (existente != null) formulario.cargar(existente);
             Window propietario = tblPropiedades.getScene() == null ? null : tblPropiedades.getScene().getWindow();
             boolean nueva = existente == null;
-            Dialog<javafx.scene.control.ButtonType> dialogo = DialogoFormulario.crear(
+            Dialog<ButtonType> dialogo = DialogoFormulario.crear(
                     nueva ? "Nueva propiedad" : "Editar propiedad", contenido, propietario, 620, 600,
                     nueva ? "Guardar propiedad" : "Guardar cambios");
             DialogoFormulario.protegerCambiosSinGuardar(dialogo, nueva ? btnNuevo : tblPropiedades, formulario::hayCambios);
@@ -170,16 +157,19 @@ public class PropiedadController {
                 evento.consume();
                 if (!formulario.validar()) return;
                 PropiedadFormController.Datos datos = formulario.datos();
+                UUID id = nueva ? null : UUID.fromString(existente.id());
+                accion.setDisable(true);
+                accion.setText("Guardando propiedad…");
                 Task<Void> tarea = new Task<>() {
-                    @Override protected Void call() throws SQLException {
-                        catalogos.guardarPropiedad(nueva ? null : existente.getId(),
-                                new PropiedadRequest(datos.nombre(), datos.direccion(),
-                            datos.activa(), datos.nombrePropietario(), datos.correoPropietario(),
-                            datos.telefonoPropietario(), nueva ? null : existente.getVersion()));
+                    @Override protected Void call() {
+                        catalogos.guardarPropiedad(id, new PropiedadRequest(
+                                datos.nombre(), datos.direccion(), datos.activa(),
+                                datos.nombrePropietario(), datos.correoPropietario(),
+                                datos.telefonoPropietario(), nueva ? null : existente.version()));
                         return null;
                     }
                 };
-                TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+                TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ignorado -> {
                     formulario.marcarLimpio();
                     DialogoFormulario.cerrar(dialogo);
                     AlertaUtil.mostrarExito(nueva ? "Propiedad registrada" : "Propiedad actualizada",
@@ -205,25 +195,29 @@ public class PropiedadController {
     }
 
     @FXML public void handleEliminar() {
-        Propiedad propiedad = seleccionada;
+        PropiedadResponse propiedad = seleccionada;
         if (propiedad == null || !permisoEliminar) return;
-        String registro = "Propiedad: " + propiedad.getNombre() + " · " + propiedad.getDireccion();
+        String registro = "Propiedad: " + propiedad.nombre() + " · " + propiedad.direccion();
         if (!AlertaUtil.mostrarConfirmacionDestructiva("Eliminar propiedad", registro,
                 "El registro se eliminará físicamente si no tiene unidades asociadas.", "Eliminar propiedad")) return;
         btnEliminar.setDisable(true);
+        UUID id = UUID.fromString(propiedad.id());
         Task<Void> tarea = new Task<>() {
-            @Override protected Void call() throws SQLException { propiedadService.eliminar(propiedad.getId()); return null; }
+            @Override protected Void call() {
+                catalogos.eliminarPropiedad(id);
+                return null;
+            }
         };
-        TareasJavaFx.ejecutar(HelloApplication.instancia().getTareas(), tarea, ignorado -> {
+        TareasJavaFx.ejecutar(LatchApplication.instancia().getTareas(), tarea, ignorado -> {
             seleccionada = null;
             AlertaUtil.mostrarExito("Propiedad eliminada", "El registro de la propiedad se eliminó.");
             cargarDatos();
         }, error -> {
             btnEliminar.setDisable(seleccionada == null || !permisoEliminar);
-            if (error instanceof ConflictoDatosException) {
-                AlertaUtil.mostrarAdvertencia("La propiedad tiene unidades", error.getMessage()
+            if (error instanceof ErrorClienteException api && api.getEstado() == 409) {
+                AlertaUtil.mostrarAdvertencia("La propiedad tiene unidades", api.getMessage()
                         + " Puedes desactivarla desde el formulario de propiedad.");
-            } else if (error instanceof SecurityException) {
+            } else if (error instanceof ErrorClienteException api && api.getEstado() == 403) {
                 AlertaUtil.mostrarAdvertencia("No tienes permiso", "Solo el propietario puede eliminar propiedades.");
             } else {
                 AlertaUtil.mostrarError("No se pudo eliminar la propiedad", "Revisa las relaciones asociadas e inténtalo de nuevo.");
@@ -232,23 +226,8 @@ public class PropiedadController {
     }
 
     @FXML public void limpiarFiltros() { txtBuscar.clear(); }
-    private void ocultarError() { lblErrorConsulta.setText(""); lblErrorConsulta.setVisible(false); lblErrorConsulta.setManaged(false); }
+    private void ocultarError() { barraError.ocultar(); }
     private static String mensajeError(Throwable error) {
-        if (error instanceof ErrorClienteException) return error.getMessage();
-        if (error instanceof IllegalArgumentException || error instanceof SecurityException
-                || error instanceof IllegalStateException) return error.getMessage();
-        return "No se pudo guardar la propiedad. Revisa los datos e inténtalo de nuevo.";
+        return MensajesUi.traducir(error, "No se pudo guardar la propiedad. Revisa los datos e inténtalo de nuevo.");
     }
-
-    @FXML
-    public void handleGenerarReportePropiedades() {
-        Window ventana = (tblPropiedades != null && tblPropiedades.getScene() != null)
-                ? tblPropiedades.getScene().getWindow()
-                : null;
-        VistaPreviaReporte.generarYMostrar(btnGenerarReportePropiedades, ventana,
-                reporteService::generarDocumentoPropiedades);
-    }
-
-
-
 }

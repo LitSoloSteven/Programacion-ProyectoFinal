@@ -44,4 +44,3 @@ class EstilosCssTest {
         assertFalse(fueraDeRaiz.contains("rgba("), "Los velos rgba solo se permiten en la raíz");
     }
 }
-

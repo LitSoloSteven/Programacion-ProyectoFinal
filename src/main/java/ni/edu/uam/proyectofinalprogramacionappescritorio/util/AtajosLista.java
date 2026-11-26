@@ -40,4 +40,3 @@ public final class AtajosLista {
                 || nodo.isFocusTraversable() && nodo.getClass().getSimpleName().contains("Text");
     }
 }
-

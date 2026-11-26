@@ -32,7 +32,13 @@ public final class InsigniaEstado {
             Map.entry("inactivo", new Estado("Inactivo", "PUNTO", "status-secondary")),
             Map.entry("activo", new Estado("Activo", "CONFIRMACION", "status-emphasis")),
             Map.entry("activa", new Estado("Activa", "CONFIRMACION", "status-emphasis")),
-            Map.entry("autorizada", new Estado("Autorizada", "CONFIRMACION", "status-emphasis"))
+            Map.entry("autorizada", new Estado("Autorizada", "CONFIRMACION", "status-emphasis")),
+            Map.entry("abierta", new Estado("Abierta", "ADVERTENCIA", "status-pending")),
+            Map.entry("en proceso", new Estado("En proceso", "RELOJ", "status-pending")),
+            Map.entry("resuelta", new Estado("Resuelta", "CONFIRMACION", "status-emphasis")),
+            Map.entry("baja", new Estado("Baja", "PUNTO", "status-neutral")),
+            Map.entry("media", new Estado("Media", "RELOJ", "status-pending")),
+            Map.entry("alta", new Estado("Alta", "ADVERTENCIA", "status-emphasis"))
     );
 
     private InsigniaEstado() { }
@@ -69,4 +75,3 @@ public final class InsigniaEstado {
         return sinAcentos.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim();
     }
 }
-

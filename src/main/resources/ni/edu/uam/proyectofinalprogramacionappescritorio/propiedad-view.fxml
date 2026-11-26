@@ -16,9 +16,6 @@
             <Label fx:id="lblTitulo" styleClass="page-title" text="Propiedades" />
             <Label styleClass="page-subtitle" text="Inmuebles administrados en Latch." />
         </VBox>
-        <Button fx:id="btnRefrescar" onAction="#refrescarTabla" styleClass="button-secondary" text="Actualizar" />
-        <Button fx:id="btnGenerarReportePropiedades" onAction="#handleGenerarReportePropiedades"
-                minWidth="-Infinity" styleClass="button-secondary" text="Reporte" />
         <Button fx:id="btnNuevo" onAction="#handleNuevo" styleClass="button-primary" text="Nueva propiedad" />
     </HBox>
     <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">

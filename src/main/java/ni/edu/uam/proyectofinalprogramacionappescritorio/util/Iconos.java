@@ -11,7 +11,7 @@ public final class Iconos {
         PANEL, PROPIEDAD, UNIDAD, PERSONAS, CONTRATO, CARGO, PAGO, TASA,
         BUSCAR, ACTUALIZAR, ADVERTENCIA, CONFIRMACION, CERRAR, RELOJ,
         MAS, ELIMINAR, EDITAR, ACCIONES, SALIR, TEMA, PUNTO, VER, ENTRAR,
-        REPORTE, DESCARGAR
+        REPORTE, DESCARGAR, MANTENIMIENTO
     }
 
     private static final String[] TRAZOS = {
@@ -36,10 +36,11 @@ public final class Iconos {
             "M10 4H4v16h16v-6 M14 3h7v7 M21 3l-9 9",
             "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18 M12 7v5l3 2",
             "M12 12h.01",
-            "M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
+            "M2 12C7 4 17 4 22 12C17 20 7 20 2 12z M12 9a3 3 0 1 0 0 6a3 3 0 0 0 0-6z",
             "M14 3h7v18h-7 M10 17l5-5-5-5 M15 12H3",
             "M6 3h9l4 4v14H6z M14 3v5h5 M9 17v-4 M12 17v-6 M15 17v-2",
-            "M12 4v11 M8 11l4 4 4-4 M4 19h16"
+            "M12 4v11 M8 11l4 4 4-4 M4 19h16",
+            "M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"
     };
 
     private Iconos() { }
@@ -67,4 +68,3 @@ public final class Iconos {
         control.setGraphic(crear(nombre, tamano));
     }
 }
-
