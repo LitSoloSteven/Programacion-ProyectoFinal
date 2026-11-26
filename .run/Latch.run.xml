@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Latch" type="MavenRunConfiguration" factoryName="Maven">
+  <configuration default="false" name="Latch (repositorio principal)" type="MavenRunConfiguration" factoryName="Maven">
     <MavenSettings>
       <option name="myGeneralSettings">
         <MavenGeneralSettings>
@@ -25,7 +25,10 @@
           <option name="cmdOptions" value="" />
           <option name="profiles"><set /></option>
           <option name="goals">
-            <list><option value="javafx:run" /></list>
+            <list>
+              <option value="compile" />
+              <option value="javafx:run" />
+            </list>
           </option>
           <option name="pomFileName" value="$PROJECT_DIR$/pom.xml" />
           <option name="profilesMap"><map /></option>

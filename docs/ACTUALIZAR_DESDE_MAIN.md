@@ -141,7 +141,7 @@ $env:LATCH_API_BASE_URL = 'http://127.0.0.1:8090'
 .\app.bat
 ```
 
-En IntelliJ puedes usar la configuración **Latch** del repositorio principal, con `LATCH_API_BASE_URL` ajustada a tu instalación. Desde la raíz de ese repositorio, el comando equivalente es `./mvnw.cmd javafx:run`.
+En IntelliJ usa **Latch (repositorio principal)**, con `LATCH_API_BASE_URL` ajustada a tu instalación. Desde la raíz de ese repositorio, el comando equivalente es `./mvnw.cmd compile javafx:run`.
 
 Con la copia de ensayo, comprueba estos recorridos:
 
