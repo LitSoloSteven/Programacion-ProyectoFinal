@@ -6,25 +6,23 @@ La versión anterior ejecuta JavaFX y su API en la misma aplicación. La versió
 
 Para compilar en Windows necesitas Git, JDK 21 y los clientes de PostgreSQL 18 (`psql`, `pg_dump`, `pg_restore`). Para desplegar el servidor necesitas Apache Tomcat 11 y PostgreSQL 18 accesible desde la API. Comprueba que `JAVA_HOME` apunta al JDK y que `java -version` y `psql --version` muestran las versiones esperadas.
 
-Abre PowerShell en una carpeta que pueda contener los tres proyectos hermanos. Si ya tienes alguno clonado, comprueba su rama y su estado antes de actualizarlo.
+Abre PowerShell en una carpeta que pueda contener el escritorio y la API como directorios hermanos. Conserva tu checkout actual de `main`. Cuando esté publicada `latch-produccion`, clónala en una carpeta distinta para ensayar el cambio.
 
 ```powershell
-git clone https://github.com/LitSoloSteven/latch-contrato.git
 git clone https://github.com/LitSoloSteven/latch-api.git
-git clone https://github.com/LitSoloSteven/latch-cliente.git
+git clone --branch latch-produccion https://github.com/LitSoloSteven/Latch.git Latch
 ```
 
-El proyecto principal sirve como entrada a esta documentación. Puedes conservar tu checkout de `main` y abrir los tres proyectos nuevos desde sus propias carpetas. En IntelliJ IDEA, abre el `pom.xml` de cada proyecto por separado y selecciona JDK 21. Usa PowerShell para la primera compilación y para verificar la configuración de Tomcat.
+El repositorio principal contiene el escritorio JavaFX y sus DTO HTTP. En IntelliJ IDEA, abre el `pom.xml` de `Latch` y el de `latch-api` como proyectos separados y selecciona JDK 21. Usa PowerShell para la primera compilación y para verificar la configuración de Tomcat.
 
 ## 2. Compila los componentes
 
-Usa el mismo usuario de Windows en los tres comandos para que Maven encuentre la biblioteca instalada en su caché local. Desde la carpeta que contiene los tres repositorios, ejecuta este bloque.
+Desde la carpeta que contiene ambos repositorios, ejecuta este bloque.
 
 ```powershell
 $compilaciones = @(
-    @{ Carpeta = 'latch-contrato'; Objetivos = @('clean', 'install') },
     @{ Carpeta = 'latch-api'; Objetivos = @('clean', 'verify') },
-    @{ Carpeta = 'latch-cliente'; Objetivos = @('clean', 'verify', 'javafx:jlink') }
+    @{ Carpeta = 'Latch'; Objetivos = @('clean', 'verify', 'javafx:jlink') }
 )
 foreach ($proyecto in $compilaciones) {
     Push-Location -LiteralPath $proyecto.Carpeta
@@ -38,7 +36,7 @@ foreach ($proyecto in $compilaciones) {
 }
 ```
 
-El servidor queda en `latch-api\target\ROOT.war`. El escritorio queda en `latch-cliente\target\app.zip`. La comprobación de dos JVM del cliente utiliza el WAR y las clases de prueba de `latch-api`, por eso se compila primero la API y se mantienen las carpetas hermanas.
+El servidor queda en `latch-api\target\ROOT.war`. El escritorio queda en `Latch\target\app.zip`. La comprobación de dos JVM del cliente utiliza el WAR y las clases de prueba de `latch-api`, por eso se compila primero la API y se mantienen las carpetas hermanas. Para empaquetar el escritorio de forma independiente desde `Latch`, usa `./mvnw.cmd -B clean test javafx:jlink`.
 
 ## 3. Respalda y migra los datos
 
@@ -136,14 +134,14 @@ Si se detiene buscando tablas o columnas, revisa la base configurada y la últim
 
 ## 5. Abre el escritorio y comprueba la instalación
 
-Descomprime `latch-cliente\target\app.zip` en una carpeta permanente. En PowerShell, define la URL de la API y ejecuta `app.bat` desde la carpeta `bin` de la imagen. La dirección base termina en el puerto para `ROOT.war`. El escritorio agrega `/api/v1` a sus solicitudes.
+Descomprime `Latch\target\app.zip` en una carpeta permanente. En PowerShell, define la URL de la API y ejecuta `app.bat` desde la carpeta `bin` de la imagen. La dirección base termina en el puerto para `ROOT.war`. El escritorio agrega `/api/v1` a sus solicitudes.
 
 ```powershell
 $env:LATCH_API_BASE_URL = 'http://127.0.0.1:8090'
 .\app.bat
 ```
 
-En IntelliJ puedes usar la configuración **Latch** del repositorio del cliente, con `LATCH_API_BASE_URL` ajustada a tu instalación. Desde la raíz de `latch-cliente`, el comando equivalente es `./mvnw.cmd javafx:run`.
+En IntelliJ puedes usar la configuración **Latch** del repositorio principal, con `LATCH_API_BASE_URL` ajustada a tu instalación. Desde la raíz de ese repositorio, el comando equivalente es `./mvnw.cmd javafx:run`.
 
 Con la copia de ensayo, comprueba estos recorridos:
 

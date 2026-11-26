@@ -7,10 +7,8 @@ Aplicación de escritorio para gestionar alquileres, propiedades, contratos, cob
 | Repositorio | Contenido |
 | --- | --- |
 | [Latch API](https://github.com/LitSoloSteven/latch-api) | Servidor Spring Boot. Genera `target/ROOT.war` para Apache Tomcat 11 y contiene las migraciones de PostgreSQL. |
-| [Latch Cliente](https://github.com/LitSoloSteven/latch-cliente) | Aplicación JavaFX. Se conecta a la API por HTTP y genera una imagen de escritorio para Windows con su runtime. |
-| [Latch Contrato](https://github.com/LitSoloSteven/latch-contrato) | Biblioteca Maven compartida por el servidor y el escritorio. |
 
-Este repositorio es el punto de entrada para consultar la documentación y pasar de la versión anterior a la nueva.
+Este repositorio contiene la aplicación JavaFX y sus DTO HTTP en un solo proyecto Maven. El escritorio se comunica con la API por HTTP. Cada proyecto compila con su propio código del contrato.
 
 ## Instalación y actualización
 
@@ -20,11 +18,12 @@ Para preparar los componentes desde el código fuente, usa JDK 21 y ejecuta los 
 
 | Carpeta | Comando | Resultado |
 | --- | --- | --- |
-| `latch-contrato` | `./mvnw.cmd -B clean install` | Instala la biblioteca en el repositorio Maven local. |
 | `latch-api` | `./mvnw.cmd -B clean verify` | Ejecuta las pruebas y genera `target/ROOT.war`. |
-| `latch-cliente` | `./mvnw.cmd -B clean verify javafx:jlink` | Verifica el escritorio y genera `target/app.zip`. |
+| Este repositorio | `./mvnw.cmd -B clean test javafx:jlink` | Prueba el escritorio y genera `target/app.zip`. |
 
 La instalación se ejecuta con PostgreSQL 18 y Tomcat 11 para la API. Despliega el WAR en un conector local `127.0.0.1`. Configura PostgreSQL en el servidor y define `LATCH_API_BASE_URL` en el escritorio con la dirección de la API, por ejemplo `http://127.0.0.1:8090`. El cliente empaquetado incluye su propia JVM.
+
+Para probar ambos procesos juntos, coloca `latch-api` junto a este repositorio, compila la API primero y ejecuta `./mvnw.cmd -B verify` aquí.
 
 ## Referencias
 

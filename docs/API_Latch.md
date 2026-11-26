@@ -1,6 +1,6 @@
 # API local de Latch
 
-Servicio HTTP REST en `latch-api` (Spring Boot WebMVC empaquetado como `ROOT.war` para Apache Tomcat 11). La interfaz JavaFX (`latch-cliente`) lo
+Servicio HTTP REST en `latch-api` (Spring Boot WebMVC empaquetado como `ROOT.war` para Apache Tomcat 11). La interfaz JavaFX del repositorio principal lo
 consume por separado con `java.net.http.HttpClient`. El servidor escucha **solo** en
 `127.0.0.1` y el cliente resuelve la URL mediante `LATCH_API_BASE_URL` (por defecto `http://127.0.0.1:8080`, o p. ej. `http://127.0.0.1:<LATCH_API_PORT>/latch-api` si se despliega en subcontexto).
 
@@ -381,7 +381,7 @@ admite hasta 255 caracteres; una solicitud más larga devuelve
 
 ## Uso desde JavaFX
 
-El cliente vive en el módulo independiente `latch-cliente` (`cliente/`, sin Spring, Hibernate, PostgreSQL, JasperReports ni BouncyCastle):
+El cliente HTTP está en el paquete `cliente` del repositorio principal. Los DTO HTTP se compilan junto al escritorio.
 
 | Clase | Uso |
 | --- | --- |

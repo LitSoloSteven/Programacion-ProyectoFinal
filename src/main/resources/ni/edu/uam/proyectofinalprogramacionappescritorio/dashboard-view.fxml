@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="ni.edu.uam.proyectofinalprogramacionappescritorio.controller.DashboardController"
+            prefHeight="820.0" prefWidth="1366.0" styleClass="dashboard-root">
+    <left>
+        <VBox fx:id="sidebar" prefWidth="224.0" styleClass="sidebar">
+            <VBox spacing="4.0" styleClass="sidebar-brand-block">
+                <Label styleClass="sidebar-brand" text="Latch" />
+                <Label styleClass="sidebar-subtitle" text="Administración" />
+            </VBox>
+            <Separator styleClass="sidebar-separator" />
+            <VBox fx:id="navContainer" spacing="6.0" VBox.vgrow="ALWAYS">
+                <Button fx:id="btnNavDashboard" maxWidth="Infinity" onAction="#navegarDashboard"
+                        styleClass="nav-item, nav-item-active" text="Panel principal" />
+                <Button fx:id="btnNavPropiedades" maxWidth="Infinity" onAction="#navegarPropiedades"
+                        styleClass="nav-item" text="Propiedades" />
+                <Button fx:id="btnNavUnidades" maxWidth="Infinity" onAction="#navegarUnidades"
+                        styleClass="nav-item" text="Unidades" />
+                <Button fx:id="btnNavInquilinos" maxWidth="Infinity" onAction="#navegarInquilinos"
+                        styleClass="nav-item" text="Inquilinos" />
+                <Button fx:id="btnNavContratos" maxWidth="Infinity" onAction="#navegarContratos"
+                        styleClass="nav-item" text="Contratos" />
+                <Button fx:id="btnNavCargos" maxWidth="Infinity" onAction="#navegarCargos"
+                        styleClass="nav-item" text="Cargos" />
+                <Button fx:id="btnNavPagos" maxWidth="Infinity" onAction="#navegarPagos"
+                        styleClass="nav-item" text="Pagos" />
+                <Button fx:id="btnNavMantenimiento" maxWidth="Infinity" onAction="#navegarMantenimiento"
+                        styleClass="nav-item" text="Mantenimiento" />
+                <Button fx:id="btnNavTasas" maxWidth="Infinity" onAction="#navegarTasas"
+                        styleClass="nav-item" text="Tasas de cambio" />
+                <Button fx:id="btnNavReportes" maxWidth="Infinity" onAction="#navegarReportes"
+                        styleClass="nav-item" text="Reportes" />
+                <Button fx:id="btnNavAdmin" maxWidth="Infinity" onAction="#navegarAdministracion"
+                        styleClass="nav-item" text="Administración" />
+            </VBox>
+            <Separator styleClass="sidebar-separator" />
+            <VBox fx:id="userProfile" spacing="4.0" styleClass="user-profile-box">
+                <Label fx:id="lblUsuarioNombre" styleClass="user-name" text="Usuario" />
+                <Label fx:id="lblUsuarioRol" styleClass="role-badge" text="Rol" />
+            </VBox>
+            <Button fx:id="btnCerrarSesion" maxWidth="Infinity" onAction="#handleCerrarSesion"
+                    styleClass="btn-logout" text="Cerrar sesión" />
+        </VBox>
+    </left>
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="14.0" styleClass="topbar">
+            <padding><Insets bottom="8.0" left="24.0" right="24.0" top="8.0" /></padding>
+            <Label fx:id="lblContexto" styleClass="section-title" text="Panel principal" HBox.hgrow="ALWAYS" />
+            <Label fx:id="lblActualizado" styleClass="secondary-text" text="" />
+            <CheckBox fx:id="chkReducirMovimiento" onAction="#handleReducirMovimiento" text="Sin efectos" />
+            <Button fx:id="btnTema" onAction="#handleCambiarTema" styleClass="button-secondary" text="Tema oscuro" />
+            <Button fx:id="btnCambiarPassword" onAction="#handleCambiarPassword" styleClass="button-secondary" text="Cambiar clave" />
+        </HBox>
+    </top>
+    <center>
+        <StackPane fx:id="contentArea" styleClass="content-area">
+            <Region fx:id="auroraFondo" focusTraversable="false" maxHeight="420.0" maxWidth="420.0"
+                    mouseTransparent="true" styleClass="aurora-layer" StackPane.alignment="TOP_RIGHT" />
+            <ScrollPane fx:id="homeView" fitToWidth="true" hbarPolicy="NEVER" styleClass="content-area">
+                <VBox spacing="20.0" styleClass="dashboard-home">
+                    <padding><Insets bottom="28.0" left="24.0" right="24.0" top="24.0" /></padding>
+                    <HBox alignment="CENTER_LEFT" spacing="16.0" styleClass="page-header">
+                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                            <Label styleClass="page-title" text="Resumen de Latch" />
+                            <Label fx:id="lblCorteGeneracion" styleClass="page-subtitle"
+                                   text="Indicadores al corte actual." />
+                        </VBox>
+                        <Label styleClass="field-label" text="Período:" />
+                        <ComboBox fx:id="cmbPeriodoDashboard" accessibleText="Filtrar indicadores financieros por período"
+                                  onAction="#handleCambiarPeriodo" prefWidth="170.0" />
+                    </HBox>
+                    <Label fx:id="lblErrorDashboard" managed="false" minHeight="18.0" styleClass="field-error"
+                           text="" visible="false" wrapText="true" />
+                    <GridPane hgap="16.0" vgap="16.0">
+                        <columnConstraints>
+                            <ColumnConstraints percentWidth="33.333" hgrow="ALWAYS" />
+                            <ColumnConstraints percentWidth="33.333" hgrow="ALWAYS" />
+                            <ColumnConstraints percentWidth="33.334" hgrow="ALWAYS" />
+                        </columnConstraints>
+
+                        <VBox fx:id="cardOcupacion" accessibleText="Ocupación actual. Pulsa Enter para abrir Unidades"
+                              focusTraversable="true" onMouseClicked="#abrirDetalleUnidades"
+                              spacing="8.0" styleClass="kpi-card, kpi-neutral, kpi-card-action"
+                              GridPane.columnIndex="0" GridPane.rowIndex="0">
+                            <Label fx:id="lblTituloKpiOcupacion" styleClass="kpi-title" text="Ocupación actual" />
+                            <Label fx:id="lblPorcentajeOcupacion" styleClass="kpi-value, numeric" text="—" />
+                            <Label fx:id="lblTotalUnidades" styleClass="kpi-desc" text="Unidades en el inventario" wrapText="true" />
+                            <Label styleClass="kpi-action-hint" text="Abrir unidades →" />
+                        </VBox>
+
+                        <VBox fx:id="cardPropiedades" accessibleText="Propiedades activas. Pulsa Enter para abrir Propiedades"
+                              focusTraversable="true" onMouseClicked="#navegarPropiedades"
+                              spacing="8.0" styleClass="kpi-card, kpi-neutral, kpi-card-action"
+                              GridPane.columnIndex="1" GridPane.rowIndex="0">
+                            <Label fx:id="lblTituloKpiPropiedades" styleClass="kpi-title" text="Propiedades activas" />
+                            <Label fx:id="lblTotalPropiedades" styleClass="kpi-value, numeric" text="—" />
+                            <Label styleClass="kpi-desc" text="Inmuebles registrados" wrapText="true" />
+                            <Label styleClass="kpi-action-hint" text="Abrir propiedades →" />
+                        </VBox>
+
+                        <VBox fx:id="cardInquilinos" accessibleText="Inquilinos activos. Pulsa Enter para abrir Inquilinos"
+                              focusTraversable="true" onMouseClicked="#navegarInquilinos"
+                              spacing="8.0" styleClass="kpi-card, kpi-neutral, kpi-card-action"
+                              GridPane.columnIndex="2" GridPane.rowIndex="0">
+                            <Label fx:id="lblTituloKpiInquilinos" styleClass="kpi-title" text="Inquilinos activos" />
+                            <Label fx:id="lblTotalInquilinos" styleClass="kpi-value, numeric" text="—" />
+                            <Label styleClass="kpi-desc" text="Arrendatarios habilitados" wrapText="true" />
+                            <Label styleClass="kpi-action-hint" text="Abrir inquilinos →" />
+                        </VBox>
+
+                        <VBox fx:id="cardContratos" accessibleText="Contratos vigentes. Pulsa Enter para abrir Contratos vigentes"
+                              focusTraversable="true" onMouseClicked="#abrirDetalleContratosVigentes"
+                              spacing="8.0" styleClass="kpi-card, kpi-neutral, kpi-card-action"
+                              GridPane.columnIndex="0" GridPane.rowIndex="1">
+                            <Label fx:id="lblTituloKpiContratos" styleClass="kpi-title" text="Contratos vigentes" />
+                            <Label fx:id="lblTotalContratos" styleClass="kpi-value, numeric" text="—" />
+                            <Label fx:id="lblContratosVencidos" styleClass="kpi-desc" text="Contratos en curso" wrapText="true" />
+                            <Label styleClass="kpi-action-hint" text="Ver vigentes →" />
+                        </VBox>
+
+                        <VBox fx:id="cardPorVencer" accessibleText="Contratos por vencer. Pulsa Enter para abrir lista filtrada"
+                              focusTraversable="true" onMouseClicked="#abrirDetalleContratosPorVencer"
+                              spacing="8.0" styleClass="kpi-card, kpi-neutral, kpi-card-action"
+                              GridPane.columnIndex="1" GridPane.rowIndex="1">
+                            <Label fx:id="lblTituloKpiPorVencer" styleClass="kpi-title" text="Contratos por vencer" />
+                            <Label fx:id="lblContratosPorVencer" styleClass="kpi-value, numeric" text="—" />
+                            <Label styleClass="kpi-desc" text="Detectados dentro del umbral vigente" wrapText="true" />
+                            <Label styleClass="kpi-action-hint" text="Ver por vencer →" />
+                        </VBox>
+
+                        <VBox fx:id="cardTasa" accessibleText="Tasa de cambio disponible. Pulsa Enter para abrir Tasas"
+                              focusTraversable="true" onMouseClicked="#navegarTasas"
+                              spacing="8.0" styleClass="kpi-card, kpi-neutral, kpi-card-action"
+                              GridPane.columnIndex="2" GridPane.rowIndex="1">
+                            <Label fx:id="lblTituloKpiTasa" styleClass="kpi-title" text="Tasa USD / NIO" />
+                            <Label fx:id="lblTasaValor" styleClass="kpi-value, rate" text="Sin tasa disponible" />
+                            <Label fx:id="lblTasaDetalle" styleClass="kpi-desc" text="Sin tasa registrada" wrapText="true" />
+                            <Label styleClass="kpi-action-hint" text="Abrir tasas →" />
+                        </VBox>
+
+                        <VBox fx:id="cardCargos" accessibleText="Por cobrar por moneda. Pulsa Enter para abrir Cargos"
+                              focusTraversable="true" onMouseClicked="#abrirDetalleCargos"
+                              spacing="6.0" styleClass="kpi-card, kpi-neutral, kpi-financial, kpi-card-action"
+                              GridPane.columnIndex="0" GridPane.rowIndex="2">
+                            <Label fx:id="lblTituloKpiCargos" styleClass="kpi-title" text="Por cobrar (cargos)" />
+                            <Label fx:id="lblCargosPendientes" styleClass="kpi-value, numeric" text="—" />
+                            <VBox styleClass="kpi-currency-totals">
+                                <Label fx:id="lblCargosMontoUsd" maxWidth="Infinity" styleClass="kpi-desc, numeric" text="" />
+                                <Label fx:id="lblCargosMontoNio" maxWidth="Infinity" styleClass="kpi-desc, numeric" text="" />
+                            </VBox>
+                            <Label styleClass="kpi-action-hint" text="Ver cargos →" />
+                        </VBox>
+
+                        <VBox fx:id="cardMora" accessibleText="Mora exigible separada del principal. Pulsa Enter para abrir cargos de mora"
+                              focusTraversable="true" onMouseClicked="#abrirDetalleMora"
+                              spacing="6.0" styleClass="kpi-card, kpi-neutral, kpi-financial, kpi-card-action"
+                              GridPane.columnIndex="1" GridPane.rowIndex="2">
+                            <Label fx:id="lblTituloKpiMora" styleClass="kpi-title" text="Mora exigible" />
+                            <Label fx:id="lblMoraCantidad" styleClass="kpi-value, numeric" text="—" />
+                            <VBox styleClass="kpi-currency-totals">
+                                <Label fx:id="lblMoraMontoUsd" maxWidth="Infinity" styleClass="kpi-desc, numeric" text="" />
+                                <Label fx:id="lblMoraMontoNio" maxWidth="Infinity" styleClass="kpi-desc, numeric" text="" />
+                            </VBox>
+                            <Label styleClass="kpi-action-hint" text="Ver mora →" />
+                        </VBox>
+
+                        <VBox fx:id="cardPagos" accessibleText="Cobrado por moneda. Pulsa Enter para abrir Pagos"
+                              focusTraversable="true" onMouseClicked="#abrirDetallePagos"
+                              spacing="6.0" styleClass="kpi-card, kpi-neutral, kpi-financial, kpi-card-action"
+                              GridPane.columnIndex="2" GridPane.rowIndex="2">
+                            <Label fx:id="lblTituloKpiPagos" styleClass="kpi-title" text="Cobrado (pagos)" />
+                            <Label fx:id="lblPagosRegistrados" styleClass="kpi-value, numeric" text="—" />
+                            <VBox styleClass="kpi-currency-totals">
+                                <Label fx:id="lblPagosMontoUsd" maxWidth="Infinity" styleClass="kpi-desc, numeric" text="" />
+                                <Label fx:id="lblPagosMontoNio" maxWidth="Infinity" styleClass="kpi-desc, numeric" text="" />
+                            </VBox>
+                            <Label styleClass="kpi-action-hint" text="Ver pagos →" />
+                        </VBox>
+                    </GridPane>
+                    <VBox spacing="8.0" styleClass="welcome-banner">
+                        <Label styleClass="welcome-title" text="Administración de alquileres" />
+                        <Label styleClass="welcome-text"
+                               text="Usa la navegación o activa cualquier indicador con clic o Enter para abrir la lista filtrada."
+                               wrapText="true" />
+                    </VBox>
+                </VBox>
+            </ScrollPane>
+        </StackPane>
+    </center>
+</BorderPane>

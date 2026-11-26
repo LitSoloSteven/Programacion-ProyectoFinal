@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.VBox?>
+
+<ScrollPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            fitToWidth="true" hbarPolicy="NEVER"
+            fx:controller="ni.edu.uam.proyectofinalprogramacionappescritorio.controller.InquilinoFormController">
+    <content>
+        <VBox spacing="14.0" styleClass="form-dialog-content">
+            <padding><Insets bottom="20.0" left="20.0" right="20.0" top="16.0" /></padding>
+            <Label fx:id="lblResumenError" managed="false" styleClass="field-error" text="" visible="false" wrapText="true" />
+            <Label styleClass="field-help" text="Los campos con * son obligatorios." wrapText="true" />
+            <GridPane hgap="16.0" vgap="8.0">
+                <columnConstraints><ColumnConstraints percentWidth="55.0" /><ColumnConstraints percentWidth="45.0" /></columnConstraints>
+                <VBox spacing="6.0" GridPane.columnIndex="0">
+                    <Label styleClass="field-label" text="Nombre completo *" />
+                    <TextField fx:id="txtNombre" promptText="Nombre y apellidos (hasta 160 car.)" styleClass="field" />
+                    <Label fx:id="lblErrorNombre" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
+                </VBox>
+                <VBox spacing="6.0" GridPane.columnIndex="1">
+                    <Label styleClass="field-label" text="Identificación" />
+                    <TextField fx:id="txtIdentificacion" promptText="Ej. 001-010190-0001A (opcional)" styleClass="field" />
+                    <Label fx:id="lblErrorIdentificacion" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
+                    <Label fx:id="lblAvisoIdentificacion" managed="false" styleClass="field-help" text="" visible="false" wrapText="true" />
+                </VBox>
+                <VBox spacing="6.0" GridPane.columnIndex="0" GridPane.rowIndex="1">
+                    <Label styleClass="field-label" text="Teléfono" />
+                    <TextField fx:id="txtTelefono" promptText="Ej. +505 8888-1234 (opcional)" styleClass="field" />
+                    <Label fx:id="lblErrorTelefono" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
+                </VBox>
+                <VBox spacing="6.0" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                    <Label styleClass="field-label" text="Correo" />
+                    <TextField fx:id="txtCorreo" promptText="Ej. correo@ejemplo.com (opcional)" styleClass="field" />
+                    <Label fx:id="lblErrorCorreo" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
+                </VBox>
+                <VBox spacing="6.0" GridPane.columnIndex="0" GridPane.rowIndex="2">
+                    <Label styleClass="field-label" text="Contacto de emergencia — Nombre (opcional)" />
+                    <TextField fx:id="txtEmergenciaNombre" promptText="Nombre completo del contacto" styleClass="field" />
+                </VBox>
+                <VBox spacing="6.0" GridPane.columnIndex="1" GridPane.rowIndex="2">
+                    <Label styleClass="field-label" text="Contacto de emergencia — Teléfono (opcional)" />
+                    <TextField fx:id="txtEmergenciaTelefono" promptText="+505 8888-0000" styleClass="field" />
+                </VBox>
+                <VBox spacing="4.0" GridPane.columnIndex="0" GridPane.rowIndex="3" GridPane.columnSpan="2">
+                    <Label fx:id="lblErrorEmergencia" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
+                    <Label styleClass="secondary-text" text="El contacto de emergencia y los adjuntos son opcionales y se conservan únicamente para atención de emergencias o respaldo contractual." wrapText="true" />
+                </VBox>
+            </GridPane>
+            <CheckBox fx:id="chkActivo" text="Inquilino activo" />
+        </VBox>
+    </content>
+</ScrollPane>

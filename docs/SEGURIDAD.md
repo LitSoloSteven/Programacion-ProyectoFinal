@@ -74,8 +74,8 @@ en errores o logs, duplicación de cobros y manipulación de importes.
 
 ### Procesos independientes y despliegue WAR
 
-- **Dos procesos JVM independientes**: `latch-api` (`ROOT.war` para Apache Tomcat 11) y `latch-cliente` (JavaFX 21), vinculados únicamente por HTTP sobre `127.0.0.1` y los DTOs puros de `latch-contrato`.
-- `latch-cliente` carece por diseño de Spring, Hibernate, PostgreSQL, JasperReports y BouncyCastle en su classpath y en su `module-info.java`; tampoco conoce credenciales ni URL JDBC.
+- `latch-api` (`ROOT.war` para Apache Tomcat 11) y la aplicación JavaFX del repositorio principal ejecutan JVM independientes. Se comunican por HTTP sobre `127.0.0.1`. Cada proyecto compila sus DTO del contrato.
+- El escritorio usa su cliente HTTP y la URL base de la API. PostgreSQL y sus credenciales se configuran en el servidor.
 - `latch-api` excluye JavaFX y las dependencias de Tomcat embebido (`spring-boot-starter-tomcat` `provided`), delegando el puerto al conector Apache Tomcat 11 configurado exclusivamente en `127.0.0.1`.
 - `FiltroApi` normaliza `request.getContextPath()` antes de validar `/api/v1/...`, conservando intactas la validación de `Host` (`127.0.0.1:<puerto>`), la autenticación previa a `404`/`405`, la ausencia de CORS y el plazo de recepción de 30 s tanto en raíz (`""`) como en subcontexto (`/latch-api`).
 

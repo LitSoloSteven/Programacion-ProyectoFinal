@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.VBox?>
+
+<ScrollPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            fitToWidth="true" hbarPolicy="NEVER"
+            fx:controller="ni.edu.uam.proyectofinalprogramacionappescritorio.controller.PropiedadFormController">
+    <content>
+        <VBox spacing="16.0" styleClass="form-dialog-content">
+            <padding><Insets bottom="20.0" left="20.0" right="20.0" top="16.0" /></padding>
+            <Label fx:id="lblResumenError" managed="false" styleClass="field-error" text="" visible="false" wrapText="true" />
+            <Label styleClass="field-help" text="Los campos con * son obligatorios." wrapText="true" />
+            <Label styleClass="section-title" text="Inmueble" />
+            <GridPane hgap="16.0" vgap="8.0">
+                <columnConstraints><ColumnConstraints percentWidth="50.0" /><ColumnConstraints percentWidth="50.0" /></columnConstraints>
+                <VBox spacing="6.0" GridPane.columnIndex="0">
+                    <Label styleClass="field-label" text="Nombre del inmueble *" />
+                    <TextField fx:id="txtNombre" promptText="Ej. Residencial Las Flores (hasta 120 car.)" styleClass="field" />
+                    <Label fx:id="lblErrorNombre" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
+                </VBox>
+                <VBox spacing="6.0" GridPane.columnIndex="1">
+                    <Label styleClass="field-label" text="Estado" />
+                    <CheckBox fx:id="chkActiva" text="Activa" />
+                </VBox>
+                <VBox spacing="6.0" GridPane.columnIndex="0" GridPane.rowIndex="1" GridPane.columnSpan="2">
+                    <Label styleClass="field-label" text="Dirección completa *" />
+                    <TextField fx:id="txtDireccion" promptText="Dirección exacta de la propiedad (hasta 300 car.)" styleClass="field" />
+                    <Label fx:id="lblErrorDireccion" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
+                </VBox>
+            </GridPane>
+            <Label styleClass="section-title" text="Propietario" />
+            <GridPane hgap="16.0" vgap="8.0">
+                <columnConstraints><ColumnConstraints percentWidth="50.0" /><ColumnConstraints percentWidth="50.0" /></columnConstraints>
+                <VBox spacing="6.0" GridPane.columnIndex="0">
+                    <Label styleClass="field-label" text="Nombre *" />
+                    <TextField fx:id="txtNombrePropietario" promptText="Nombre completo (hasta 100 car.)" styleClass="field" />
+                    <Label fx:id="lblErrorPropietario" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
+                </VBox>
+                <VBox spacing="6.0" GridPane.columnIndex="1">
+                    <Label styleClass="field-label" text="Correo *" />
+                    <TextField fx:id="txtCorreoPropietario" promptText="Ej. propietario@correo.com" styleClass="field" />
+                    <Label fx:id="lblErrorCorreo" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
+                </VBox>
+                <VBox spacing="6.0" GridPane.columnIndex="0" GridPane.rowIndex="1">
+                    <Label styleClass="field-label" text="Teléfono" />
+                    <TextField fx:id="txtTelefonoPropietario" promptText="Ej. +505 8888-1234 (opcional)" styleClass="field" />
+                    <Label fx:id="lblErrorTelefono" managed="false" minHeight="18.0" styleClass="field-error" text="" visible="false" wrapText="true" />
+                </VBox>
+            </GridPane>
+        </VBox>
+    </content>
+</ScrollPane>

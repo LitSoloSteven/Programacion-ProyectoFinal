@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:id="rootView" fx:controller="ni.edu.uam.proyectofinalprogramacionappescritorio.controller.ContratoController"
+      spacing="14.0" styleClass="view-container">
+    <HBox alignment="CENTER_LEFT" spacing="16.0" styleClass="page-header">
+        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+            <Label fx:id="lblTitulo" styleClass="page-title" text="Contratos" />
+            <Label styleClass="page-subtitle" text="Vigencias, cánones, renovaciones y garantías de arrendamiento." />
+        </VBox>
+        <Button fx:id="btnNuevo" onAction="#handleNuevo" styleClass="button-primary" text="Nuevo contrato" />
+    </HBox>
+    <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
+        <TextField fx:id="txtBuscar" prefWidth="240.0" promptText="Buscar por inquilino, unidad o estado" styleClass="search-field" />
+        <ComboBox fx:id="cmbFiltroUnidad" prefWidth="190.0" promptText="Unidad" styleClass="field" />
+        <ComboBox fx:id="cmbFiltroInquilino" prefWidth="180.0" promptText="Inquilino" styleClass="field" />
+        <ComboBox fx:id="cmbFiltroEstado" prefWidth="135.0" promptText="Estado" styleClass="field" />
+        <Button fx:id="btnLimpiar" onAction="#limpiarFiltros" styleClass="button-secondary" text="Limpiar" />
+        <Label fx:id="lblContador" styleClass="secondary-text" text="0 registros" HBox.hgrow="ALWAYS" />
+    </HBox>
+    <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="filter-bar">
+        <Button fx:id="btnActivar" disable="true" onAction="#handleActivarContrato"
+                styleClass="button-primary" text="Activar" />
+        <Button fx:id="btnCancelarBorrador" disable="true" onAction="#handleCancelarBorrador"
+                styleClass="button-secondary" text="Cancelar borrador" />
+        <Button fx:id="btnRenovar" disable="true" onAction="#handleRenovarContrato"
+                styleClass="button-secondary" text="Renovar" />
+        <Button fx:id="btnTerminar" disable="true" onAction="#handleTerminarContrato"
+                styleClass="button-secondary" text="Finalizar" />
+        <HBox fx:id="garantiaTooltipHost">
+            <Button fx:id="btnAjustarGarantia" disable="true" onAction="#handleAjustarGarantia"
+                    styleClass="button-secondary" text="Garantía" />
+        </HBox>
+        <HBox fx:id="eliminarTooltipHost">
+            <Button fx:id="btnEliminar" disable="true" onAction="#handleEliminar"
+                    styleClass="button-destructive" text="Eliminar contrato" />
+        </HBox>
+    </HBox>
+    <Label fx:id="lblErrorConsulta" managed="false" minHeight="18.0" styleClass="field-error"
+           text="" visible="false" wrapText="true" />
+    <TableView fx:id="tblContratos" styleClass="data-table" VBox.vgrow="ALWAYS">
+        <placeholder><Label text="Aún no hay contratos registrados." /></placeholder>
+        <columns>
+            <TableColumn fx:id="colInquilino" minWidth="150.0" prefWidth="200.0" text="Inquilino" />
+            <TableColumn fx:id="colUnidad" minWidth="135.0" prefWidth="175.0" text="Unidad" />
+            <TableColumn fx:id="colInicio" minWidth="85.0" prefWidth="105.0" text="Inicio" />
+            <TableColumn fx:id="colFin" minWidth="85.0" prefWidth="105.0" text="Fin" />
+            <TableColumn fx:id="colCanon" minWidth="110.0" prefWidth="130.0" text="Canon" />
+            <TableColumn fx:id="colDiaPago" minWidth="65.0" prefWidth="80.0" text="Día pago" />
+            <TableColumn fx:id="colDeposito" minWidth="100.0" prefWidth="120.0" text="Depósito" />
+            <TableColumn fx:id="colSaldoGarantia" minWidth="110.0" prefWidth="135.0" text="Saldo garantía" />
+            <TableColumn fx:id="colEstado" minWidth="90.0" prefWidth="110.0" text="Estado" />
+            <TableColumn fx:id="colAcciones" minWidth="48.0" prefWidth="48.0" maxWidth="48.0" text="" />
+        </columns>
+    </TableView>
+</VBox>
