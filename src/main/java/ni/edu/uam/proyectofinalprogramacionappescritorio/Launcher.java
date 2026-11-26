@@ -1,9 +1,0 @@
-package ni.edu.uam.proyectofinalprogramacionappescritorio;
-
-import javafx.application.Application;
-
-public class Launcher {
-    public static void main(String[] args) {
-        Application.launch(LatchApplication.class, args);
-    }
-}
